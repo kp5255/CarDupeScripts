@@ -1,53 +1,52 @@
-local player = game.Players.LocalPlayer
-local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ServerStorage = game:GetService("ServerStorage")
 
-local dupeEvent = ReplicatedStorage:WaitForChild("RemoteEvents"):WaitForChild("RequestDupeCar")
-
-local currentCarModel = nil
-local lastDupedTime = 0
-
--- Detect car player is sitting in
-local function updateCurrentCar()
-    local character = player.Character
-    if not character then return end
-    local humanoid = character:FindFirstChildOfClass("Humanoid")
-    if not humanoid then return end
-
-    local sitting = false
-    for _, seat in ipairs(workspace:GetDescendants()) do
-        if seat:IsA("VehicleSeat") and seat.Occupant == humanoid then
-            local model = seat:FindFirstAncestorOfClass("Model")
-            if model then
-                if model ~= currentCarModel then
-                    print("[Local] Sitting in car:", model.Name)
-                end
-                currentCarModel = model
-                sitting = true
-                break
-            end
-        end
-    end
-
-    if not sitting and tick() - lastDupedTime > 0.5 then
-        currentCarModel = nil
-    end
+local remoteFolder = ReplicatedStorage:FindFirstChild("RemoteEvents")
+if not remoteFolder then
+    remoteFolder = Instance.new("Folder")
+    remoteFolder.Name = "RemoteEvents"
+    remoteFolder.Parent = ReplicatedStorage
 end
 
--- Update current car periodically
-game:GetService("RunService").RenderStepped:Connect(updateCurrentCar)
+local dupeEvent = remoteFolder:FindFirstChild("RequestDupeCar")
+if not dupeEvent then
+    dupeEvent = Instance.new("RemoteEvent")
+    dupeEvent.Name = "RequestDupeCar"
+    dupeEvent.Parent = remoteFolder
+end
 
--- Press R to duplicate car into inventory
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if input.KeyCode == Enum.KeyCode.R then
-        if currentCarModel then
-            dupeEvent:FireServer(currentCarModel)
-            lastDupedTime = tick()
-            print("[Local] Requested duplication of", currentCarModel.Name)
-        else
-            print("[Local] Not sitting in any car!")
-        end
+local inventoryFolder = ServerStorage:FindFirstChild("PlayerInventory")
+if not inventoryFolder then
+    inventoryFolder = Instance.new("Folder")
+    inventoryFolder.Name = "PlayerInventory"
+    inventoryFolder.Parent = ServerStorage
+end
+
+dupeEvent.OnServerEvent:Connect(function(player, carName)
+    if type(carName) ~= "string" then
+        warn("[Server] Invalid car name from", player.Name)
+        return
     end
-end)
 
+    -- Find the car model in workspace
+    local carModel = workspace:FindFirstChild(carName)
+    if not carModel then
+        warn("[Server] Could not find car model:", carName)
+        return
+    end
+
+    -- Ensure player inventory folder exists
+    local playerFolder = inventoryFolder:FindFirstChild(player.Name)
+    if not playerFolder then
+        playerFolder = Instance.new("Folder")
+        playerFolder.Name = player.Name
+        playerFolder.Parent = inventoryFolder
+    end
+
+    -- Clone car into inventory
+    local carClone = carModel:Clone()
+    carClone.Name = carModel.Name .. "_Inventory"
+    carClone.Parent = playerFolder
+
+    print("[Server] Car duplicated for", player.Name, "in inventory")
+end)
