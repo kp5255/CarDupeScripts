@@ -1,109 +1,53 @@
--- ServerCarDupe.lua
+local player = game.Players.LocalPlayer
+local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local ServerStorage = game:GetService("ServerStorage")
-local Workspace = game:GetService("Workspace")
 
--- Setup RemoteEvent & folders automatically
-local function setup()
-    local remoteFolder = ReplicatedStorage:FindFirstChild("RemoteEvents")
-    if not remoteFolder then
-        remoteFolder = Instance.new("Folder")
-        remoteFolder.Name = "RemoteEvents"
-        remoteFolder.Parent = ReplicatedStorage
-        print("[Setup] Created RemoteEvents folder")
-    end
+local dupeEvent = ReplicatedStorage:WaitForChild("RemoteEvents"):WaitForChild("RequestDupeCar")
 
-    local dupeEvent = remoteFolder:FindFirstChild("RequestDupeCar")
-    if not dupeEvent then
-        dupeEvent = Instance.new("RemoteEvent")
-        dupeEvent.Name = "RequestDupeCar"
-        dupeEvent.Parent = remoteFolder
-        print("[Setup] Created RequestDupeCar RemoteEvent")
-    end
+local currentCarModel = nil
+local lastDupedTime = 0
 
-    local invFolder = ServerStorage:FindFirstChild("PlayerInventory")
-    if not invFolder then
-        invFolder = Instance.new("Folder")
-        invFolder.Name = "PlayerInventory"
-        invFolder.Parent = ServerStorage
-        print("[Setup] Created PlayerInventory folder in ServerStorage")
-    end
+-- Detect car player is sitting in
+local function updateCurrentCar()
+    local character = player.Character
+    if not character then return end
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return end
 
-    local publicCarsFolder = Workspace:FindFirstChild("PublicCars")
-    if not publicCarsFolder then
-        publicCarsFolder = Instance.new("Folder")
-        publicCarsFolder.Name = "PublicCars"
-        publicCarsFolder.Parent = Workspace
-        print("[Setup] Created PublicCars folder in Workspace")
-    end
-
-    return dupeEvent, invFolder, publicCarsFolder
-end
-
-local dupeEvent, playerInventoryFolder, publicCarsFolder = setup()
-
--- Scan for car templates
-local function scanForCars()
-    local cars = {}
-    local function scan(folder)
-        for _, obj in ipairs(folder:GetDescendants()) do
-            if obj:IsA("Model") then
-                local lname = obj.Name:lower()
-                if lname:find("car") or lname:find("vehicle") then
-                    cars[obj.Name] = obj
+    local sitting = false
+    for _, seat in ipairs(workspace:GetDescendants()) do
+        if seat:IsA("VehicleSeat") and seat.Occupant == humanoid then
+            local model = seat:FindFirstAncestorOfClass("Model")
+            if model then
+                if model ~= currentCarModel then
+                    print("[Local] Sitting in car:", model.Name)
                 end
+                currentCarModel = model
+                sitting = true
+                break
             end
         end
     end
-    scan(ReplicatedStorage)
-    scan(ServerStorage)
-    return cars
+
+    if not sitting and tick() - lastDupedTime > 0.5 then
+        currentCarModel = nil
+    end
 end
 
--- Get or create player's inventory folder
-local function getPlayerInventory(player)
-    local folder = playerInventoryFolder:FindFirstChild(player.Name)
-    if not folder then
-        folder = Instance.new("Folder")
-        folder.Name = player.Name
-        folder.Parent = playerInventoryFolder
-    end
-    return folder
-end
+-- Update current car periodically
+game:GetService("RunService").RenderStepped:Connect(updateCurrentCar)
 
--- When a player requests duplication
-dupeEvent.OnServerEvent:Connect(function(player, carName)
-    local carTemplates = scanForCars()
-    local template = carTemplates[carName]
-
-    if not template then
-        warn("[Dupe] Car template not found:", carName)
-        return
-    end
-
-    local playerInv = getPlayerInventory(player)
-
-    -- Clone car to inventory
-    local carClone = template:Clone()
-    carClone.Name = template.Name .. "_Dupe_" .. player.Name
-    carClone.Parent = playerInv
-
-    -- Also clone another copy into the public world folder
-    local publicClone = template:Clone()
-    publicClone.Name = template.Name .. "_PublicDupe_" .. player.Name
-    publicClone.Parent = publicCarsFolder
-
-    -- Position the public clone
-    local basePosition = Vector3.new(0, 5, 0)
-    local offset = Vector3.new((player.UserId % 10) * 30, 0, math.floor(player.UserId / 10) * 30)
-    if publicClone.PrimaryPart then
-        publicClone:SetPrimaryPartCFrame(CFrame.new(basePosition + offset))
-    else
-        publicClone.PrimaryPart = publicClone:FindFirstChildWhichIsA("BasePart")
-        if publicClone.PrimaryPart then
-            publicClone:SetPrimaryPartCFrame(CFrame.new(basePosition + offset))
+-- Press R to duplicate car into inventory
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.R then
+        if currentCarModel then
+            dupeEvent:FireServer(currentCarModel)
+            lastDupedTime = tick()
+            print("[Local] Requested duplication of", currentCarModel.Name)
+        else
+            print("[Local] Not sitting in any car!")
         end
     end
-
-    print("[Dupe] Player", player.Name, "duplicated", carClone.Name, "and spawned public car", publicClone.Name)
 end)
+
