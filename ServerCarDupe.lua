@@ -1,6 +1,10 @@
+-- ServerCarDupe.lua
+-- Put this in ServerScriptService
+
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
 
+-- Create RemoteEvents folder automatically
 local remoteFolder = ReplicatedStorage:FindFirstChild("RemoteEvents")
 if not remoteFolder then
     remoteFolder = Instance.new("Folder")
@@ -8,6 +12,7 @@ if not remoteFolder then
     remoteFolder.Parent = ReplicatedStorage
 end
 
+-- Create duplication RemoteEvent automatically
 local dupeEvent = remoteFolder:FindFirstChild("RequestDupeCar")
 if not dupeEvent then
     dupeEvent = Instance.new("RemoteEvent")
@@ -15,6 +20,7 @@ if not dupeEvent then
     dupeEvent.Parent = remoteFolder
 end
 
+-- Create inventory folder automatically
 local inventoryFolder = ServerStorage:FindFirstChild("PlayerInventory")
 if not inventoryFolder then
     inventoryFolder = Instance.new("Folder")
@@ -22,13 +28,14 @@ if not inventoryFolder then
     inventoryFolder.Parent = ServerStorage
 end
 
+-- Handle duplication requests
 dupeEvent.OnServerEvent:Connect(function(player, carName)
     if type(carName) ~= "string" then
         warn("[Server] Invalid car name from", player.Name)
         return
     end
 
-    -- Find the car model in workspace
+    -- Find car model in workspace
     local carModel = workspace:FindFirstChild(carName)
     if not carModel then
         warn("[Server] Could not find car model:", carName)
