@@ -4,44 +4,33 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local dupeEvent = ReplicatedStorage:WaitForChild("RemoteEvents"):WaitForChild("RequestDupeCar")
 
-local currentCarName = nil
-local lastDupedTime = 0
-
-local function updateCurrentCar()
+-- Function to get the car the player is currently sitting in
+local function getCurrentCar()
     local character = player.Character
-    if not character then return end
+    if not character then return nil end
     local humanoid = character:FindFirstChildOfClass("Humanoid")
-    if not humanoid then return end
+    if not humanoid then return nil end
 
-    local sitting = false
     for _, seat in ipairs(workspace:GetDescendants()) do
         if seat:IsA("VehicleSeat") and seat.Occupant == humanoid then
             local model = seat:FindFirstAncestorOfClass("Model")
             if model then
-                if model.Name ~= currentCarName then
-                    print("[Local] Sitting in car:", model.Name)
-                end
-                currentCarName = model.Name
-                sitting = true
-                break
+                return model
             end
         end
     end
 
-    if not sitting and tick() - lastDupedTime > 0.5 then
-        currentCarName = nil
-    end
+    return nil
 end
 
-game:GetService("RunService").RenderStepped:Connect(updateCurrentCar)
-
+-- Press R to duplicate car into inventory
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     if input.KeyCode == Enum.KeyCode.R then
-        if currentCarName then
-            dupeEvent:FireServer(currentCarName) -- send the name, not the instance
-            lastDupedTime = tick()
-            print("[Local] Requested duplication of", currentCarName)
+        local carModel = getCurrentCar() -- check the seat now
+        if carModel then
+            dupeEvent:FireServer(carModel.Name)
+            print("[Local] Requested duplication of", carModel.Name)
         else
             print("[Local] Not sitting in any car!")
         end
