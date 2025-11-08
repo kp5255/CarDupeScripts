@@ -1,10 +1,14 @@
+-- LocalCarDupe.lua
+-- Put this in StarterPlayerScripts
+
 local player = game.Players.LocalPlayer
 local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+-- Wait for RemoteEvent
 local dupeEvent = ReplicatedStorage:WaitForChild("RemoteEvents"):WaitForChild("RequestDupeCar")
 
--- Function to get the car the player is currently sitting in
+-- Function to detect the car you are sitting in
 local function getCurrentCar()
     local character = player.Character
     if not character then return nil end
@@ -27,7 +31,7 @@ end
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     if input.KeyCode == Enum.KeyCode.R then
-        local carModel = getCurrentCar() -- check the seat now
+        local carModel = getCurrentCar()
         if carModel then
             dupeEvent:FireServer(carModel.Name)
             print("[Local] Requested duplication of", carModel.Name)
