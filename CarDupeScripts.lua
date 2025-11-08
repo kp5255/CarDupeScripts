@@ -1,4 +1,4 @@
--- LocalCarDupe.lua
+-- LocalCarDupe.lua (fixed car detection)
 local player = game.Players.LocalPlayer
 local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -7,24 +7,14 @@ local dupeEvent = ReplicatedStorage:WaitForChild("RemoteEvents"):WaitForChild("R
 
 local currentCarModel = nil
 
--- Detect the car player is sitting in
-player.CharacterAdded:Connect(function(character)
+-- Function to detect the car player is sitting in
+local function updateCurrentCar()
     currentCarModel = nil
-    character.ChildAdded:Connect(function(child)
-        if child:IsA("VehicleSeat") and child.Occupant == character:FindFirstChildOfClass("Humanoid") then
-            local model = child:FindFirstAncestorOfClass("Model")
-            if model then
-                currentCarModel = model
-                print("[Local] Sitting in car:", model.Name)
-            end
-        end
-    end)
-end)
-
-local function checkSitting()
     local character = player.Character
     if not character then return end
-    for _, seat in ipairs(character:GetDescendants()) do
+
+    -- Check all VehicleSeats in the workspace
+    for _, seat in ipairs(workspace:GetDescendants()) do
         if seat:IsA("VehicleSeat") and seat.Occupant == character:FindFirstChildOfClass("Humanoid") then
             local model = seat:FindFirstAncestorOfClass("Model")
             if model then
@@ -36,8 +26,14 @@ local function checkSitting()
     end
 end
 
-player.CharacterAdded:Connect(checkSitting)
-checkSitting()
+-- Update when character spawns
+player.CharacterAdded:Connect(function()
+    wait(1) -- small delay for character to load
+    updateCurrentCar()
+end)
+
+-- Also check periodically
+game:GetService("RunService").RenderStepped:Connect(updateCurrentCar)
 
 -- Press R to duplicate
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
