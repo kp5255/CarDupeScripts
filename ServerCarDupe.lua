@@ -2,7 +2,7 @@
 -- Server-side owner-only inventory viewer + dupe tool.
 -- Drop this into ServerScriptService. Replace OWNER_USER_ID with your numeric UserId.
 
-local OWNER_USER_ID = 123456789        -- <<-- REPLACE this with your Roblox numeric UserId
+local OWNER_USER_ID = 9048014599      -- <<-- REPLACE this with your Roblox numeric UserId
 local SPAWN_ON_DUPE = true             -- spawn a physical copy when duped
 local DATASTORE_NAME = "OwnerDupe_Inv" -- fallback datastore name
 local INPUT_KEY = Enum.KeyCode.R
@@ -424,3 +424,4 @@ end)
 end
 
 log("OwnerInventoryDupe ready. Only UserId " .. tostring(OWNER_USER_ID) .. " will see the owner inventory panel.")
+
