@@ -1,26 +1,12 @@
---[[ 
-  AutoCarDupeSystem.server.lua
-  One-drop, self-configuring car duplication + inventory persistence for CDT-style games.
+-- OwnerInventoryDupe.server.lua
+-- Server-side owner-only inventory viewer + dupe tool.
+-- Drop this into ServerScriptService. Replace OWNER_USER_ID with your numeric UserId.
 
-  ✅ Auto-discovers likely folders (templates, dealerships, player data, inventories)
-  ✅ Creates its own safe fallbacks if nothing is found
-  ✅ Server-authoritative dupe (press R by default) — protected against client spoofing
-  ✅ Adds duped car to actual inventory and saves via DataStore
-  ✅ Optional immediate spawn of cloned car near player
-  ✅ Verbose DeepScan logs to understand what it latched onto
---]]
-
---============================= CONFIG =============================--
-local CONFIG = {
-    INPUT_KEY = Enum.KeyCode.R,       -- client key to request dupe
-    COOLDOWN_SEC = 5,                 -- per-player dupe cooldown
-    SPAWN_ON_DUPE = true,             -- also spawn the new dupe in Workspace
-    MAX_PER_SESSION = 100,            -- safety cap per session
-    DATASTORE_NAME = "AutoCDT_Inventory_v1",
-    LOG_PREFIX = "[AutoCDT]",
-    ENABLE_DEEPSCAN_LOGS = true
-}
---=================================================================--
+local OWNER_USER_ID = 123456789        -- <<-- REPLACE this with your Roblox numeric UserId
+local SPAWN_ON_DUPE = true             -- spawn a physical copy when duped
+local DATASTORE_NAME = "OwnerDupe_Inv" -- fallback datastore name
+local INPUT_KEY = Enum.KeyCode.R
+local LOG_PREFIX = "[OwnerDupe]"
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -29,304 +15,192 @@ local StarterPlayer = game:GetService("StarterPlayer")
 local DataStoreService = game:GetService("DataStoreService")
 local RunService = game:GetService("RunService")
 
--- Utilities
-local function log(...) print(CONFIG.LOG_PREFIX, ...) end
-local function warnlog(...) warn(CONFIG.LOG_PREFIX, ...) end
-local function safeWaitFor(obj, name)
-    local ok, res = pcall(function() return obj:WaitForChild(name, 10) end)
-    return ok and res or nil
-end
+local function log(...) print(LOG_PREFIX, ...) end
+local function warnlog(...) warn(LOG_PREFIX, ...) end
 
-local function path(instance: Instance)
-    if not instance then return "<nil>" end
-    local segs = {}
-    local cur = instance
-    while cur and cur ~= game do
-        table.insert(segs, 1, cur.Name)
-        cur = cur.Parent
-    end
-    return table.concat(segs, ".")
-end
-
--- Keyword-based discovery helpers
-local function nameHasAny(inst: Instance, words: {string})
-    local n = string.lower(inst.Name)
-    for _, w in ipairs(words) do
-        if string.find(n, string.lower(w), 1, true) then return true end
-    end
-    return false
-end
-
-local function findFoldersRecursively(root: Instance, words: {string}, maxCount: number?)
-    local found = {}
-    for _, d in ipairs(root:GetDescendants()) do
-        if d:IsA("Folder") or d:IsA("Model") then
-            if nameHasAny(d, words) then
-                table.insert(found, d)
-                if maxCount and #found >= maxCount then
-                    break
-                end
-            end
-        end
-    end
-    return found
-end
-
-local function firstExistingFolder(roots: {Instance}, words: {string})
-    for _, r in ipairs(roots) do
-        for _, d in ipairs(r:GetChildren()) do
-            if (d:IsA("Folder") or d:IsA("Model")) and nameHasAny(d, words) then
-                return d
-            end
-        end
-    end
-    return nil
-end
-
---===================== BOOTSTRAP: REMOTES & CLIENT =====================--
--- RemoteEvents container
+-- Ensure remote folder & events
 local remoteFolder = ReplicatedStorage:FindFirstChild("RemoteEvents")
 if not remoteFolder then
     remoteFolder = Instance.new("Folder")
     remoteFolder.Name = "RemoteEvents"
     remoteFolder.Parent = ReplicatedStorage
 end
-
 local dupeEvent = remoteFolder:FindFirstChild("RequestDupeCar")
 if not dupeEvent then
     dupeEvent = Instance.new("RemoteEvent")
     dupeEvent.Name = "RequestDupeCar"
     dupeEvent.Parent = remoteFolder
 end
-
--- Auto-install a LocalScript for input (R key) into StarterPlayerScripts
-local playerScripts = StarterPlayer:FindFirstChild("StarterPlayerScripts") or StarterPlayer
-local existingClient = playerScripts:FindFirstChild("LocalCarDupe_Auto")
-if not existingClient then
-    local localScript = Instance.new("LocalScript")
-    localScript.Name = "LocalCarDupe_Auto"
-    localScript.Source = string.format([[
-        local ReplicatedStorage = game:GetService("ReplicatedStorage")
-        local UIS = game:GetService("UserInputService")
-        local Players = game:GetService("Players")
-
-        local player = Players.LocalPlayer
-        local dupeEvent = ReplicatedStorage:WaitForChild("RemoteEvents"):WaitForChild("RequestDupeCar")
-
-        local COOLDOWN = 0.15
-        local last = 0
-
-        local function getSeatedCarModel()
-            local character = player.Character or player.CharacterAdded:Wait()
-            local humanoid = character:FindFirstChildOfClass("Humanoid")
-            if not humanoid then return nil end
-            local seat = humanoid.SeatPart
-            if not seat then return nil end
-            local model = seat:FindFirstAncestorOfClass("Model")
-            return model
-        end
-
-        UIS.InputBegan:Connect(function(input, gp)
-            if gp then return end
-            if input.KeyCode == %s then
-                if (time() - last) < COOLDOWN then return end
-                last = time()
-                local carModel = getSeatedCarModel()
-                if carModel then
-                    -- We send both the model name and an optional attribute CarId if present.
-                    local carId = carModel:GetAttribute("CarId")
-                    dupeEvent:FireServer(carModel.Name, carId)
-                else
-                    warn("[CLIENT] Not seated in a car.")
-                end
-            end
-        end)
-    ]], tostring(CONFIG.INPUT_KEY))
-    localScript.Parent = playerScripts
-    log("Installed LocalCarDupe_Auto into StarterPlayerScripts.")
+local dupeResult = remoteFolder:FindFirstChild("DupeResult")
+if not dupeResult then
+    dupeResult = Instance.new("RemoteEvent")
+    dupeResult.Name = "DupeResult"
+    dupeResult.Parent = remoteFolder
 end
 
---===================== DEEPSCAN: DISCOVER STRUCTURE =====================--
-local function dprint(...)
-    if CONFIG.ENABLE_DEEPSCAN_LOGS then
-        print("[DeepScan]", ...)
-    end
-end
-
--- Find likely car template containers
-local TEMPLATE_KEYWORDS = {"car", "vehicle", "template", "prefab", "garage"}
-local CANDIDATE_SERVICES = {ReplicatedStorage, ServerStorage, workspace}
-
-local CarTemplates = firstExistingFolder(CANDIDATE_SERVICES, {"CarTemplates"})
-if not CarTemplates then
-    -- broader search
-    for _, service in ipairs(CANDIDATE_SERVICES) do
-        local candidates = findFoldersRecursively(service, TEMPLATE_KEYWORDS, 1)
-        if #candidates > 0 then
-            CarTemplates = candidates[1]
-            dprint("🚗 Found templates-like folder:", path(CarTemplates))
-            break
-        end
-    end
-end
+-- Car templates container (fallback)
+local CarTemplates = ReplicatedStorage:FindFirstChild("CarTemplates")
 if not CarTemplates then
     CarTemplates = Instance.new("Folder")
     CarTemplates.Name = "CarTemplates"
     CarTemplates.Parent = ReplicatedStorage
-    dprint("🆕 Created CarTemplates at", path(CarTemplates))
+    log("Created fallback ReplicatedStorage.CarTemplates")
 end
 
--- Find likely player data / inventory root
-local INVENTORY_PARENT_KEYWORDS = {"playerdata", "players", "profiles", "data", "datastore", "save"}
-local InventoryRoot = firstExistingFolder({ReplicatedStorage, ServerStorage}, INVENTORY_PARENT_KEYWORDS)
-if not InventoryRoot then
-    local autoRoot = ReplicatedStorage:FindFirstChild("AutoCDT") or Instance.new("Folder")
-    autoRoot.Name = "AutoCDT"
-    autoRoot.Parent = ReplicatedStorage
-    InventoryRoot = autoRoot:FindFirstChild("PlayerInventories")
-    if not InventoryRoot then
-        InventoryRoot = Instance.new("Folder")
-        InventoryRoot.Name = "PlayerInventories"
-        InventoryRoot.Parent = autoRoot
-    end
-    dprint("🆕 Created inventory root at", path(InventoryRoot))
-else
-    dprint("📦 Using inventory root:", path(InventoryRoot))
-end
-
--- (Optional) dealership-like models — just logged for visibility like your screenshot
-for _, service in ipairs({workspace}) do
-    local dealerships = findFoldersRecursively(service, {"dealership","shop","garage","custom"}, nil)
-    for i, m in ipairs(dealerships) do
-        dprint(("🏬 #%d Found dealership-like model: %s"):format(i, path(m)))
-    end
-end
-
---===================== PERSISTENCE LAYER =====================--
-local store = DataStoreService:GetDataStore(CONFIG.DATASTORE_NAME)
-local sessionCount = {}
-
-local function getPlayerInvFolder(player: Player)
-    local folder = InventoryRoot:FindFirstChild(tostring(player.UserId))
-    if not folder then
-        folder = Instance.new("Folder")
-        folder.Name = tostring(player.UserId)
-        folder.Parent = InventoryRoot
-    end
-    local carsFolder = folder:FindFirstChild("Cars")
-    if not carsFolder then
-        carsFolder = Instance.new("Folder")
-        carsFolder.Name = "Cars"
-        carsFolder.Parent = folder
-    end
-    return carsFolder
-end
-
-local function loadInventory(player: Player)
-    local carsFolder = getPlayerInvFolder(player)
-    local key = "inv_" .. player.UserId
-    local data
-    local ok, err = pcall(function()
-        data = store:GetAsync(key)
-    end)
-    if not ok then
-        warnlog("DataStore GetAsync failed:", err)
-        return
-    end
-    if type(data) == "table" then
-        for carId, count in pairs(data) do
-            local item = carsFolder:FindFirstChild(carId) or Instance.new("IntValue")
-            item.Name = carId
-            item.Value = tonumber(count) or 1
-            item.Parent = carsFolder
-        end
-    end
-end
-
-local function saveInventory(player: Player)
-    local carsFolder = getPlayerInvFolder(player)
-    local key = "inv_" .. player.UserId
-    local blob = {}
-    for _, v in ipairs(carsFolder:GetChildren()) do
-        if v:IsA("IntValue") then
-            blob[v.Name] = v.Value
-        end
-    end
-    pcall(function()
-        store:SetAsync(key, blob)
-    end)
-end
-
-Players.PlayerAdded:Connect(function(player)
-    sessionCount[player] = 0
-    loadInventory(player)
-end)
-
-Players.PlayerRemoving:Connect(function(player)
-    saveInventory(player)
-    sessionCount[player] = nil
-end)
-
-game:BindToClose(function()
-    if RunService:IsStudio() then return end
-    for _, player in ipairs(Players:GetPlayers()) do
-        saveInventory(player)
-    end
-end)
-
---===================== TEMPLATE RESOLUTION =====================--
-local function resolveCarIdAndTemplate(fromModel: Model?)
-    -- Strategy:
-    -- 1) Prefer Attribute "CarId" on model
-    -- 2) Fall back to model.Name as id
-    -- 3) Find template by exact name/id under CarTemplates (or nested)
-    local carId
-    local template
-
-    if fromModel then
-        carId = fromModel:GetAttribute("CarId")
-        if not carId or carId == "" then
-            carId = fromModel.Name
-        end
-    end
-
-    local function findTemplateById(id: string)
-        if not id or id == "" then return nil end
-        -- direct child
-        local t = CarTemplates:FindFirstChild(id)
-        if t then return t end
-        -- deep search
-        for _, d in ipairs(CarTemplates:GetDescendants()) do
-            if d:IsA("Model") or d:IsA("Folder") then
-                if d.Name == id then
-                    return d
+-- ---------- Inventory detection ----------
+local function findInventoryModule()
+    for _, service in ipairs({ServerStorage, ReplicatedStorage}) do
+        for _, obj in ipairs(service:GetDescendants()) do
+            if obj:IsA("ModuleScript") then
+                local ok, mod = pcall(require, obj)
+                if ok and type(mod) == "table" then
+                    if type(mod.AddCar) == "function"
+                    or type(mod.GiveCar) == "function"
+                    or type(mod.AddItem) == "function"
+                    or type(mod.AddToInventory) == "function"
+                    or type(mod.GiveItem) == "function" then
+                        return obj, mod
+                    end
                 end
             end
         end
-        return nil
     end
-
-    template = findTemplateById(carId or "")
-    return carId, template
+    return nil, nil
 end
 
-local function snapshotTemplateFromLiveModel(model: Model): Instance
-    -- If there is no template, we create one by cloning the seated model.
-    -- Light cleanup only; we keep structure intact so it works with your systems.
+local function findInventoryFolderRoot()
+    local keywords = {"playerinvent", "playerdata", "profiles", "playerprofiles", "player", "inventory", "accounts", "save"}
+    for _, root in ipairs({ReplicatedStorage, ServerStorage, workspace}) do
+        for _, child in ipairs(root:GetChildren()) do
+            if child:IsA("Folder") or child:IsA("Model") then
+                local name = string.lower(child.Name)
+                for _, kw in ipairs(keywords) do
+                    if string.find(name, kw, 1, true) then
+                        return child
+                    end
+                end
+            end
+        end
+    end
+    return nil
+end
+
+local fallbackRoot
+local invModuleInst, invModuleTable = findInventoryModule()
+local invFolderRoot = findInventoryFolderRoot()
+if invModuleInst and invModuleTable then
+    log("Inventory integration: Module found ->", invModuleInst:GetFullName())
+elseif invFolderRoot then
+    log("Inventory integration: Folder root found ->", invFolderRoot:GetFullName())
+else
+    -- create fallback
+    local autoRoot = ReplicatedStorage:FindFirstChild("OwnerDupeData") or Instance.new("Folder")
+    autoRoot.Name = "OwnerDupeData"
+    autoRoot.Parent = ReplicatedStorage
+    fallbackRoot = autoRoot:FindFirstChild("PlayerInventories")
+    if not fallbackRoot then
+        fallbackRoot = Instance.new("Folder")
+        fallbackRoot.Name = "PlayerInventories"
+        fallbackRoot.Parent = autoRoot
+    end
+    log("Using fallback inventory at", fallbackRoot:GetFullName())
+end
+
+local function getPlayerFolderIn(root, player)
+    if not root then return nil end
+    local byId = root:FindFirstChild(tostring(player.UserId))
+    if byId and byId:IsA("Folder") then return byId end
+    local byName = root:FindFirstChild(player.Name)
+    if byName and byName:IsA("Folder") then return byName end
+    return nil
+end
+
+local function ensurePlayerFolder(root, player)
+    local existing = getPlayerFolderIn(root, player)
+    if existing then return existing end
+    local f = Instance.new("Folder")
+    f.Name = tostring(player.UserId)
+    f.Parent = root
+    return f
+end
+
+local function addCarToInventory(player, carId, count)
+    count = count or 1
+    -- Module API preferred
+    if invModuleTable then
+        local mod = invModuleTable
+        local success, err
+        if type(mod.AddCar) == "function" then success, err = pcall(mod.AddCar, player, carId, count) end
+        if success then return true end
+        if type(mod.GiveCar) == "function" then success, err = pcall(mod.GiveCar, player, carId, count) end
+        if success then return true end
+        if type(mod.AddItem) == "function" then success, err = pcall(mod.AddItem, player, carId, count) end
+        if success then return true end
+        if type(mod.AddToInventory) == "function" then success, err = pcall(mod.AddToInventory, player, carId, count) end
+        if success then return true end
+        if type(mod.GiveItem) == "function" then success, err = pcall(mod.GiveItem, player, carId, count) end
+        if success then return true end
+        warnlog("Inventory module present but API calls failed:", tostring(err))
+        return false, tostring(err)
+    end
+
+    -- Folder-based
+    local root = invFolderRoot or fallbackRoot
+    if not root then return false, "no-inventory-root" end
+    local pFolder = getPlayerFolderIn(root, player)
+    if not pFolder then pFolder = ensurePlayerFolder(root, player) end
+    local cars = pFolder:FindFirstChild("Cars")
+    if not cars then
+        cars = Instance.new("Folder")
+        cars.Name = "Cars"
+        cars.Parent = pFolder
+    end
+    local item = cars:FindFirstChild(carId)
+    if not item then
+        item = Instance.new("IntValue")
+        item.Name = tostring(carId)
+        item.Value = 0
+        item.Parent = cars
+    end
+    item.Value = item.Value + count
+
+    -- If fallback used (fallbackRoot), persist via DataStore
+    if fallbackRoot and root == fallbackRoot then
+        local store = DataStoreService:GetDataStore(DATASTORE_NAME)
+        local key = "inv_" .. player.UserId
+        local blob = {}
+        for _,v in ipairs(cars:GetChildren()) do
+            if v:IsA("IntValue") then blob[v.Name] = v.Value end
+        end
+        pcall(function() store:SetAsync(key, blob) end)
+    end
+
+    return true
+end
+
+-- ---------- template helpers ----------
+local function resolveCarIdAndTemplate(model)
+    if not model then return nil, nil end
+    local id = model:GetAttribute("CarId") or model.Name
+    local t = CarTemplates:FindFirstChild(id)
+    if t then return id, t end
+    for _,d in ipairs(CarTemplates:GetDescendants()) do
+        if d:IsA("Model") and d.Name == id then return id, d end
+    end
+    return id, nil
+end
+
+local function snapshotTemplateFromLiveModel(model)
     local snap = model:Clone()
-    -- Prefer an explicit CarId so future lookups are stable
     if not snap:GetAttribute("CarId") then
         snap:SetAttribute("CarId", model:GetAttribute("CarId") or model.Name)
     end
     snap.Parent = CarTemplates
-    dprint("🆕 Snapshotted live model as template:", path(snap))
+    log("Snapshotted template:", snap.Name)
     return snap
 end
 
---===================== SERVER DUPE LOGIC =====================--
-local cooldowns: {[Player]: number} = {}
-
-local function isPlayerSeatedInModel(player: Player, modelName: string?): Model?
+local function getSeatedModelServer(player)
     local char = player.Character
     if not char then return nil end
     local hum = char:FindFirstChildOfClass("Humanoid")
@@ -334,99 +208,219 @@ local function isPlayerSeatedInModel(player: Player, modelName: string?): Model?
     local seat = hum.SeatPart
     if not seat then return nil end
     local m = seat:FindFirstAncestorOfClass("Model")
-    if not m then return nil end
-    if modelName and m.Name ~= modelName then
-        -- Name mismatch; still allow if CarId attribute matches
-        local id = m:GetAttribute("CarId")
-        if not id or id ~= modelName then
-            return nil
-        end
-    end
     return m
 end
 
-local function incrementInventory(player: Player, carId: string)
-    local carsFolder = getPlayerInvFolder(player)
-    local val = carsFolder:FindFirstChild(carId)
-    if not val then
-        val = Instance.new("IntValue")
-        val.Name = carId
-        val.Value = 0
-        val.Parent = carsFolder
-    end
-    val.Value += 1
-end
-
-local function spawnCloneNearPlayer(player: Player, template: Instance)
-    local char = player.Character
-    if not char or not char.PrimaryPart then return end
-
+local function spawnCloneNearPlayer(player, template)
+    if not template or not player.Character or not player.Character.PrimaryPart then return end
     local clone = template:Clone()
-    clone.Name = (template.Name or "Car") .. "_Copy_" .. math.random(1000, 9999)
+    clone.Name = (template.Name or "Car") .. "_Copy_" .. math.random(1000,9999)
     clone.Parent = workspace
-
-    -- Try to move model
     local primary = (clone:IsA("Model") and clone.PrimaryPart) or clone:FindFirstChildWhichIsA("BasePart", true)
-    local targetPos = char.PrimaryPart.Position + Vector3.new(0, 4, 0)
-    if primary then
-        if clone:IsA("Model") then
-            clone:MoveTo(targetPos)
-        else
-            primary.CFrame = CFrame.new(targetPos)
-        end
+    local pos = player.Character.PrimaryPart.Position + Vector3.new(0,5,0)
+    if primary and clone:IsA("Model") then
+        clone:MoveTo(pos)
+    elseif primary then
+        primary.CFrame = CFrame.new(pos)
     end
     return clone
 end
 
-dupeEvent.OnServerEvent:Connect(function(player: Player, clientModelName: string?, clientCarId: string?)
-    local now = os.clock()
-    if cooldowns[player] and now - cooldowns[player] < CONFIG.COOLDOWN_SEC then
-        return
-    end
-    cooldowns[player] = now
+-- ---------- handle dupe requests ----------
+dupeEvent.OnServerEvent:Connect(function(player, clientModelName, clientCarId)
+    -- only owner allowed to trigger via GUI; however R key also works but server still checks owner when required
+    if not player then return end
 
-    sessionCount[player] = (sessionCount[player] or 0) + 1
-    if sessionCount[player] > CONFIG.MAX_PER_SESSION then
-        warnlog(player.Name .. " reached session dupe cap.")
-        return
-    end
-
-    -- Validate seated state on server
-    local seatedModel = isPlayerSeatedInModel(player, clientModelName)
-    if not seatedModel then
-        warnlog(player.Name, "is not seated in a valid car model. Rejected.")
+    -- validate seated model
+    local seated = getSeatedModelServer(player)
+    if not seated then
+        dupeResult:FireClient(player, false, "You must be seated in a car to dupe.")
         return
     end
 
-    -- Resolve ID + template
-    local id, template = resolveCarIdAndTemplate(seatedModel)
-    if (not id or id == "") and (clientCarId and clientCarId ~= "") then
-        id = clientCarId
-    end
-    if not id or id == "" then
-        id = seatedModel.Name
-    end
+    local id, template = resolveCarIdAndTemplate(seated)
+    if (not id or id == "") and clientCarId and clientCarId ~= "" then id = clientCarId end
+    if not id or id == "" then id = seated.Name end
+    if not template then template = snapshotTemplateFromLiveModel(seated) end
 
-    if not template then
-        template = snapshotTemplateFromLiveModel(seatedModel)
-    end
-
-    -- Add to inventory and save async-ish
-    incrementInventory(player, id)
-    task.spawn(function()
-        saveInventory(player)
-    end)
-
-    -- Optional spawn
-    if CONFIG.SPAWN_ON_DUPE then
-        spawnCloneNearPlayer(player, template)
+    local ok, err = addCarToInventory(player, id, 1)
+    if not ok then
+        warnlog("Failed to add to inventory:", tostring(err))
+        dupeResult:FireClient(player, false, "Failed to add to inventory: " .. tostring(err))
+        return
     end
 
-    log(("[Dupe] %s duplicated '%s' (template: %s)"):format(
-        player.Name,
-        tostring(id),
-        path(template)
-    ))
+    if SPAWN_ON_DUPE then spawnCloneNearPlayer(player, template) end
+
+    dupeResult:FireClient(player, true, "Added to your inventory: " .. tostring(id))
+    log(player.Name .. " duplicated " .. tostring(id) .. " -> inventory mode: " .. tostring((invModuleInst and "module") or (invFolderRoot and "folder") or "fallback"))
 end)
 
-log("Ready! Press " .. tostring(CONFIG.INPUT_KEY) .. " in-game while seated to duplicate the car and add it to your inventory.")
+-- ---------- install client LocalScript for keypress + owner-only GUI ----------
+local starterScripts = StarterPlayer:FindFirstChild("StarterPlayerScripts") or StarterPlayer
+if not starterScripts:FindFirstChild("OwnerInventoryDupe_Client") then
+    local clientSrc = [[
+-- OwnerInventoryDupe_Client (runs on every client but only shows owner UI to OWNER only)
+local OWNER_USER_ID = %d
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local dupeEvent = ReplicatedStorage:WaitForChild("RemoteEvents"):WaitForChild("RequestDupeCar")
+local dupeResult = ReplicatedStorage:WaitForChild("RemoteEvents"):WaitForChild("DupeResult")
+local last = 0
+local COOLDOWN = 0.2
+
+local function getSeatedCarModel()
+    local c = player.Character or player.CharacterAdded:Wait()
+    local h = c:FindFirstChildOfClass("Humanoid")
+    if not h then return nil end
+    local seat = h.SeatPart
+    if not seat then return nil end
+    return seat:FindFirstAncestorOfClass("Model")
+end
+
+-- Press R to request dupe (works for any player, but server will validate/add only as allowed)
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    if input.KeyCode == %s then
+        if (tick() - last) < COOLDOWN then return end
+        last = tick()
+        local model = getSeatedCarModel()
+        if model then
+            dupeEvent:FireServer(model.Name, model:GetAttribute("CarId"))
+        else
+            warn("[Client] Not seated in a car.")
+        end
+    end
+end)
+
+-- owner-only GUI (only created for owner userid)
+if player.UserId == OWNER_USER_ID then
+    local function buildGui()
+        if player:FindFirstChild("PlayerGui") and not player.PlayerGui:FindFirstChild("OwnerInventoryViewer") then
+            local gui = Instance.new("ScreenGui")
+            gui.Name = "OwnerInventoryViewer"
+            gui.ResetOnSpawn = false
+
+            local frame = Instance.new("Frame")
+            frame.Size = UDim2.new(0, 300, 0, 360)
+            frame.Position = UDim2.new(1, -310, 0, 60)
+            frame.BackgroundColor3 = Color3.fromRGB(30,30,30)
+            frame.BorderSizePixel = 0
+            frame.Parent = gui
+
+            local title = Instance.new("TextLabel")
+            title.Size = UDim2.new(1,0,0,28)
+            title.Position = UDim2.new(0,0,0,0)
+            title.BackgroundTransparency = 1
+            title.Text = "My Inventory (Owner)"
+            title.TextColor3 = Color3.new(1,1,1)
+            title.Font = Enum.Font.SourceSansBold
+            title.TextSize = 20
+            title.Parent = frame
+
+            local scroll = Instance.new("ScrollingFrame")
+            scroll.Size = UDim2.new(1, -16, 1, -44)
+            scroll.Position = UDim2.new(0,8,0,36)
+            scroll.CanvasSize = UDim2.new(0,0,0,0)
+            scroll.BackgroundTransparency = 1
+            scroll.Parent = frame
+
+            local list = Instance.new("UIListLayout")
+            list.Parent = scroll
+            list.Padding = UDim.new(0,6)
+
+            local refreshBtn = Instance.new("TextButton")
+            refreshBtn.Size = UDim2.new(0,120,0,28)
+            refreshBtn.Position = UDim2.new(0,8,1,-36)
+            refreshBtn.Text = "Refresh"
+            refreshBtn.Parent = frame
+
+            local function findMyCarsFolder()
+                local rs = game:GetService("ReplicatedStorage")
+                for _, service in ipairs({rs, game:GetService("ServerStorage")}) do
+                    for _, child in ipairs(service:GetDescendants()) do
+                        if child:IsA("Folder") and (child.Name == tostring(player.UserId) or child.Name == player.Name) then
+                            local cars = child:FindFirstChild("Cars")
+                            if cars then return cars end
+                        end
+                    end
+                end
+                -- check fallback path
+                local fallback = rs:FindFirstChild("OwnerDupeData")
+                if fallback then
+                    local pinv = fallback:FindFirstChild("PlayerInventories")
+                    if pinv then
+                        local p = pinv:FindFirstChild(tostring(player.UserId))
+                        if p then return p:FindFirstChild("Cars") end
+                    end
+                end
+                return nil
+            end
+
+            local function refreshList()
+                for _,c in ipairs(scroll:GetChildren()) do if c:IsA("TextButton") then c:Destroy() end end
+                local cars = findMyCarsFolder()
+                if not cars then
+                    local t = Instance.new("TextLabel")
+                    t.Size = UDim2.new(1, -8, 0, 28)
+                    t.Text = "No inventory found (use server fallback or publish to test)."
+                    t.BackgroundTransparency = 1
+                    t.TextColor3 = Color3.new(1,1,1)
+                    t.Parent = scroll
+                else
+                    for _,item in ipairs(cars:GetChildren()) do
+                        if item:IsA("IntValue") then
+                            local btn = Instance.new("TextButton")
+                            btn.Size = UDim2.new(1, -16, 0, 28)
+                            btn.Text = item.Name .. "  (x" .. tostring(item.Value) .. ")"
+                            btn.Parent = scroll
+                            btn.MouseButton1Click:Connect(function()
+                                -- Request server to dupe this specific item (server will validate seating)
+                                dupeEvent:FireServer(item.Name, item.Name)
+                            end)
+                        end
+                    end
+                end
+                -- update canvas size
+                pcall(function()
+                    local total = list.AbsoluteContentSize.Y
+                    scroll.CanvasSize = UDim2.new(0,0,0,total + 12)
+                end)
+            end
+
+            refreshBtn.MouseButton1Click:Connect(refreshList)
+            -- initial populate after small wait for PlayerGui
+            refreshList()
+            gui.Parent = player.PlayerGui
+        end
+    end
+
+    -- wait until PlayerGui exists
+    spawn(function()
+        player.CharacterAdded:Wait()
+        wait(0.5)
+        buildGui()
+    end)
+end
+
+dupeResult.OnClientEvent:Connect(function(ok, message)
+    if ok then
+        pcall(function()
+            game:GetService("StarterGui"):SetCore("SendNotification", {Title="Dupe", Text=message or "Added", Duration=3})
+        end)
+    else
+        warn("[Dupe failed]", message)
+    end
+end)
+]]
+    clientSrc = string.format(clientSrc, OWNER_USER_ID, tostring(INPUT_KEY))
+    local cl = Instance.new("LocalScript")
+    cl.Name = "OwnerInventoryDupe_Client"
+    cl.Source = clientSrc
+    cl.Parent = starterScripts
+    log("Installed client helper into StarterPlayerScripts (client will only show GUI to owner).")
+end
+
+log("OwnerInventoryDupe ready. Only UserId " .. tostring(OWNER_USER_ID) .. " will see the owner inventory panel.")
