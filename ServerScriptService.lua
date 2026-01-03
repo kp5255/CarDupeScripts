@@ -1,158 +1,137 @@
--- SERVER: AUTO DETECT CAR FROM SEAT + REAL DUPE (DEV TEST)
--- COPY AND PASTE THIS ENTIRE SCRIPT EXACTLY AS IS
-
--- Services
+-- SIMPLE CAR DUPE CLIENT
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local ServerStorage = game:GetService("ServerStorage")
-local HttpService = game:GetService("HttpService")
-local Workspace = game:GetService("Workspace")
 
--- Get or create event
-local DupeEvent = ReplicatedStorage:FindFirstChild("Dev_DupeCar")
-if not DupeEvent then
-	DupeEvent = Instance.new("RemoteEvent")
-	DupeEvent.Name = "Dev_DupeCar"
-	DupeEvent.Parent = ReplicatedStorage
-	print("[SERVER] Dev_DupeCar created")
-else
-	print("[SERVER] Dev_DupeCar already exists")
+local player = Players.LocalPlayer
+
+-- WAIT FOR SERVER EVENT
+local DupeEvent = ReplicatedStorage:WaitForChild("Dev_DupeCar")
+print("✅ Connected to server event")
+
+-- SIMPLE GUI
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "SimpleCarDupeGUI"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = player:WaitForChild("PlayerGui")
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 250, 0, 120)
+frame.Position = UDim2.new(1, -260, 0, 20)
+frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+frame.BorderSizePixel = 0
+frame.Parent = screenGui
+
+local title = Instance.new("TextLabel")
+title.Text = "🚗 CAR DUPLICATOR"
+title.Size = UDim2.new(1, 0, 0, 30)
+title.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+title.TextColor3 = Color3.new(1, 1, 1)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 16
+title.Parent = frame
+
+local status = Instance.new("TextLabel")
+status.Text = "Sit in a car, then click below"
+status.Size = UDim2.new(1, -20, 0, 40)
+status.Position = UDim2.new(0, 10, 0, 35)
+status.BackgroundTransparency = 1
+status.TextColor3 = Color3.new(1, 1, 1)
+status.Font = Enum.Font.Gotham
+status.TextSize = 14
+status.TextWrapped = true
+status.Parent = frame
+
+local button = Instance.new("TextButton")
+button.Text = "DUPLICATE CAR"
+button.Size = UDim2.new(1, -40, 0, 40)
+button.Position = UDim2.new(0, 20, 0, 80)
+button.Font = Enum.Font.GothamBold
+button.TextSize = 14
+button.TextColor3 = Color3.new(1, 1, 1)
+button.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+button.BorderSizePixel = 0
+button.Parent = frame
+
+-- TRACK CURRENT SEAT
+local currentSeat = nil
+
+-- CHECK FOR SEAT
+local function checkSeat()
+    local character = player.Character
+    if not character then return nil end
+    
+    local humanoid = character:FindFirstChild("Humanoid")
+    if not humanoid then return nil end
+    
+    return humanoid.SeatPart
 end
 
--- Inventory setup
-local Inventories = ServerStorage:FindFirstChild("Inventories")
-if not Inventories then
-	Inventories = Instance.new("Folder")
-	Inventories.Name = "Inventories"
-	Inventories.Parent = ServerStorage
-	print("[SERVER] Inventories folder created")
-end
-
--- Player join
-Players.PlayerAdded:Connect(function(player)
-	local inv = Instance.new("Folder")
-	inv.Name = tostring(player.UserId)
-	inv.Parent = Inventories
-
-	local cars = Instance.new("Folder")
-	cars.Name = "Cars"
-	cars.Parent = inv
-	
-	print("[SERVER] Inventory created for:", player.Name)
+-- UPDATE STATUS
+game:GetService("RunService").Heartbeat:Connect(function()
+    local seat = checkSeat()
+    
+    if seat and seat:IsA("VehicleSeat") then
+        currentSeat = seat
+        status.Text = "✅ In car: " .. seat.Parent.Name
+        button.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
+        button.Text = "DUPLICATE CAR"
+    else
+        currentSeat = nil
+        status.Text = "❌ Not in a car\nSit in a vehicle first"
+        button.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+        button.Text = "NEED TO SIT IN CAR"
+    end
 end)
 
--- Player leave cleanup
-Players.PlayerRemoving:Connect(function(player)
-	local playerInv = Inventories:FindFirstChild(tostring(player.UserId))
-	if playerInv then
-		playerInv:Destroy()
-		print("[SERVER] Inventory cleaned for:", player.Name)
-	end
+-- BUTTON ACTION
+button.MouseButton1Click:Connect(function()
+    if not currentSeat then
+        status.Text = "❌ You must sit in a car first!"
+        button.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+        task.wait(1)
+        return
+    end
+    
+    -- Send request
+    status.Text = "🔄 Duplicating..."
+    button.Text = "PROCESSING..."
+    button.BackgroundColor3 = Color3.fromRGB(255, 165, 0)
+    
+    local success = DupeEvent:FireServer(currentSeat)
+    
+    if success then
+        status.Text = "✅ Car duplicated!\nCheck ServerStorage"
+        button.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+        button.Text = "SUCCESS!"
+    else
+        status.Text = "❌ Failed to duplicate"
+        button.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        button.Text = "FAILED - TRY AGAIN"
+    end
+    
+    -- Reset after 3 seconds
+    task.delay(3, function()
+        if currentSeat then
+            button.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
+            button.Text = "DUPLICATE CAR"
+            status.Text = "✅ In car: " .. currentSeat.Parent.Name
+        else
+            button.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+            button.Text = "NEED TO SIT IN CAR"
+            status.Text = "❌ Not in a car"
+        end
+    end)
 end)
 
--- Find car from seat
-local function findCarModelFromSeat(seat)
-	if not seat then return nil end
-	
-	local current = seat
-	local carModel = nil
-
-	while current and current ~= Workspace do
-		if current:IsA("Model") then
-			carModel = current
-		end
-		current = current.Parent
-	end
-
-	return carModel
-end
-
--- Main duplication
-DupeEvent.OnServerEvent:Connect(function(player, seat)
-	-- Basic validation
-	if not player then return end
-	if not seat then
-		warn("[SERVER] No seat provided by", player.Name)
-		return
-	end
-	
-	-- Type check
-	if typeof(seat) == "Instance" then
-		if not seat:IsA("VehicleSeat") then
-			warn("[SERVER] Not a VehicleSeat from", player.Name)
-			return
-		end
-	else
-		warn("[SERVER] Invalid seat type from", player.Name)
-		return
-	end
-
-	-- Find car model
-	local carModel = findCarModelFromSeat(seat)
-	if not carModel then
-		warn("[SERVER] Could not find car model for", player.Name)
-		return
-	end
-
-	-- Get player inventory
-	local inv = Inventories:FindFirstChild(tostring(player.UserId))
-	if not inv then
-		warn("[SERVER] No inventory for", player.Name)
-		return
-	end
-
-	local carsFolder = inv:FindFirstChild("Cars")
-	if not carsFolder then
-		warn("[SERVER] No Cars folder for", player.Name)
-		return
-	end
-
-	-- Generate unique ID safely
-	local success, guid = pcall(function()
-		return HttpService:GenerateGUID(false)
-	end)
-	
-	if not success then
-		warn("[SERVER] Failed to generate GUID for", player.Name)
-		return
-	end
-
-	-- Clone the car
-	local clone = carModel:Clone()
-	local uniqueId = "CAR_" .. guid
-	clone.Name = uniqueId
-
-	-- Add metadata
-	local meta = Instance.new("StringValue")
-	meta.Name = "OriginalCarName"
-	meta.Value = carModel.Name
-	meta.Parent = clone
-	
-	-- Add owner info
-	local owner = Instance.new("StringValue")
-	owner.Name = "Owner"
-	owner.Value = player.Name
-	owner.Parent = clone
-	
-	-- Add timestamp
-	local timestamp = Instance.new("NumberValue")
-	timestamp.Name = "CreatedAt"
-	timestamp.Value = os.time()
-	timestamp.Parent = clone
-
-	-- Save to inventory
-	clone.Parent = carsFolder
-
-	-- Log success
-	print("[SERVER DUPE] Car duplicated:", carModel.Name, "->", uniqueId, "for", player.Name)
-	
-	return true
+-- KEYBIND TOGGLE
+local UserInputService = game:GetService("UserInputService")
+UserInputService.InputBegan:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.F then
+        screenGui.Enabled = not screenGui.Enabled
+        print("GUI toggled:", screenGui.Enabled)
+    end
 end)
 
-print("======================================")
-print("🚗 CAR DUPLICATION SYSTEM LOADED")
-print("======================================")
-print("• RemoteEvent: Dev_DupeCar ✓")
-print("• Folder: ServerStorage/Inventories ✓")
-print("• Ready for player connections")
-print("======================================")
+print("🚗 Car Duplication Client READY!")
+print("Press F to show/hide GUI")
+print("Sit in a car and click the button!")
