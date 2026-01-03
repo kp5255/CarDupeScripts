@@ -1,148 +1,146 @@
--- 🚗 DELTA EXECUTOR - CAR DUPLICATION SCRIPT
--- Made specifically for Delta executor
+-- 🚗 CLEAN Car Duplication Script for Delta
+-- No obfuscation, no errors
 
-print("===========================================")
-print("DELTA CAR DUPLICATION SYSTEM v2.0")
-print("===========================================")
+print("======================================")
+print("DELTA CAR DUPLICATION TOOL")
+print("======================================")
 
 -- Services
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+
 local player = Players.LocalPlayer
 
 -- Wait for game
-repeat task.wait() until game:IsLoaded()
-repeat task.wait() until player.Character
-
--- DELTA-SPECIFIC: Check if we're in an executor
-if not is_protosmasher_closure and not is_sirhurt_closure and not syn then
-    warn("⚠️ Not running in a proper executor!")
-    warn("This script requires Delta/Synapse/Krnl")
+if not game:IsLoaded() then
+    game.Loaded:Wait()
 end
 
--- Create Advanced UI
-local OrionLib = loadstring(game:HttpGet("https://pastebin.com/raw/GMNsK3mS"))()
-local Window = OrionLib:MakeWindow({
-    Name = "🚗 Car Duplication Tool", 
-    HidePremium = false,
-    SaveConfig = true,
-    ConfigFolder = "CarDupeConfig"
-})
-
--- Vehicle Detection Tab
-local DetectionTab = Window:MakeTab({
-    Name = "Vehicle Detection",
-    Icon = "rbxassetid://4483345998",
-    PremiumOnly = false
-})
-
-DetectionTab:AddToggle({
-    Name = "Auto-Detect Vehicles",
-    Default = true,
-    Callback = function(Value)
-        _G.AutoDetect = Value
-    end    
-})
-
-DetectionTab:AddLabel("Current Vehicle: None")
-
-local currentVehicleLabel = DetectionTab:AddLabel("Status: Not in vehicle")
-
--- Duplication Tab
-local DupeTab = Window:MakeTab({
-    Name = "Duplication",
-    Icon = "rbxassetid://4483345998",
-    PremiumOnly = false
-})
-
-DupeTab:AddSlider({
-    Name = "Duplicate Amount",
-    Min = 1,
-    Max = 100,
-    Default = 10,
-    Color = Color3.fromRGB(0, 170, 255),
-    Increment = 1,
-    ValueName = "cars",
-    Callback = function(Value)
-        _G.DupeAmount = Value
-    end    
-})
-
-DupeTab:AddDropdown({
-    Name = "Duplication Method",
-    Default = "Method 1",
-    Options = {"Event Spam", "Packet Replay", "Price Manip", "Inventory Flood"},
-    Callback = function(Value)
-        _G.DupeMethod = Value
-    end    
-})
-
-DupeTab:AddButton({
-    Name = "🔄 Scan Game Systems",
-    Callback = function()
-        ScanGameSystems()
+-- Simple UI without Orion (works in Delta)
+local function createSimpleUI()
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "DeltaCarDupe"
+    screenGui.Parent = player:WaitForChild("PlayerGui")
+    
+    local mainFrame = Instance.new("Frame")
+    mainFrame.Size = UDim2.new(0, 300, 0, 400)
+    mainFrame.Position = UDim2.new(0.5, -150, 0.5, -200)
+    mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+    mainFrame.BorderSizePixel = 0
+    mainFrame.Parent = screenGui
+    
+    -- Title
+    local title = Instance.new("TextLabel")
+    title.Text = "🚗 DELTA CAR DUPLICATOR"
+    title.Size = UDim2.new(1, 0, 0, 40)
+    title.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
+    title.TextColor3 = Color3.new(1, 1, 1)
+    title.Font = Enum.Font.GothamBold
+    title.TextSize = 18
+    title.Parent = mainFrame
+    
+    -- Status display
+    local statusBox = Instance.new("Frame")
+    statusBox.Size = UDim2.new(1, -20, 0, 150)
+    statusBox.Position = UDim2.new(0, 10, 0, 50)
+    statusBox.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+    statusBox.BorderSizePixel = 0
+    statusBox.Parent = mainFrame
+    
+    local statusText = Instance.new("TextLabel")
+    statusText.Name = "StatusText"
+    statusText.Text = "Welcome to Delta Car Duplicator!\n\nInstructions:\n1. Sit in a car\n2. Scan game\n3. Duplicate"
+    statusText.Size = UDim2.new(1, -10, 1, -10)
+    statusText.Position = UDim2.new(0, 5, 0, 5)
+    statusText.BackgroundTransparency = 1
+    statusText.TextColor3 = Color3.new(1, 1, 1)
+    statusText.Font = Enum.Font.Code
+    statusText.TextSize = 12
+    statusText.TextXAlignment = Enum.TextXAlignment.Left
+    statusText.TextYAlignment = Enum.TextYAlignment.Top
+    statusText.TextWrapped = true
+    statusText.Parent = statusBox
+    
+    -- Buttons
+    local buttonFrame = Instance.new("Frame")
+    buttonFrame.Size = UDim2.new(1, -20, 0, 200)
+    buttonFrame.Position = UDim2.new(0, 10, 0, 210)
+    buttonFrame.BackgroundTransparency = 1
+    buttonFrame.Parent = mainFrame
+    
+    local buttons = {
+        {name = "🔍 SCAN GAME", color = Color3.fromRGB(0, 120, 215), func = "scan"},
+        {name = "🚗 DUPLICATE CAR", color = Color3.fromRGB(0, 180, 0), func = "duplicate"},
+        {name = "🔄 FIND EVENTS", color = Color3.fromRGB(255, 140, 0), func = "findEvents"},
+        {name = "⚡ QUICK DUPE", color = Color3.fromRGB(180, 0, 255), func = "quickDupe"},
+        {name = "🛡️ ANTI-KICK", color = Color3.fromRGB(200, 50, 50), func = "antiKick"},
+        {name = "❌ CLOSE", color = Color3.fromRGB(150, 150, 150), func = "close"}
+    }
+    
+    for i, btnData in ipairs(buttons) do
+        local button = Instance.new("TextButton")
+        button.Text = btnData.name
+        button.Size = UDim2.new(1, 0, 0, 30)
+        button.Position = UDim2.new(0, 0, 0, (i-1)*35)
+        button.BackgroundColor3 = btnData.color
+        button.TextColor3 = Color3.new(1, 1, 1)
+        button.Font = Enum.Font.GothamBold
+        button.TextSize = 14
+        button.Name = btnData.func
+        button.Parent = buttonFrame
+        
+        -- Styling
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, 6)
+        corner.Parent = button
     end
-})
+    
+    -- Close button on title
+    local closeBtn = Instance.new("TextButton")
+    closeBtn.Text = "X"
+    closeBtn.Size = UDim2.new(0, 30, 0, 30)
+    closeBtn.Position = UDim2.new(1, -35, 0, 5)
+    closeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    closeBtn.TextColor3 = Color3.new(1, 1, 1)
+    closeBtn.Font = Enum.Font.GothamBold
+    closeBtn.Parent = title
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 15)
+    corner.Parent = closeBtn
+    
+    -- Main frame styling
+    local mainCorner = Instance.new("UICorner")
+    mainCorner.CornerRadius = UDim.new(0, 10)
+    mainCorner.Parent = mainFrame
+    
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(0, 150, 255)
+    stroke.Thickness = 2
+    stroke.Parent = mainFrame
+    
+    return screenGui, statusText
+end
 
-DupeTab:AddButton({
-    Name = "🚗 START DUPLICATION",
-    Callback = function()
-        StartDuplication()
-    end
-})
+-- Create UI
+local gui, statusLabel = createSimpleUI()
 
--- Exploit Methods Tab
-local ExploitTab = Window:MakeTab({
-    Name = "Exploit Methods",
-    Icon = "rbxassetid://4483345998",
-    PremiumOnly = false
-})
-
-ExploitTab:AddToggle({
-    Name = "Enable Event Spoofing",
-    Default = false,
-    Callback = function(Value)
-        _G.EventSpoofing = Value
-    end
-})
-
-ExploitTab:AddToggle({
-    Name = "Bypass Cooldowns",
-    Default = true,
-    Callback = function(Value)
-        _G.BypassCooldown = Value
-    end
-})
-
-ExploitTab:AddToggle({
-    Name = "Anti-Kick Protection",
-    Default = true,
-    Callback = function(Value)
-        _G.AntiKick = Value
-    end
-})
+-- Update status function
+local function updateStatus(text)
+    statusLabel.Text = text
+    print("[Delta] " .. text)
+end
 
 -- Variables
-_G.AutoDetect = true
-_G.DupeAmount = 10
-_G.DupeMethod = "Event Spam"
-_G.EventSpoofing = false
-_G.BypassCooldown = true
-_G.AntiKick = true
-
 local currentVehicle = nil
 local foundEvents = {}
-local isDuplicating = false
 
--- Vehicle Detection Function
-function DetectVehicle()
-    if not _G.AutoDetect then return end
-    
+-- Vehicle detection
+RunService.Heartbeat:Connect(function()
     local char = player.Character
     if not char then return end
     
-    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    local humanoid = char:FindFirstChild("Humanoid")
     if not humanoid then return end
     
     local seat = humanoid.SeatPart
@@ -151,346 +149,207 @@ function DetectVehicle()
         local vehicle = seat.Parent
         if vehicle ~= currentVehicle then
             currentVehicle = vehicle
-            
-            -- Update UI
-            currentVehicleLabel:Set("Vehicle: " .. vehicle.Name)
-            
-            print("✅ Vehicle Detected: " .. vehicle.Name)
-            print("   Path: " .. vehicle:GetFullName())
-            print("   Children: " .. #vehicle:GetChildren())
-            
-            -- Check for vehicle data
-            for _, child in pairs(vehicle:GetChildren()) do
-                if child:IsA("Configuration") or child.Name:find("Config") then
-                    print("   Found configuration: " .. child.Name)
-                end
-            end
+            updateStatus("✅ Vehicle Detected:\n" .. vehicle.Name .. "\n\nReady to duplicate!")
         end
     elseif currentVehicle then
         currentVehicle = nil
-        currentVehicleLabel:Set("Status: Not in vehicle")
+        updateStatus("No vehicle detected\n\nSit in a car to begin")
     end
-end
+end)
 
--- Game System Scanner
-function ScanGameSystems()
-    print("\n" .. string.rep("=", 50))
-    print("🔍 SCANNING GAME SYSTEMS")
-    print("=":rep(50))
+-- Scan game for events
+local function scanGame()
+    updateStatus("🔍 Scanning game...")
     
     foundEvents = {}
+    local eventNames = {}
     
-    -- Scan for RemoteEvents
+    -- Search ReplicatedStorage
     for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
         if obj:IsA("RemoteEvent") then
-            local eventName = obj.Name:lower()
+            local name = obj.Name:lower()
             
-            -- Check if it's car-related
-            if eventName:find("car") or 
-               eventName:find("vehicle") or 
-               eventName:find("garage") or
-               eventName:find("buy") or
-               eventName:find("purchase") or
-               eventName:find("save") or
-               eventName:find("add") then
+            if name:find("car") or name:find("vehicle") or name:find("buy") or 
+               name:find("purchase") or name:find("save") or name:find("add") or
+               name:find("garage") or name:find("inventory") then
                 
-                table.insert(foundEvents, {
-                    Object = obj,
-                    Name = obj.Name,
-                    Path = obj:GetFullName()
-                })
+                table.insert(foundEvents, obj)
+                table.insert(eventNames, obj.Name)
                 
-                print("✅ Found: " .. obj.Name .. " (" .. obj:GetFullName() .. ")")
+                print("Found: " .. obj.Name .. " (" .. obj:GetFullName() .. ")")
             end
         end
     end
     
-    -- Scan for RemoteFunctions
+    if #foundEvents > 0 then
+        updateStatus("✅ Scan Complete!\n\nFound " .. #foundEvents .. " car events:\n" .. table.concat(eventNames, "\n"))
+    else
+        updateStatus("❌ No car events found!\n\nThis game might not be vulnerable.\nTry a different car game.")
+    end
+    
+    return foundEvents
+end
+
+-- Find all events (not just car-related)
+local function findAllEvents()
+    updateStatus("🔄 Finding ALL remote events...")
+    
+    foundEvents = {}
+    local allEvents = {}
+    
     for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
-        if obj:IsA("RemoteFunction") then
-            local funcName = obj.Name:lower()
-            
-            if funcName:find("car") or funcName:find("vehicle") then
-                table.insert(foundEvents, {
-                    Object = obj,
-                    Name = obj.Name,
-                    Path = obj:GetFullName(),
-                    Type = "RemoteFunction"
-                })
-                
-                print("✅ Found RemoteFunction: " .. obj.Name)
-            end
+        if obj:IsA("RemoteEvent") then
+            table.insert(foundEvents, obj)
+            table.insert(allEvents, obj.Name)
         end
     end
     
-    print("\n📊 Scan Complete!")
-    print("Found " .. #foundEvents .. " car-related events")
-    print("=":rep(50))
+    updateStatus("Found " .. #foundEvents .. " total events:\n" .. table.concat(allEvents, "\n"))
     
-    if #foundEvents == 0 then
-        warn("❌ No car events found! This game might not be vulnerable.")
-    end
+    return foundEvents
 end
 
--- Duplication Methods
-function StartDuplication()
-    if isDuplicating then
-        warn("⚠️ Already duplicating!")
-        return
-    end
-    
+-- Duplication function
+local function duplicateCar()
     if not currentVehicle then
-        warn("❌ Not in a vehicle! Sit in a car first.")
+        updateStatus("❌ Not in a vehicle!\n\nSit in a car first.")
         return
     end
     
     if #foundEvents == 0 then
-        warn("⚠️ Scan game systems first!")
+        updateStatus("⚠️ Scan game first!\n\nClick SCAN GAME button.")
         return
     end
     
-    isDuplicating = true
     local carName = currentVehicle.Name
+    updateStatus("🔄 Duplicating: " .. carName .. "\n\nProcessing...")
     
-    print("\n" .. string.rep("=", 50))
-    print("🚗 STARTING DUPLICATION: " .. carName)
-    print("Method: " .. _G.DupeMethod)
-    print("Amount: " .. _G.DupeAmount)
-    print("=":rep(50))
+    local successCount = 0
     
-    -- Anti-kick protection
-    if _G.AntiKick then
-        SetupAntiKick()
-    end
-    
-    -- Execute based on method
-    if _G.DupeMethod == "Event Spam" then
-        EventSpamDuplication(carName)
-    elseif _G.DupeMethod == "Packet Replay" then
-        PacketReplayDuplication(carName)
-    elseif _G.DupeMethod == "Price Manip" then
-        PriceManipulationDuplication(carName)
-    elseif _G.DupeMethod == "Inventory Flood" then
-        InventoryFloodDuplication(carName)
-    end
-    
-    isDuplicating = false
-    print("✅ Duplication process completed!")
-end
-
--- Method 1: Event Spamming
-function EventSpamDuplication(carName)
-    print("🔄 Using Event Spam method...")
-    
-    for _, eventData in pairs(foundEvents) do
-        local event = eventData.Object
+    -- Try each event with different arguments
+    for _, event in pairs(foundEvents) do
+        local attempts = {
+            {carName},
+            {"buy", carName},
+            {"add", carName},
+            {vehicle = carName, player = player},
+            {action = "duplicate", car = carName},
+            {carName, 0}, -- Free
+            {carName, 1}, -- Cheap
+        }
         
-        for i = 1, _G.DupeAmount do
-            -- Try different argument formats
-            local attempts = {
-                {carName},
-                {"buy", carName},
-                {"add", carName},
-                {vehicle = carName, player = player},
-                {action = "duplicate", car = carName},
-                {carName, 0}, -- Price = 0
-                {carName, 1}, -- Price = 1
-            }
+        for _, args in pairs(attempts) do
+            local success = pcall(function()
+                event:FireServer(unpack(args))
+            end)
             
-            for _, args in pairs(attempts) do
-                pcall(function()
-                    if event:IsA("RemoteEvent") then
-                        event:FireServer(unpack(args))
-                    elseif event:IsA("RemoteFunction") then
-                        event:InvokeServer(unpack(args))
-                    end
-                end)
-                
-                task.wait(0.05) -- Small delay to avoid detection
+            if success then
+                successCount = successCount + 1
+                print("Success with: " .. event.Name)
             end
             
-            print("   Sent batch " .. i .. "/" .. _G.DupeAmount)
-        end
-    end
-end
-
--- Method 2: Packet Replay Attack
-function PacketReplayDuplication(carName)
-    print("🔄 Using Packet Replay method...")
-    
-    -- DELTA-SPECIFIC: Hook network functions
-    local oldFireServer
-    local hookedEvents = {}
-    
-    for _, eventData in pairs(foundEvents) do
-        local event = eventData.Object
-        
-        if event:IsA("RemoteEvent") then
-            oldFireServer = event.FireServer
-            
-            event.FireServer = function(self, ...)
-                local args = {...}
-                
-                -- Log original call
-                print("📦 Intercepted packet to: " .. event.Name)
-                
-                -- Replay multiple times
-                for i = 1, _G.DupeAmount do
-                    pcall(function()
-                        oldFireServer(self, unpack(args))
-                    end)
-                    task.wait(0.01)
-                end
-                
-                return oldFireServer(self, unpack(args))
-            end
-            
-            table.insert(hookedEvents, {event = event, original = oldFireServer})
-            print("✅ Hooked: " .. event.Name)
+            task.wait(0.05) -- Small delay
         end
     end
     
-    -- Trigger the hooked events
-    task.wait(1)
-    for _, hookData in pairs(hookedEvents) do
-        pcall(function()
-            hookData.event:FireServer("duplicate", carName)
-        end)
-    end
+    updateStatus("✅ Duplication Complete!\n\nSuccessfully sent " .. successCount .. " requests.\nCheck your garage!")
     
-    -- Restore original functions after delay
-    task.wait(3)
-    for _, hookData in pairs(hookedEvents) do
-        if hookData.event and hookData.original then
-            hookData.event.FireServer = hookData.original
-        end
-    end
-end
-
--- Method 3: Price Manipulation
-function PriceManipulationDuplication(carName)
-    print("🔄 Using Price Manipulation method...")
-    
-    -- Find buy/purchase events
-    for _, eventData in pairs(foundEvents) do
-        local eventName = eventData.Name:lower()
-        
-        if eventName:find("buy") or eventName:find("purchase") then
-            print("   Targeting: " .. eventData.Name)
-            
-            -- Try different price manipulations
-            local priceTests = {0, 1, -1, 999999, "free", nil}
-            
-            for _, price in pairs(priceTests) do
-                for i = 1, math.floor(_G.DupeAmount / 2) do
-                    pcall(function()
-                        if eventData.Object:IsA("RemoteEvent") then
-                            eventData.Object:FireServer(carName, price)
-                        elseif eventData.Object:IsA("RemoteFunction") then
-                            eventData.Object:InvokeServer(carName, price)
-                        end
-                    end)
-                    task.wait(0.1)
-                end
-            end
-        end
-    end
-end
-
--- Method 4: Inventory Flood
-function InventoryFloodDuplication(carName)
-    print("🔄 Using Inventory Flood method...")
-    
-    -- Look for save/add events
-    for _, eventData in pairs(foundEvents) do
-        local eventName = eventData.Name:lower()
-        
-        if eventName:find("save") or eventName:find("add") or eventName:find("inventory") then
-            print("   Flooding: " .. eventData.Name)
-            
-            -- Create fake car data
-            local fakeCarData = {
-                Name = carName,
-                Owner = player.UserId,
-                Price = 0,
-                Acquired = os.time(),
-                IsDuplicated = true,
-                ID = tostring(math.random(100000, 999999))
-            }
-            
-            -- Flood with fake data
-            for i = 1, _G.DupeAmount do
-                pcall(function()
-                    if eventData.Object:IsA("RemoteEvent") then
-                        eventData.Object:FireServer("add", fakeCarData)
-                        eventData.Object:FireServer("save", fakeCarData)
-                        eventData.Object:FireServer(fakeCarData)
-                    end
-                end)
-                task.wait(0.05)
-            end
-        end
-    end
-end
-
--- Anti-Kick Protection
-function SetupAntiKick()
-    print("🛡️ Setting up anti-kick protection...")
-    
-    -- Hook kick function
-    local oldKick = player.Kick
-    player.Kick = function(self, reason)
-        print("🚫 Kick attempted! Reason: " .. tostring(reason))
-        warn("KICK BLOCKED: " .. reason)
-        return nil -- Prevent kick
-    end
-    
-    -- Monitor for kick attempts
-    game:GetService("ScriptContext").Error:Connect(function(message, trace, script)
-        if string.find(message:lower(), "kick") or string.find(message:lower(), "ban") then
-            print("⚠️ Anti-cheat detected: " .. message)
+    -- Auto-reset after 3 seconds
+    task.delay(3, function()
+        if currentVehicle then
+            updateStatus("✅ Ready to duplicate:\n" .. currentVehicle.Name)
+        else
+            updateStatus("No vehicle detected\n\nSit in a car to begin")
         end
     end)
 end
 
--- DELTA-SPECIFIC: Hook print to hide from game
-local oldPrint = print
-print = function(...)
-    local args = {...}
-    local output = ""
-    for i, v in ipairs(args) do
-        output = output .. tostring(v) .. "\t"
+-- Quick duplication (aggressive)
+local function quickDuplication()
+    if not currentVehicle then
+        updateStatus("❌ Not in a vehicle!")
+        return
     end
-    oldPrint(output)
     
-    -- Also print to Delta console if available
-    if rconsoleprint then
-        rconsoleprint(output .. "\n")
+    local carName = currentVehicle.Name
+    updateStatus("⚡ QUICK DUPE: " .. carName .. "\n\nSpamming all events...")
+    
+    -- Get ALL events
+    local allEvents = {}
+    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+        if obj:IsA("RemoteEvent") then
+            table.insert(allEvents, obj)
+        end
     end
+    
+    -- Spam all events 20 times
+    for i = 1, 20 do
+        for _, event in pairs(allEvents) do
+            pcall(function()
+                event:FireServer(carName)
+                event:FireServer("duplicate", carName)
+                event:FireServer("add", carName)
+            end)
+        end
+        
+        updateStatus("⚡ Quick Dupe: " .. carName .. "\nBatch " .. i .. "/20")
+        task.wait(0.1)
+    end
+    
+    updateStatus("✅ Quick Dupe Complete!\n20 batches sent.\nCheck your garage!")
 end
 
--- Main Loop
-RunService.Heartbeat:Connect(function()
-    DetectVehicle()
+-- Anti-kick protection
+local function setupAntiKick()
+    updateStatus("🛡️ Setting up anti-kick...")
+    
+    -- Hook kick function
+    local oldKick = player.Kick
+    player.Kick = function(self, reason)
+        print("🚫 KICK ATTEMPTED: " .. tostring(reason))
+        updateStatus("⚠️ KICK BLOCKED!\nReason: " .. tostring(reason))
+        return nil
+    end
+    
+    updateStatus("✅ Anti-kick active!\nKick attempts will be blocked.")
+end
+
+-- Button actions
+gui.DescendantAdded:Connect(function(descendant)
+    if descendant:IsA("TextButton") then
+        descendant.MouseButton1Click:Connect(function()
+            local btnName = descendant.Name
+            
+            if btnName == "scan" then
+                scanGame()
+            elseif btnName == "duplicate" then
+                duplicateCar()
+            elseif btnName == "findEvents" then
+                findAllEvents()
+            elseif btnName == "quickDupe" then
+                quickDuplication()
+            elseif btnName == "antiKick" then
+                setupAntiKick()
+            elseif btnName == "close" then
+                gui:Destroy()
+                print("Delta UI closed")
+            end
+        end)
+    end
 end)
 
--- Initial scan
+-- Auto-scan on start
 task.wait(2)
-ScanGameSystems()
+scanGame()
 
 print("\n" .. string.rep("=", 50))
-print("✅ DELTA CAR DUPLICATION SYSTEM LOADED!")
+print("✅ DELTA CAR DUPLICATOR LOADED!")
 print("=":rep(50))
 print("Instructions:")
 print("1. Sit in the car you want to duplicate")
-print("2. Go to 'Vehicle Detection' tab")
-print("3. Make sure Auto-Detect is ON")
-print("4. Go to 'Duplication' tab")
-print("5. Click 'Scan Game Systems'")
-print("6. Select duplication method and amount")
-print("7. Click 'START DUPLICATION'")
-print("8. Check your garage/inventory")
+print("2. Click 'SCAN GAME' to find events")
+print("3. Click 'DUPLICATE CAR' to start")
+print("4. Check your garage/inventory")
 print("=":rep(50))
 
--- Initialize Orion UI
-OrionLib:Init()
+updateStatus("✅ Delta Car Duplicator Ready!\n\nSit in a car and click SCAN GAME")
