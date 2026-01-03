@@ -1,141 +1,242 @@
--- ULTRA SIMPLE CAR DUPE CLIENT
-print("🚗 CAR DUPE CLIENT STARTING...")
+-- FINAL WORKING CAR DUPE CLIENT
+print("==========================================")
+print("🚗 CAR DUPLICATION CLIENT - STARTING")
+print("==========================================")
 
+-- Services
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
 
--- Get the event
-local DupeEvent = ReplicatedStorage:FindFirstChild("Dev_DupeCar")
-if not DupeEvent then
-	print("❌ Waiting for server event...")
-	-- Wait a bit and try again
-	wait(2)
-	DupeEvent = ReplicatedStorage:FindFirstChild("Dev_DupeCar")
-	if not DupeEvent then
-		warn("❌ Server not responding. Make sure server script is running!")
-	else
-		print("✅ Found server event!")
+-- Get RemoteEvent (wait with timeout)
+local DupeEvent = nil
+local serverReady = false
+
+local function connectToServer()
+	for i = 1, 15 do -- 15 second timeout
+		DupeEvent = ReplicatedStorage:FindFirstChild("Dev_DupeCar")
+		if DupeEvent then
+			print("✅ Connected to server!")
+			serverReady = true
+			return true
+		end
+		wait(1)
+		print("⏳ Waiting for server... (" .. i .. "/15)")
 	end
-else
-	print("✅ Server event found immediately")
+	print("❌ Server timeout - make sure server script is running!")
+	return false
 end
 
--- Simple button in corner
+-- Try to connect
+task.spawn(connectToServer)
+
+-- Create simple GUI
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "CarDupeButton"
+screenGui.Name = "CarDupeGUI"
+screenGui.ResetOnSpawn = false
 screenGui.Parent = player:WaitForChild("PlayerGui")
 
-local button = Instance.new("TextButton")
-button.Size = UDim2.new(0, 200, 0, 50)
-button.Position = UDim2.new(1, -210, 0, 20)
-button.Text = "🚗 DUPE CAR"
-button.Font = Enum.Font.GothamBold
-button.TextSize = 18
-button.TextColor3 = Color3.new(1, 1, 1)
-button.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
-button.BorderSizePixel = 0
-button.Parent = screenGui
+-- Main frame
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 300, 0, 180)
+frame.Position = UDim2.new(1, -320, 0, 20)
+frame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+frame.BorderSizePixel = 0
+frame.Parent = screenGui
 
--- Rounded corners
-local corner = Instance.new("UICorner")
-corner.CornerRadius = UDim.new(0, 8)
-corner.Parent = button
+-- Title
+local title = Instance.new("TextLabel")
+title.Text = "🚗 CAR DUPLICATOR"
+title.Size = UDim2.new(1, 0, 0, 40)
+title.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
+title.TextColor3 = Color3.new(1, 1, 1)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 20
+title.Parent = frame
 
--- Status label
+-- Status
 local status = Instance.new("TextLabel")
-status.Size = UDim2.new(0, 200, 0, 40)
-status.Position = UDim2.new(1, -210, 0, 80)
+status.Text = "Initializing..."
+status.Size = UDim2.new(1, -20, 0, 60)
+status.Position = UDim2.new(0, 10, 0, 45)
 status.BackgroundTransparency = 1
 status.TextColor3 = Color3.new(1, 1, 1)
 status.Font = Enum.Font.Gotham
 status.TextSize = 14
 status.TextWrapped = true
-status.Text = "Sit in a car, then click"
-status.Parent = screenGui
+status.Parent = frame
 
--- Track current seat
+-- Button
+local button = Instance.new("TextButton")
+button.Text = "INITIALIZING..."
+button.Size = UDim2.new(1, -40, 0, 50)
+button.Position = UDim2.new(0, 20, 0, 110)
+button.Font = Enum.Font.GothamBold
+button.TextSize = 16
+button.TextColor3 = Color3.new(1, 1, 1)
+button.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+button.BorderSizePixel = 0
+button.Parent = frame
+
+-- Rounded corners
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 10)
+corner.Parent = frame
+
+local buttonCorner = Instance.new("UICorner")
+buttonCorner.CornerRadius = UDim.new(0, 8)
+buttonCorner.Parent = button
+
+-- Border
+local stroke = Instance.new("UIStroke")
+stroke.Color = Color3.fromRGB(0, 150, 255)
+stroke.Thickness = 2
+stroke.Parent = frame
+
+-- Track seat
 local currentSeat = nil
 
--- Check for seat periodically
-game:GetService("RunService").Heartbeat:Connect(function()
+-- Update seat status
+RunService.Heartbeat:Connect(function()
+	-- Check server connection
+	if not serverReady and DupeEvent then
+		serverReady = true
+		status.Text = "✅ Server connected!\nSit in a car to begin"
+		button.Text = "WAITING FOR CAR"
+		button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+	end
+	
+	-- Check character
 	local character = player.Character
-	if not character then return end
+	if not character then
+		currentSeat = nil
+		return
+	end
 	
+	-- Check humanoid
 	local humanoid = character:FindFirstChild("Humanoid")
-	if not humanoid then return end
+	if not humanoid then
+		currentSeat = nil
+		return
+	end
 	
+	-- Check seat
 	local seat = humanoid.SeatPart
 	
 	if seat and seat:IsA("VehicleSeat") then
 		if currentSeat ~= seat then
 			currentSeat = seat
-			status.Text = "✅ In: " .. (seat.Parent.Name or "Car")
-			button.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
-			print("✅ Sitting in car")
+			if serverReady then
+				status.Text = "✅ IN CAR: " .. (seat.Parent.Name or "Unknown Car")
+				button.Text = "DUPLICATE THIS CAR"
+				button.BackgroundColor3 = Color3.fromRGB(0, 180, 80)
+				print("✅ Sitting in car:", seat.Parent.Name)
+			end
 		end
 	else
 		if currentSeat ~= nil then
 			currentSeat = nil
-			status.Text = "❌ Not in a car\nSit in vehicle first"
-			button.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+			if serverReady then
+				status.Text = "❌ NOT IN A CAR\nSit in a vehicle first"
+				button.Text = "NEED TO SIT IN CAR"
+				button.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+			end
 		end
 	end
 end)
 
--- Button click
+-- Button click handler
 button.MouseButton1Click:Connect(function()
-	if not DupeEvent then
-		status.Text = "❌ Server offline!\nRun server script first"
+	-- Check server
+	if not serverReady or not DupeEvent then
+		status.Text = "❌ SERVER OFFLINE\nRun server script first!"
 		button.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
-		warn("Server event not found!")
+		button.Text = "SERVER ERROR"
+		
+		-- Try to reconnect
+		task.spawn(function()
+			wait(2)
+			connectToServer()
+		end)
+		
 		return
 	end
 	
+	-- Check seat
 	if not currentSeat then
-		status.Text = "❌ Sit in a car first!"
+		status.Text = "❌ NO CAR DETECTED\nSit in a car first!"
 		button.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
+		button.Text = "NO CAR"
+		
+		-- Flash red
+		for i = 1, 3 do
+			button.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+			wait(0.1)
+			button.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
+			wait(0.1)
+		end
+		
+		wait(1)
+		if not currentSeat then
+			button.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+			button.Text = "NEED TO SIT IN CAR"
+			status.Text = "❌ NOT IN A CAR\nSit in a vehicle first"
+		end
 		return
 	end
 	
-	-- Visual feedback
-	status.Text = "🔄 Duplicating..."
+	-- Send duplication request
+	print("🔄 Sending duplication request...")
+	
+	status.Text = "🔄 DUPLICATING CAR...\nPlease wait..."
 	button.Text = "PROCESSING..."
 	button.BackgroundColor3 = Color3.fromRGB(255, 165, 0)
 	
-	-- Send request
+	-- Send to server
 	local success = DupeEvent:FireServer(currentSeat)
 	
+	-- Handle response
 	if success then
-		status.Text = "✅ Success!\nCheck ServerStorage"
+		print("✅ Server confirmed duplication!")
+		status.Text = "✅ CAR DUPLICATED!\nCheck ServerStorage/Inventories/"
 		button.Text = "SUCCESS!"
 		button.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
-		print("✅ Duplication successful!")
 	else
-		status.Text = "❌ Failed\nTry again"
-		button.Text = "FAILED"
+		print("❌ Server reported failure")
+		status.Text = "❌ DUPLICATION FAILED\nCheck server output for details"
+		button.Text = "FAILED - TRY AGAIN"
 		button.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-		print("❌ Duplication failed")
 	end
 	
 	-- Reset after 3 seconds
-	wait(3)
-	
-	if currentSeat then
-		button.Text = "🚗 DUPE CAR"
-		button.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
-		status.Text = "✅ In: " .. (currentSeat.Parent.Name or "Car")
-	else
-		button.Text = "🚗 DUPE CAR"
-		button.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-		status.Text = "❌ Not in a car\nSit in vehicle first"
+	task.delay(3, function()
+		if currentSeat then
+			button.Text = "DUPLICATE THIS CAR"
+			button.BackgroundColor3 = Color3.fromRGB(0, 180, 80)
+			status.Text = "✅ IN CAR: " .. (currentSeat.Parent.Name or "Unknown Car")
+		else
+			button.Text = "NEED TO SIT IN CAR"
+			button.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+			status.Text = "❌ NOT IN A CAR\nSit in a vehicle first"
+		end
+	end)
+end)
+
+-- Keybind to toggle GUI
+local UserInputService = game:GetService("UserInputService")
+UserInputService.InputBegan:Connect(function(input)
+	if input.KeyCode == Enum.KeyCode.F2 then
+		screenGui.Enabled = not screenGui.Enabled
+		print("GUI toggled:", screenGui.Enabled)
 	end
 end)
 
-print("==================================")
-print("🚗 CAR DUPE CLIENT READY!")
-print("==================================")
-print("• Button appears in top-right")
+print("==========================================")
+print("🚗 CLIENT READY!")
+print("==========================================")
+print("• GUI appears in top-right corner")
+print("• Press F2 to show/hide GUI")
 print("• Sit in any car with VehicleSeat")
 print("• Click button to duplicate")
-print("==================================")
+print("==========================================")
