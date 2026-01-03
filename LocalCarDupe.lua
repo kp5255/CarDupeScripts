@@ -1,9 +1,10 @@
 -- SERVICES
 local Players = game:GetService("Players")
 local player = Players.LocalPlayer
+local Workspace = game:GetService("Workspace")
 
 -- =========================
--- GUI CREATION
+-- GUI
 -- =========================
 local gui = Instance.new("ScreenGui")
 gui.Name = "DuplicarAutoGUI"
@@ -14,14 +15,13 @@ local fondo = Instance.new("Frame")
 fondo.Size = UDim2.new(0, 340, 0, 210)
 fondo.Position = UDim2.new(0, 100, 0, 100)
 fondo.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-fondo.BorderSizePixel = 0
 fondo.Parent = gui
 
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, 0, 0, 30)
 title.BackgroundTransparency = 1
 title.Text = "Car Detector (Client Test)"
-title.TextColor3 = Color3.fromRGB(255,255,255)
+title.TextColor3 = Color3.new(1,1,1)
 title.TextScaled = true
 title.Parent = fondo
 
@@ -30,7 +30,6 @@ textBox.Size = UDim2.new(0, 260, 0, 32)
 textBox.Position = UDim2.new(0, 40, 0, 50)
 textBox.PlaceholderText = "Sit in a car..."
 textBox.TextEditable = false
-textBox.Text = ""
 textBox.Parent = fondo
 
 local boton = Instance.new("TextButton")
@@ -49,33 +48,35 @@ status.Text = "Waiting..."
 status.Parent = fondo
 
 -- =========================
--- CHARACTER / HUMANOID
+-- CHARACTER
 -- =========================
 local function getCharacter()
     return player.Character or player.CharacterAdded:Wait()
 end
 
 -- =========================
--- ROOT CAR FINDER (FIXED)
+-- CORRECT ROOT CAR DETECTOR
 -- =========================
-local function getRootCarModel(seat)
+local function findCarModelFromSeat(seat)
     local current = seat
-    local rootModel = nil
 
-    while current do
+    while current and current ~= Workspace do
         if current:IsA("Model") then
-            rootModel = current
+            -- Validate this model is a car
+            if current:FindFirstChildWhichIsA("VehicleSeat", true) then
+                return current
+            end
         end
         current = current.Parent
     end
 
-    return rootModel
+    return nil
 end
 
 -- =========================
--- CAR DETECTION
+-- DETECTION
 -- =========================
-local function setupCarDetection()
+local function setupDetection()
     local character = getCharacter()
     local humanoid = character:WaitForChild("Humanoid")
 
@@ -83,16 +84,16 @@ local function setupCarDetection()
         local seat = humanoid.SeatPart
 
         if seat and seat:IsA("VehicleSeat") then
-            local carModel = getRootCarModel(seat)
+            local carModel = findCarModelFromSeat(seat)
 
             if carModel then
                 textBox.Text = carModel.Name
                 status.Text = "Car detected: " .. carModel.Name
-                print("[CLIENT] ROOT car detected:", carModel.Name)
+                print("[CLIENT] Car detected:", carModel.Name)
             else
                 textBox.Text = ""
                 status.Text = "Car not detected"
-                warn("[CLIENT] No root car model found")
+                warn("[CLIENT] Seat found but no car model")
             end
         else
             textBox.Text = ""
@@ -106,27 +107,23 @@ end
 -- CLIENT DUPLICATION
 -- =========================
 local function duplicarAuto()
-    local carName = textBox.Text
-
-    if carName == "" then
-        status.Text = "No car detected"
-        warn("[CLIENT] Duplicate failed: no car")
+    local name = textBox.Text
+    if name == "" then
+        warn("[CLIENT] No car to duplicate")
         return
     end
 
-    local car = workspace:FindFirstChild(carName)
+    local car = Workspace:FindFirstChild(name)
     if not car then
-        status.Text = "Car not in workspace"
-        warn("[CLIENT] Car not found in workspace:", carName)
+        warn("[CLIENT] Car not found in workspace:", name)
         return
     end
 
     local clone = car:Clone()
-    clone.Name = carName .. "_CLIENT"
-    clone.Parent = workspace
+    clone.Name = name .. "_CLIENT"
+    clone.Parent = Workspace
 
-    status.Text = "Client clone created"
-    print("[CLIENT] Cloned locally:", clone.Name)
+    print("[CLIENT] Local clone created:", clone.Name)
 end
 
 boton.MouseButton1Click:Connect(duplicarAuto)
@@ -134,5 +131,6 @@ boton.MouseButton1Click:Connect(duplicarAuto)
 -- =========================
 -- INIT
 -- =========================
-setupCarDetection()
-print("[CLIENT] Car detector loaded")
+setupDetection()
+print("[CLIENT] Car detector loaded correctly")
+
