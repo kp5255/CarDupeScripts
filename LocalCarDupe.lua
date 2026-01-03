@@ -1,136 +1,141 @@
--- SERVICES
+-- SERVER: AUTO DETECT CAR FROM SEAT + REAL DUPE (DEV TEST)
+-- COPY AND PASTE THIS ENTIRE SCRIPT EXACTLY AS IS
+
+-- Services
 local Players = game:GetService("Players")
-local player = Players.LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ServerStorage = game:GetService("ServerStorage")
+local HttpService = game:GetService("HttpService")
 local Workspace = game:GetService("Workspace")
 
--- =========================
--- GUI
--- =========================
-local gui = Instance.new("ScreenGui")
-gui.Name = "DuplicarAutoGUI"
-gui.ResetOnSpawn = false
-gui.Parent = player:WaitForChild("PlayerGui")
-
-local fondo = Instance.new("Frame")
-fondo.Size = UDim2.new(0, 340, 0, 210)
-fondo.Position = UDim2.new(0, 100, 0, 100)
-fondo.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-fondo.Parent = gui
-
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 0, 30)
-title.BackgroundTransparency = 1
-title.Text = "Car Detector (Client Test)"
-title.TextColor3 = Color3.new(1,1,1)
-title.TextScaled = true
-title.Parent = fondo
-
-local textBox = Instance.new("TextBox")
-textBox.Size = UDim2.new(0, 260, 0, 32)
-textBox.Position = UDim2.new(0, 40, 0, 50)
-textBox.PlaceholderText = "Sit in a car..."
-textBox.TextEditable = false
-textBox.Parent = fondo
-
-local boton = Instance.new("TextButton")
-boton.Size = UDim2.new(0, 140, 0, 34)
-boton.Position = UDim2.new(0, 100, 0, 120)
-boton.Text = "Duplicate (Client)"
-boton.Parent = fondo
-
-local status = Instance.new("TextLabel")
-status.Size = UDim2.new(1, -20, 0, 30)
-status.Position = UDim2.new(0, 10, 0, 165)
-status.BackgroundTransparency = 1
-status.TextColor3 = Color3.fromRGB(200,200,200)
-status.TextScaled = true
-status.Text = "Waiting..."
-status.Parent = fondo
-
--- =========================
--- CHARACTER
--- =========================
-local function getCharacter()
-    return player.Character or player.CharacterAdded:Wait()
+-- Get or create event
+local DupeEvent = ReplicatedStorage:FindFirstChild("Dev_DupeCar")
+if not DupeEvent then
+	DupeEvent = Instance.new("RemoteEvent")
+	DupeEvent.Name = "Dev_DupeCar"
+	DupeEvent.Parent = ReplicatedStorage
 end
 
--- =========================
--- CORRECT ROOT CAR DETECTOR
--- =========================
+-- Inventory setup
+local Inventories = ServerStorage:FindFirstChild("Inventories")
+if not Inventories then
+	Inventories = Instance.new("Folder")
+	Inventories.Name = "Inventories"
+	Inventories.Parent = ServerStorage
+end
+
+-- Player join
+Players.PlayerAdded:Connect(function(player)
+	local inv = Instance.new("Folder")
+	inv.Name = tostring(player.UserId)
+	inv.Parent = Inventories
+
+	local cars = Instance.new("Folder")
+	cars.Name = "Cars"
+	cars.Parent = inv
+end)
+
+-- Player leave cleanup
+Players.PlayerRemoving:Connect(function(player)
+	local playerInv = Inventories:FindFirstChild(tostring(player.UserId))
+	if playerInv then
+		playerInv:Destroy()
+	end
+end)
+
+-- Find car from seat
 local function findCarModelFromSeat(seat)
-    local current = seat
+	if not seat then return nil end
+	
+	local current = seat
+	local carModel = nil
 
-    while current and current ~= Workspace do
-        if current:IsA("Model") then
-            -- Validate this model is a car
-            if current:FindFirstChildWhichIsA("VehicleSeat", true) then
-                return current
-            end
-        end
-        current = current.Parent
-    end
+	while current and current ~= Workspace do
+		if current:IsA("Model") then
+			carModel = current
+		end
+		current = current.Parent
+	end
 
-    return nil
+	return carModel
 end
 
--- =========================
--- DETECTION
--- =========================
-local function setupDetection()
-    local character = getCharacter()
-    local humanoid = character:WaitForChild("Humanoid")
+-- Main duplication
+DupeEvent.OnServerEvent:Connect(function(player, seat)
+	-- Basic validation
+	if not player then return end
+	if not seat then
+		warn("[DEV] No seat provided")
+		return
+	end
+	
+	-- Type check
+	if typeof(seat) == "Instance" then
+		if not seat:IsA("VehicleSeat") then
+			warn("[DEV] Not a VehicleSeat")
+			return
+		end
+	else
+		warn("[DEV] Invalid seat type")
+		return
+	end
 
-    humanoid:GetPropertyChangedSignal("SeatPart"):Connect(function()
-        local seat = humanoid.SeatPart
+	-- Find car model
+	local carModel = findCarModelFromSeat(seat)
+	if not carModel then
+		warn("[DEV] Could not find car model")
+		return
+	end
 
-        if seat and seat:IsA("VehicleSeat") then
-            local carModel = findCarModelFromSeat(seat)
+	-- Get player inventory
+	local inv = Inventories:FindFirstChild(tostring(player.UserId))
+	if not inv then
+		warn("[DEV] No inventory for player")
+		return
+	end
 
-            if carModel then
-                textBox.Text = carModel.Name
-                status.Text = "Car detected: " .. carModel.Name
-                print("[CLIENT] Car detected:", carModel.Name)
-            else
-                textBox.Text = ""
-                status.Text = "Car not detected"
-                warn("[CLIENT] Seat found but no car model")
-            end
-        else
-            textBox.Text = ""
-            status.Text = "Not seated"
-            print("[CLIENT] Not seated")
-        end
-    end)
-end
+	local carsFolder = inv:FindFirstChild("Cars")
+	if not carsFolder then
+		warn("[DEV] No Cars folder")
+		return
+	end
 
--- =========================
--- CLIENT DUPLICATION
--- =========================
-local function duplicarAuto()
-    local name = textBox.Text
-    if name == "" then
-        warn("[CLIENT] No car to duplicate")
-        return
-    end
+	-- Generate unique ID safely
+	local success, guid = pcall(function()
+		return HttpService:GenerateGUID(false)
+	end)
+	
+	if not success then
+		warn("[DEV] Failed to generate GUID")
+		return
+	end
 
-    local car = Workspace:FindFirstChild(name)
-    if not car then
-        warn("[CLIENT] Car not found in workspace:", name)
-        return
-    end
+	-- Clone the car
+	local clone = carModel:Clone()
+	local uniqueId = "CAR_" .. guid
+	clone.Name = uniqueId
 
-    local clone = car:Clone()
-    clone.Name = name .. "_CLIENT"
-    clone.Parent = Workspace
+	-- Add metadata
+	local meta = Instance.new("StringValue")
+	meta.Name = "OriginalCarName"
+	meta.Value = carModel.Name
+	meta.Parent = clone
+	
+	-- Add owner info
+	local owner = Instance.new("StringValue")
+	owner.Name = "Owner"
+	owner.Value = player.Name
+	owner.Parent = clone
 
-    print("[CLIENT] Local clone created:", clone.Name)
-end
+	-- Save to inventory
+	clone.Parent = carsFolder
 
-boton.MouseButton1Click:Connect(duplicarAuto)
+	-- Log success
+	print("[DEV DUPE] Duplicated:", carModel.Name, "->", uniqueId, "for", player.Name)
+	
+	return true
+end)
 
--- =========================
--- INIT
--- =========================
-setupDetection()
-print("[CLIENT] Car detector loaded correctly")
+print("Car Auto-Detection Duplication System Loaded")
+
 
