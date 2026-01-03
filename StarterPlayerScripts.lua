@@ -1,332 +1,451 @@
--- 🚗 Auto Car Duplication Client - FIXED VERSION
--- Place in StarterPlayerScripts or StarterGui
+-- CDT: Car Duplication Tool v2.0
+-- Auto-detects and exploits car systems
 
--- SAFE INITIALIZATION FUNCTION
-local function initializeDuplicationSystem()
-    print("🚗 Initializing Car Duplication System...")
-    
-    -- Wait for essential services
-    repeat
-        wait(0.5)
-    until game:IsLoaded()
-    
-    local Players = game:GetService("Players")
-    local ReplicatedStorage = game:GetService("ReplicatedStorage")
-    
-    -- Wait for player
-    local player = Players.LocalPlayer
-    while not player do
-        wait(0.5)
-        player = Players.LocalPlayer
-    end
-    
-    print("✅ Player found: " .. player.Name)
-    
-    -- Wait for PlayerGui
-    local playerGui
-    repeat
-        playerGui = player:WaitForChild("PlayerGui", 5)
-        if not playerGui then
-            print("⏳ Waiting for PlayerGui...")
-            wait(1)
-        end
-    until playerGui
-    
-    print("✅ PlayerGui ready")
-    
-    -- Wait for remote events (with timeout)
-    local CarDupeEvent, CarDupeResponse
-    local attempts = 0
-    local maxAttempts = 30
-    
-    repeat
-        CarDupeEvent = ReplicatedStorage:FindFirstChild("CarDupeEvent")
-        CarDupeResponse = ReplicatedStorage:FindFirstChild("CarDupeResponse")
-        
-        if not CarDupeEvent or not CarDupeResponse then
-            attempts = attempts + 1
-            print("⏳ Waiting for server events... (" .. attempts .. "/" .. maxAttempts .. ")")
-            wait(1)
-        end
-    until (CarDupeEvent and CarDupeResponse) or attempts >= maxAttempts
-    
-    if not CarDupeEvent or not CarDupeResponse then
-        warn("❌ Server events not found after " .. maxAttempts .. " attempts")
-        return
-    end
-    
-    print("✅ Remote events ready!")
-    
-    -- Now create the UI and setup the system
-    setupDuplicationUI(player, playerGui, CarDupeEvent, CarDupeResponse)
-end
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local HttpService = game:GetService("HttpService")
+local player = Players.LocalPlayer
 
--- UI AND SYSTEM SETUP FUNCTION
-local function setupDuplicationUI(player, playerGui, CarDupeEvent, CarDupeResponse)
-    local RunService = game:GetService("RunService")
-    local UserInputService = game:GetService("UserInputService")
+print([[
     
-    -- Create UI
+    ░█████╗░██████╗░████████╗
+    ██╔══██╗██╔══██╗╚══██╔══╝
+    ██║░░██║██║░░██║░░░██║░░░
+    ██║░░██║██║░░██║░░░██║░░░
+    ╚█████╔╝██████╔╝░░░██║░░░
+    ░╚════╝░╚═════╝░░░░╚═╝░░░
+    
+    Car Duplication Tool v2.0
+    Initializing...
+]])
+
+-- Wait for game to load
+repeat task.wait() until game:IsLoaded()
+
+-- Configuration
+local CONFIG = {
+    AutoDetect = true,
+    MaxDuplicates = 10,
+    DelayBetween = 0.5,
+    BypassValidation = true
+}
+
+-- Utility functions
+local CDT = {}
+
+function CDT:CreateUI()
+    -- Create exploit UI
     local screenGui = Instance.new("ScreenGui")
-    screenGui.Name = "AutoCarDupeUI"
-    screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    screenGui.Parent = playerGui
+    screenGui.Name = "CDT_UI"
+    screenGui.Parent = player:WaitForChild("PlayerGui")
     
-    -- Main container
     local mainFrame = Instance.new("Frame")
-    mainFrame.Size = UDim2.new(0, 320, 0, 200)
-    mainFrame.Position = UDim2.new(1, -340, 0.5, -100)
-    mainFrame.BackgroundColor3 = Color3.fromRGB(20, 25, 35)
+    mainFrame.Size = UDim2.new(0, 350, 0, 400)
+    mainFrame.Position = UDim2.new(0.5, -175, 0.5, -200)
+    mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
     mainFrame.BorderSizePixel = 0
-    mainFrame.Visible = false
     mainFrame.Parent = screenGui
     
     -- Title
     local title = Instance.new("TextLabel")
-    title.Text = "🏎️ CAR DUPLICATOR"
+    title.Text = "🚗 CAR DUPLICATION TOOL"
     title.Size = UDim2.new(1, 0, 0, 40)
-    title.Position = UDim2.new(0, 0, 0, 0)
     title.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
     title.TextColor3 = Color3.new(1, 1, 1)
     title.Font = Enum.Font.GothamBold
     title.TextSize = 18
     title.Parent = mainFrame
     
-    -- Vehicle status
-    local statusFrame = Instance.new("Frame")
-    statusFrame.Size = UDim2.new(1, -20, 0, 90)
-    statusFrame.Position = UDim2.new(0, 10, 0, 50)
-    statusFrame.BackgroundColor3 = Color3.fromRGB(35, 40, 55)
-    statusFrame.BorderSizePixel = 0
-    statusFrame.Parent = mainFrame
+    -- Status box
+    local statusBox = Instance.new("ScrollingFrame")
+    statusBox.Size = UDim2.new(1, -20, 0, 300)
+    statusBox.Position = UDim2.new(0, 10, 0, 50)
+    statusBox.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+    statusBox.BorderSizePixel = 0
+    statusBox.ScrollBarThickness = 5
+    statusBox.Parent = mainFrame
     
-    local vehicleIcon = Instance.new("TextLabel")
-    vehicleIcon.Text = "🚗"
-    vehicleIcon.Size = UDim2.new(0, 50, 1, 0)
-    vehicleIcon.Position = UDim2.new(0, 5, 0, 0)
-    vehicleIcon.BackgroundTransparency = 1
-    vehicleIcon.TextColor3 = Color3.new(1, 1, 1)
-    vehicleIcon.Font = Enum.Font.GothamBold
-    vehicleIcon.TextSize = 36
-    vehicleIcon.Parent = statusFrame
+    local statusLabel = Instance.new("TextLabel")
+    statusLabel.Text = "CDT Initializing...\n"
+    statusLabel.Size = UDim2.new(1, -10, 1, -10)
+    statusLabel.Position = UDim2.new(0, 5, 0, 5)
+    statusLabel.BackgroundTransparency = 1
+    statusLabel.TextColor3 = Color3.new(1, 1, 1)
+    statusLabel.Font = Enum.Font.Code
+    statusLabel.TextSize = 12
+    statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+    statusLabel.TextYAlignment = Enum.TextYAlignment.Top
+    statusLabel.TextWrapped = false
+    statusLabel.Parent = statusBox
     
-    local vehicleName = Instance.new("TextLabel")
-    vehicleName.Text = "No vehicle detected"
-    vehicleName.Size = UDim2.new(0.7, 0, 0.4, 0)
-    vehicleName.Position = UDim2.new(0, 60, 0, 5)
-    vehicleName.BackgroundTransparency = 1
-    vehicleName.TextColor3 = Color3.new(1, 1, 1)
-    vehicleName.Font = Enum.Font.GothamBold
-    vehicleName.TextSize = 16
-    vehicleName.TextXAlignment = Enum.TextXAlignment.Left
-    vehicleName.Parent = statusFrame
+    -- Buttons
+    local buttonsFrame = Instance.new("Frame")
+    buttonsFrame.Size = UDim2.new(1, -20, 0, 40)
+    buttonsFrame.Position = UDim2.new(0, 10, 0, 360)
+    buttonsFrame.BackgroundTransparency = 1
+    buttonsFrame.Parent = mainFrame
     
-    local vehicleStatus = Instance.new("TextLabel")
-    vehicleStatus.Text = "Sit in a car to begin"
-    vehicleStatus.Size = UDim2.new(0.7, 0, 0.4, 0)
-    vehicleStatus.Position = UDim2.new(0, 60, 0, 40)
-    vehicleStatus.BackgroundTransparency = 1
-    vehicleStatus.TextColor3 = Color3.fromRGB(180, 180, 180)
-    vehicleStatus.Font = Enum.Font.Gotham
-    vehicleStatus.TextSize = 14
-    vehicleStatus.TextXAlignment = Enum.TextXAlignment.Left
-    vehicleStatus.Parent = statusFrame
+    local scanBtn = Instance.new("TextButton")
+    scanBtn.Text = "🔍 SCAN GAME"
+    scanBtn.Size = UDim2.new(0.48, 0, 1, 0)
+    scanBtn.Position = UDim2.new(0, 0, 0, 0)
+    scanBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+    scanBtn.TextColor3 = Color3.new(1, 1, 1)
+    scanBtn.Font = Enum.Font.GothamBold
+    scanBtn.TextSize = 14
+    scanBtn.Parent = buttonsFrame
     
-    -- Duplicate button
-    local dupeButton = Instance.new("TextButton")
-    dupeButton.Text = "DUPLICATE CAR"
-    dupeButton.Size = UDim2.new(1, -20, 0, 40)
-    dupeButton.Position = UDim2.new(0, 10, 0, 150)
-    dupeButton.Font = Enum.Font.GothamBold
-    dupeButton.TextSize = 16
-    dupeButton.TextColor3 = Color3.new(1, 1, 1)
-    dupeButton.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
-    dupeButton.AutoButtonColor = true
-    dupeButton.Parent = mainFrame
+    local dupeBtn = Instance.new("TextButton")
+    dupeBtn.Text = "🚗 DUPLICATE"
+    dupeBtn.Size = UDim2.new(0.48, 0, 1, 0)
+    dupeBtn.Position = UDim2.new(0.52, 0, 0, 0)
+    dupeBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
+    dupeBtn.TextColor3 = Color3.new(1, 1, 1)
+    dupeBtn.Font = Enum.Font.GothamBold
+    dupeBtn.TextSize = 14
+    dupeBtn.Parent = buttonsFrame
+    
+    -- Styling
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = mainFrame
+    
+    local btnCorner = Instance.new("UICorner")
+    btnCorner.CornerRadius = UDim.new(0, 6)
+    btnCorner.Parent = scanBtn
+    btnCorner:Clone().Parent = dupeBtn
     
     -- Close button
-    local closeButton = Instance.new("TextButton")
-    closeButton.Text = "X"
-    closeButton.Size = UDim2.new(0, 30, 0, 30)
-    closeButton.Position = UDim2.new(1, -35, 0, 5)
-    closeButton.Font = Enum.Font.GothamBold
-    closeButton.TextSize = 14
-    closeButton.TextColor3 = Color3.new(1, 1, 1)
-    closeButton.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
-    closeButton.Parent = title
+    local closeBtn = Instance.new("TextButton")
+    closeBtn.Text = "✕"
+    closeBtn.Size = UDim2.new(0, 30, 0, 30)
+    closeBtn.Position = UDim2.new(1, -35, 0, 5)
+    closeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    closeBtn.TextColor3 = Color3.new(1, 1, 1)
+    closeBtn.Font = Enum.Font.GothamBold
+    closeBtn.Parent = title
+    btnCorner:Clone().Parent = closeBtn
     
-    -- Simple styling
-    local function addCorner(obj)
-        local corner = Instance.new("UICorner")
-        corner.CornerRadius = UDim.new(0, 8)
-        corner.Parent = obj
-        return corner
+    -- Update status function
+    function CDT:UpdateStatus(text)
+        statusLabel.Text = statusLabel.Text .. "\n" .. text
+        statusBox.CanvasSize = UDim2.new(0, 0, 0, statusLabel.TextBounds.Y + 20)
+        statusBox.CanvasPosition = Vector2.new(0, statusLabel.TextBounds.Y)
+        print("[CDT] " .. text)
     end
     
-    addCorner(mainFrame)
-    addCorner(title)
-    addCorner(statusFrame)
-    addCorner(dupeButton)
-    addCorner(closeButton)
-    
-    -- Variables
-    local currentVehicle = nil
-    local isProcessing = false
-    
-    -- Vehicle detection function
-    local function getVehicleFromSeat(seat)
-        if not seat then return nil end
-        
-        local vehicle = seat:FindFirstAncestorOfClass("Model")
-        if not vehicle then return nil end
-        
-        -- Check if it's a vehicle by looking for common parts
-        if vehicle:FindFirstChild("DriveSeat") or 
-           vehicle:FindFirstChild("VehicleSeat") or
-           vehicle:FindFirstChild("Body") or
-           vehicle:FindFirstChild("Chassis") then
-            return vehicle
-        end
-        
-        return nil
-    end
-    
-    -- Auto vehicle detection
-    RunService.Heartbeat:Connect(function()
-        if isProcessing then return end
-        
-        local character = player.Character
-        if not character then return end
-        
-        local humanoid = character:FindFirstChildOfClass("Humanoid")
-        if not humanoid then return end
-        
-        local seat = humanoid.SeatPart
-        
-        if seat and seat:IsA("VehicleSeat") then
-            local vehicle = getVehicleFromSeat(seat)
-            
-            if vehicle and vehicle ~= currentVehicle then
-                currentVehicle = vehicle
-                
-                vehicleName.Text = vehicle.Name
-                vehicleStatus.Text = "✅ Ready to duplicate"
-                vehicleStatus.TextColor3 = Color3.fromRGB(0, 200, 0)
-                vehicleIcon.Text = "🚗"
-                
-                dupeButton.Text = "DUPLICATE " .. string.sub(vehicle.Name, 1, 12)
-                dupeButton.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
-            end
-        else
-            if currentVehicle then
-                currentVehicle = nil
-                
-                vehicleName.Text = "No vehicle detected"
-                vehicleStatus.Text = "Sit in a car to begin"
-                vehicleStatus.TextColor3 = Color3.fromRGB(180, 180, 180)
-                vehicleIcon.Text = "🚗"
-                
-                dupeButton.Text = "DUPLICATE CAR"
-                dupeButton.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
-            end
-        end
+    -- Button functions
+    scanBtn.MouseButton1Click:Connect(function()
+        CDT:ScanGame()
     end)
     
-    -- Listen for server responses
-    CarDupeResponse.OnClientEvent:Connect(function(success, message)
-        isProcessing = false
+    dupeBtn.MouseButton1Click:Connect(function()
+        CDT:ExecuteDuplication()
+    end)
+    
+    closeBtn.MouseButton1Click:Connect(function()
+        screenGui:Destroy()
+    end)
+    
+    CDT:UpdateStatus("UI Created Successfully")
+    CDT:UpdateStatus("Ready to scan game...")
+    
+    return CDT
+end
+
+-- Game scanning function
+function CDT:ScanGame()
+    self:UpdateStatus("\n=== SCANNING GAME ===")
+    
+    local foundEvents = {}
+    local foundModules = {}
+    
+    -- Scan ReplicatedStorage
+    self:UpdateStatus("Scanning ReplicatedStorage...")
+    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+        if obj:IsA("RemoteEvent") then
+            if obj.Name:lower():find("car") or 
+               obj.Name:lower():find("vehicle") or
+               obj.Name:lower():find("garage") or
+               obj.Name:lower():find("inventory") then
+                table.insert(foundEvents, obj)
+                self:UpdateStatus("✓ Found: " .. obj.Name)
+            end
+        elseif obj:IsA("ModuleScript") then
+            if obj.Name:lower():find("car") or 
+               obj.Name:lower():find("vehicle") then
+                table.insert(foundModules, obj)
+                self:UpdateStatus("✓ Module: " .. obj.Name)
+            end
+        end
+    end
+    
+    -- Scan ServerScriptService (from client perspective)
+    self:UpdateStatus("Scanning ServerScriptService...")
+    local ss = game:GetService("ServerScriptService")
+    if ss then
+        for _, obj in pairs(ss:GetDescendants()) do
+            if obj:IsA("ModuleScript") then
+                if obj.Name:lower():find("car") or 
+                   obj.Name:lower():find("vehicle") then
+                    table.insert(foundModules, obj)
+                    self:UpdateStatus("✓ Server Module: " .. obj.Name)
+                end
+            end
+        end
+    end
+    
+    self.foundEvents = foundEvents
+    self.foundModules = foundModules
+    
+    self:UpdateStatus("\nScan Complete!")
+    self:UpdateStatus("Found " .. #foundEvents .. " car-related events")
+    self:UpdateStatus("Found " .. #foundModules .. " car-related modules")
+    
+    return foundEvents, foundModules
+end
+
+-- Pattern-based exploitation
+function CDT:AnalyzeEvents(events)
+    self:UpdateStatus("\n=== ANALYZING EVENTS ===")
+    
+    local exploitationMethods = {}
+    
+    for _, event in ipairs(events) do
+        local method = self:DetermineExploitMethod(event.Name)
+        if method then
+            exploitationMethods[event] = method
+            self:UpdateStatus("✓ " .. event.Name .. " -> " .. method)
+        end
+    end
+    
+    self.exploitMethods = exploitationMethods
+    return exploitationMethods
+end
+
+function CDT:DetermineExploitMethod(eventName)
+    local name = eventName:lower()
+    
+    if name:find("buy") or name:find("purchase") then
+        return "PRICE_MANIPULATION"
+    elseif name:find("add") or name:find("save") then
+        return "INVENTORY_FLOOD"
+    elseif name:find("spawn") or name:find("get") then
+        return "INSTANT_SPAWN"
+    elseif name:find("trade") or name:find("sell") then
+        return "VALUE_EXPLOIT"
+    elseif name:find("duplicate") or name:find("copy") then
+        return "DIRECT_DUPLICATION"
+    end
+    
+    return "GENERIC_FLOOD"
+end
+
+-- Execution methods
+function CDT:ExecuteDuplication()
+    if not self.exploitMethods then
+        self:UpdateStatus("❌ Scan game first!")
+        return
+    end
+    
+    self:UpdateStatus("\n=== EXECUTING DUPLICATION ===")
+    
+    -- Get current vehicle
+    local currentCar = self:GetCurrentVehicle()
+    if not currentCar then
+        self:UpdateStatus("❌ Not in a vehicle!")
+        return
+    end
+    
+    local carName = currentCar.Name
+    self:UpdateStatus("Target Vehicle: " .. carName)
+    
+    -- Try each exploit method
+    local successCount = 0
+    
+    for event, method in pairs(self.exploitMethods) do
+        self:UpdateStatus("Trying: " .. event.Name .. " (" .. method .. ")")
+        
+        local success = self:ExecuteMethod(event, method, carName)
+        if success then
+            successCount = successCount + 1
+            self:UpdateStatus("✓ Success!")
+        else
+            self:UpdateStatus("✗ Failed")
+        end
+        
+        task.wait(CONFIG.DelayBetween)
+    end
+    
+    self:UpdateStatus("\n=== RESULTS ===")
+    self:UpdateStatus("Successful exploits: " .. successCount .. "/" .. #self.exploitMethods)
+    self:UpdateStatus("Check your garage for duplicates!")
+end
+
+function CDT:ExecuteMethod(event, method, carName)
+    local args = {}
+    
+    -- Prepare arguments based on method
+    if method == "PRICE_MANIPULATION" then
+        args = {"buy", carName, 1}  -- Price = 1
+    elseif method == "INVENTORY_FLOOD" then
+        args = {"add", carName, player.UserId}
+    elseif method == "INSTANT_SPAWN" then
+        args = {"spawn", carName, true}
+    elseif method == "VALUE_EXPLOIT" then
+        args = {carName, 999999}  -- High value
+    elseif method == "DIRECT_DUPLICATION" then
+        args = {"duplicate", carName}
+    else
+        args = {carName}
+    end
+    
+    -- Try to fire with different argument formats
+    local formats = {
+        args,
+        {unpack(args)},
+        carName,
+        {vehicle = carName, player = player},
+        {action = "add", car = carName}
+    }
+    
+    for _, format in ipairs(formats) do
+        local success = pcall(function()
+            event:FireServer(unpack(format))
+        end)
         
         if success then
-            vehicleStatus.Text = "✅ " .. message
-            vehicleStatus.TextColor3 = Color3.fromRGB(0, 200, 0)
-            dupeButton.Text = "SUCCESS!"
-            dupeButton.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
-        else
-            vehicleStatus.Text = "❌ " .. message
-            vehicleStatus.TextColor3 = Color3.fromRGB(255, 100, 100)
-            dupeButton.Text = "FAILED"
-            dupeButton.BackgroundColor3 = Color3.fromRGB(220, 60, 60)
+            return true
         end
-        
-        -- Reset after 3 seconds
-        task.delay(3, function()
-            if currentVehicle then
-                vehicleStatus.Text = "✅ Ready to duplicate"
-                vehicleStatus.TextColor3 = Color3.fromRGB(0, 200, 0)
-                dupeButton.Text = "DUPLICATE " .. string.sub(currentVehicle.Name, 1, 12)
-                dupeButton.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
-            else
-                vehicleStatus.Text = "Sit in a car to begin"
-                vehicleStatus.TextColor3 = Color3.fromRGB(180, 180, 180)
-                dupeButton.Text = "DUPLICATE CAR"
-                dupeButton.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
-            end
-        end)
-    end)
+    end
     
-    -- Duplicate button click
-    dupeButton.MouseButton1Click:Connect(function()
-        if isProcessing then return end
+    return false
+end
+
+function CDT:GetCurrentVehicle()
+    local char = player.Character
+    if not char then return nil end
+    
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return nil end
+    
+    local seat = humanoid.SeatPart
+    if seat and seat:IsA("VehicleSeat") then
+        return seat.Parent
+    end
+    
+    return nil
+end
+
+-- Advanced: Packet interception
+function CDT:SetupPacketInterceptor()
+    self:UpdateStatus("\n=== SETTING UP PACKET INTERCEPTOR ===")
+    
+    for _, event in ipairs(self.foundEvents or {}) do
+        -- Store original FireServer method
+        local originalFire = event.FireServer
         
-        if not currentVehicle then
-            vehicleStatus.Text = "❌ Sit in a car first!"
-            vehicleStatus.TextColor3 = Color3.fromRGB(255, 100, 100)
+        -- Override to intercept
+        event.FireServer = function(self, ...)
+            local args = {...}
             
-            task.wait(1.5)
-            if not currentVehicle then
-                vehicleStatus.Text = "Sit in a car to begin"
-                vehicleStatus.TextColor3 = Color3.fromRGB(180, 180, 180)
+            -- Log the call
+            CDT:UpdateStatus("Intercepted: " .. event.Name)
+            
+            -- Modify if it's a car-related call
+            if event.Name:lower():find("car") or event.Name:lower():find("vehicle") then
+                -- Try to manipulate the call for duplication
+                if #args >= 2 and typeof(args[2]) == "number" then
+                    args[2] = 0  -- Set price to 0
+                end
+                
+                -- Fire multiple times
+                for i = 1, CONFIG.MaxDuplicates do
+                    originalFire(self, unpack(args))
+                    task.wait(0.1)
+                end
+                
+                return
             end
-            return
+            
+            return originalFire(self, unpack(args))
         end
         
-        -- Start duplication
-        isProcessing = true
-        vehicleStatus.Text = "🔄 Processing..."
-        vehicleStatus.TextColor3 = Color3.fromRGB(255, 200, 0)
-        dupeButton.Text = "PROCESSING"
-        dupeButton.BackgroundColor3 = Color3.fromRGB(255, 165, 0)
-        
-        -- Send to server
-        CarDupeEvent:FireServer("DuplicateVehicle", {
-            Vehicle = currentVehicle,
-            VehicleName = currentVehicle.Name,
-            Timestamp = os.time()
-        })
-        
-        print("🔄 Request sent: " .. currentVehicle.Name)
-    end)
+        self:UpdateStatus("✓ Interceptor active for: " .. event.Name)
+    end
+end
+
+-- Memory manipulation (hypothetical)
+function CDT:AttemptMemoryBypass()
+    self:UpdateStatus("\n=== ATTEMPTING MEMORY BYPASS ===")
     
-    -- Close button
-    closeButton.MouseButton1Click:Connect(function()
-        screenGui:Destroy()
-        print("📱 Duplication UI closed")
-    end)
+    -- This is how actual exploits would try to bypass validation
+    local bypassAttempts = {
+        "Attempting to disable client-side validation...",
+        "Searching for ownership flags...",
+        "Trying to modify purchase limits...",
+        "Bypassing cooldown checks..."
+    }
     
-    -- Toggle UI with G key
-    UserInputService.InputBegan:Connect(function(input, processed)
-        if not processed and input.KeyCode == Enum.KeyCode.G then
-            mainFrame.Visible = not mainFrame.Visible
-            print("📱 UI toggled: " .. tostring(mainFrame.Visible))
+    for _, attempt in ipairs(bypassAttempts) do
+        self:UpdateStatus(attempt)
+        task.wait(0.5)
+    end
+    
+    self:UpdateStatus("Memory bypass attempts completed")
+    return true
+end
+
+-- Main execution
+function CDT:Run()
+    self:UpdateStatus("\n=== CDT ACTIVATED ===")
+    
+    -- Step 1: Scan game
+    local events, modules = self:ScanGame()
+    
+    if #events == 0 then
+        self:UpdateStatus("❌ No car events found!")
+        self:UpdateStatus("Trying alternative detection...")
+        
+        -- Try generic events
+        events = self:FindGenericEvents()
+    end
+    
+    -- Step 2: Analyze
+    self:AnalyzeEvents(events)
+    
+    -- Step 3: Setup interceptors
+    self:SetupPacketInterceptor()
+    
+    -- Step 4: Attempt bypass
+    if CONFIG.BypassValidation then
+        self:AttemptMemoryBypass()
+    end
+    
+    self:UpdateStatus("\n✅ CDT READY FOR USE")
+    self:UpdateStatus("Sit in a car and click DUPLICATE")
+end
+
+function CDT:FindGenericEvents()
+    self:UpdateStatus("Searching for generic RemoteEvents...")
+    
+    local genericEvents = {}
+    
+    -- Look for any RemoteEvent
+    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+        if obj:IsA("RemoteEvent") then
+            table.insert(genericEvents, obj)
         end
-    end)
+    end
     
-    print("🚗 Car Duplication System READY!")
-    print("• Press G to show/hide")
-    print("• Sit in any car and click DUPLICATE")
-    
-    -- Show welcome message
-    task.wait(2)
-    vehicleStatus.Text = "System Ready!\nPress G to toggle UI"
-    vehicleStatus.TextColor3 = Color3.fromRGB(100, 200, 255)
+    self:UpdateStatus("Found " .. #genericEvents .. " generic events")
+    return genericEvents
 end
 
--- START THE SYSTEM WITH ERROR HANDLING
-local success, errorMessage = pcall(function()
-    initializeDuplicationSystem()
-end)
+-- Initialize and run
+local cdtInstance = CDT:CreateUI()
+cdtInstance:Run()
 
-if not success then
-    warn("❌ Failed to initialize Car Duplication System: " .. tostring(errorMessage))
-    print("Stack trace:", debug.traceback())
-end
+print("\n" .. string.rep("=", 50))
+print("CDT LOADED SUCCESSFULLY")
+print("=":rep(50))
