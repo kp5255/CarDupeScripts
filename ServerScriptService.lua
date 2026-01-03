@@ -503,4 +503,5 @@ print("• Max per day: " .. CONFIG.MaxDuplicatesPerDay)
 print("• Cooldown: " .. CONFIG.DuplicateCooldown .. "s")
 print("• Trading: " .. (CONFIG.AllowTrading and "ENABLED" : "DISABLED"))
 print("• Selling: " .. (CONFIG.AllowSelling and "ENABLED" : "DISABLED"))
-print("• Model Cloning: " ..
+print("• Model Cloning: " .. (CONFIG.EnableVehicleCloning and "ENABLED" : "DISABLED"))
+print("=":rep(70))
