@@ -1,6 +1,16 @@
 -- SERVER: AUTO DETECT CAR FROM SEAT + REAL DUPE (DEV TEST)
 -- COPY AND PASTE THIS ENTIRE SCRIPT EXACTLY AS IS
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local DupeEvent = ReplicatedStorage:FindFirstChild("Dev_DupeCar")
+if not DupeEvent then
+    DupeEvent = Instance.new("RemoteEvent")
+    DupeEvent.Name = "Dev_DupeCar"
+    DupeEvent.Parent = ReplicatedStorage
+    print("[SERVER] Dev_DupeCar created")
+else
+    print("[SERVER] Dev_DupeCar already exists")
+end
 -- Services
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -137,3 +147,4 @@ DupeEvent.OnServerEvent:Connect(function(player, seat)
 end)
 
 print("Car Auto-Detection Duplication System Loaded")
+
