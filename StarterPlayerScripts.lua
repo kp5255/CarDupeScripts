@@ -1,9 +1,8 @@
--- 🏢 SPECIFIC SCRIPT FOR: Car Dealership Tycoon
--- Game ID from your link: Code ffad7ea30d080c4aa1d7bf4b2f5f4381
--- This is a specific Car Dealership Tycoon game
+-- 🏢 IMPROVED CAR DEALERSHIP TYCOON SCRIPT
+-- Game ID: ffad7ea30d080c4aa1d7bf4b2f5f4381
 
 print("==========================================")
-print("SPECIFIC CAR DEALERSHIP TYCOON EXPLOIT")
+print("CAR DEALERSHIP TYCOON - FIXED VERSION")
 print("==========================================")
 
 -- Services
@@ -16,412 +15,283 @@ local player = Players.LocalPlayer
 repeat task.wait() until game:IsLoaded()
 print("Game loaded: " .. game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name)
 
--- ===== GAME-SPECIFIC HACKS =====
--- Based on analysis of Car Dealership Tycoon games
+-- ===== FIXED FUNCTIONS =====
 
--- 1. First, let's find the ACTUAL events in this specific game
-local function findRealEvents()
-    print("\n🔍 Finding game events...")
+-- FIX 1: Track REAL changes, not just successful pcall()
+local function getFreeMoney()
+    print("\n💰 Getting FREE MONEY...")
     
-    local eventsFound = {}
+    -- Store ORIGINAL money BEFORE trying anything
+    local originalMoney = 0
+    local moneyStatName = nil
     
-    -- Common events in Car Dealership Tycoon
-    local targetEvents = {
-        -- Money related
-        "AddMoney",
-        "SetMoney", 
-        "GiveMoney",
-        "Money",
-        "Cash",
-        -- Car related
-        "BuyCar",
-        "PurchaseCar",
-        "SellCar",
-        "AddCar",
-        "RemoveCar",
-        -- Dealership related
-        "BuyDealership",
-        "UpgradeDealership",
-        "UnlockDealership",
-        -- Game save/load
-        "Save",
-        "Load",
-        "DataSave"
-    }
-    
-    for _, eventName in pairs(targetEvents) do
-        local event = ReplicatedStorage:FindFirstChild(eventName)
-        if event then
-            table.insert(eventsFound, {Name = eventName, Object = event, Type = event.ClassName})
-            print("✅ Found: " .. eventName .. " (" .. event.ClassName .. ")")
-        end
-    end
-    
-    -- Search for any remote with car/money/dealership in name
-    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
-        if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
-            local name = obj.Name:lower()
-            if name:find("car") or name:find("money") or name:find("dealership") or 
-               name:find("buy") or name:find("sell") or name:find("vehicle") then
-                
-                local alreadyFound = false
-                for _, found in pairs(eventsFound) do
-                    if found.Name == obj.Name then
-                        alreadyFound = true
-                        break
-                    end
-                end
-                
-                if not alreadyFound then
-                    table.insert(eventsFound, {Name = obj.Name, Object = obj, Type = obj.ClassName})
-                    print("✅ Found: " .. obj.Name .. " (" .. obj.ClassName .. ")")
+    if player:FindFirstChild("leaderstats") then
+        for _, stat in pairs(player.leaderstats:GetChildren()) do
+            if stat:IsA("IntValue") or stat:IsA("NumberValue") then
+                local nameLower = stat.Name:lower()
+                if nameLower:find("money") or nameLower:find("cash") or nameLower:find("dollar") then
+                    originalMoney = stat.Value
+                    moneyStatName = stat.Name
+                    print("Found money stat: " .. stat.Name .. " = $" .. originalMoney)
                 end
             end
         end
     end
     
-    return eventsFound
-end
-
--- 2. Get FREE MONEY (most important first)
-local function getFreeMoney()
-    print("\n💰 Getting FREE MONEY...")
+    -- Now try the events
+    local moneyAmounts = {999999, 1000000 }
+    local events = {"AddMoney", "SetMoney", "GiveMoney", "Money", "Cash"}
     
-    local moneyEvents = findRealEvents()
-    local success = false
-    
-    -- Try specific money amounts
-    local moneyAmounts = {999999, 1000000, 5000000, 10000000, 9999999}
-    
-    for _, eventData in pairs(moneyEvents) do
-        local event = eventData.Object
-        local eventName = eventData.Name:lower()
-        
-        if eventName:find("money") or eventName:find("cash") or eventName:find("add") or eventName:find("set") then
-            print("Trying money event: " .. eventData.Name)
+    for _, eventName in pairs(events) do
+        local event = ReplicatedStorage:FindFirstChild(eventName)
+        if event then
+            print("Trying event: " .. eventName .. " (" .. event.ClassName .. ")")
             
             for _, amount in pairs(moneyAmounts) do
-                -- Try different argument formats
                 local attempts = {
                     {amount},
                     {player, amount},
-                    {"add", amount},
-                    {"set", amount},
                     {player.UserId, amount}
                 }
                 
                 for _, args in pairs(attempts) do
-                    local worked = pcall(function()
-                        if eventData.Type == "RemoteEvent" then
+                    local success, errorMsg = pcall(function()
+                        if event:IsA("RemoteEvent") then
                             event:FireServer(unpack(args))
                         else
                             event:InvokeServer(unpack(args))
                         end
                     end)
                     
-                    if worked then
-                        print("✅ Sent $" .. amount .. " via " .. eventData.Name)
-                        success = true
+                    if success then
+                        print("✅ Event fired: " .. eventName .. " with $" .. amount)
+                        -- WAIT and CHECK if money actually changed
+                        task.wait(0.5)
+                        if moneyStatName then
+                            local newMoney = player.leaderstats[moneyStatName].Value
+                            if newMoney ~= originalMoney then
+                                print("🎉 REAL CHANGE! Money: $" .. originalMoney .. " → $" .. newMoney)
+                                return true
+                            end
+                        end
+                    else
+                        print("❌ Event failed: " .. errorMsg)
                     end
-                    
-                    task.wait(0.05)
                 end
             end
         end
     end
     
-    -- Try to modify leaderstats directly
-    if player:FindFirstChild("leaderstats") then
-        local leaderstats = player.leaderstats
-        for _, stat in pairs(leaderstats:GetChildren()) do
-            if stat:IsA("IntValue") or stat:IsA("NumberValue") then
-                local statName = stat.Name:lower()
-                if statName:find("money") or statName:find("cash") or statName:find("dollar") then
-                    pcall(function()
-                        local oldValue = stat.Value
-                        stat.Value = 9999999
-                        print("✅ Changed " .. stat.Name .. " from $" .. oldValue .. " to $9,999,999")
-                        success = true
-                    end)
+    -- FIX 2: If direct events don't work, try to find money-related modules
+    print("\n🔍 Searching for money modules...")
+    
+    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+        if obj:IsA("ModuleScript") and obj.Name:lower():find("money") then
+            print("Found money module: " .. obj.Name)
+            -- Try to require and call it
+            local success, module = pcall(function() return require(obj) end)
+            if success then
+                if type(module) == "table" then
+                    for funcName, func in pairs(module) do
+                        if type(func) == "function" and (funcName:lower():find("add") or funcName:lower():find("set")) then
+                            local success2 = pcall(function()
+                                func(9999999)
+                            end)
+                            if success2 then
+                                print("✅ Called money function: " .. funcName)
+                            end
+                        end
+                    end
                 end
             end
         end
     end
     
-    if success then
-        print("\n🎉 MONEY EXPLOIT SUCCESSFUL!")
-        print("Check your money in the game!")
-    else
-        print("\n❌ Money exploit failed")
-        print("Game might have security measures")
+    -- Final check
+    if moneyStatName then
+        local finalMoney = player.leaderstats[moneyStatName].Value
+        if finalMoney > originalMoney then
+            print("🎉 SUCCESS! Money increased by: $" .. (finalMoney - originalMoney))
+            return true
+        end
     end
     
-    return success
+    print("❌ No money changes detected")
+    return false
 end
 
--- 3. Duplicate Cars in Dealership
+-- FIX 3: Better car detection and duplication
 local function duplicateDealershipCars()
     print("\n🚗 Duplicating dealership cars...")
     
-    -- First, find cars in the game
-    local carsInGame = {}
+    -- FIRST: Check if player actually owns any cars
+    local ownedCars = {}
     
-    -- Look in workspace for car models
-    if Workspace:FindFirstChild("Cars") then
-        for _, car in pairs(Workspace.Cars:GetChildren()) do
-            if car:IsA("Model") then
-                table.insert(carsInGame, car.Name)
-                print("Found car: " .. car.Name)
+    -- Check player data folder
+    if player:FindFirstChild("Data") then
+        for _, data in pairs(player.Data:GetChildren()) do
+            if data.Name:find("Car") or data.Name:find("Vehicle") then
+                table.insert(ownedCars, data.Name)
+                print("Found owned car: " .. data.Name)
             end
         end
     end
     
-    -- Look for car spawners or dealership lots
-    for _, obj in pairs(Workspace:GetDescendants()) do
-        if obj:IsA("Model") then
-            if obj.Name:find("Car") or obj.Name:find("Vehicle") then
-                if #obj:GetChildren() > 5 then -- Likely a car model
-                    if not table.find(carsInGame, obj.Name) then
-                        table.insert(carsInGame, obj.Name)
-                        print("Found vehicle: " .. obj.Name)
-                    end
-                end
+    -- Check inventory
+    if player:FindFirstChild("Inventory") then
+        for _, item in pairs(player.Inventory:GetChildren()) do
+            if item.Name:find("Car") or item.Name:find("Vehicle") then
+                table.insert(ownedCars, item.Name)
+                print("Found inventory car: " .. item.Name)
             end
         end
     end
     
-    if #carsInGame == 0 then
-        print("❌ No cars found in dealership!")
-        print("Buy some cars first or walk around the dealership")
+    if #ownedCars == 0 then
+        print("⚠️ No owned cars found! Buy a car first!")
         return false
     end
     
-    -- Now try to duplicate them
-    local events = findRealEvents()
+    -- Now try to duplicate owned cars
+    local events = {"BuyCar", "PurchaseCar", "AddCar", "UnlockCar"}
     local successCount = 0
     
-    for _, carName in pairs(carsInGame) do
+    for _, carName in pairs(ownedCars) do
         print("\nTrying to duplicate: " .. carName)
         
-        for _, eventData in pairs(events) do
-            local eventName = eventData.Name:lower()
-            
-            if eventName:find("buy") or eventName:find("purchase") or eventName:find("add") then
-                local event = eventData.Object
-                
-                -- Try different purchase methods
+        for _, eventName in pairs(events) do
+            local event = ReplicatedStorage:FindFirstChild(eventName)
+            if event then
+                -- Try different purchase formats
                 local attempts = {
                     {carName},
-                    {carName, 0}, -- Free
-                    {carName, 1}, -- $1
                     {player, carName},
-                    {"buy", carName},
-                    {vehicle = carName, price = 0}
+                    {carName, 0},
+                    {"free", carName}
                 }
                 
                 for _, args in pairs(attempts) do
-                    local worked = pcall(function()
-                        if eventData.Type == "RemoteEvent" then
+                    local success, errorMsg = pcall(function()
+                        if event:IsA("RemoteEvent") then
                             event:FireServer(unpack(args))
                         else
                             event:InvokeServer(unpack(args))
                         end
                     end)
                     
-                    if worked then
-                        print("✅ Duplicated via " .. eventData.Name)
+                    if success then
+                        print("✅ Event fired: " .. eventName)
                         successCount = successCount + 1
+                        -- Wait a bit to avoid rate limiting
+                        task.wait(0.2)
+                    else
+                        if errorMsg:find("rate") or errorMsg:find("spam") then
+                            print("⚠️ Rate limited, waiting...")
+                            task.wait(1)
+                        end
                     end
-                    
-                    task.wait(0.03)
                 end
             end
         end
     end
     
-    if successCount > 0 then
-        print("\n🎉 CAR DUPLICATION SUCCESSFUL!")
-        print(successCount .. " duplication attempts made")
-        print("Check your dealership for new cars!")
-        return true
-    else
-        print("\n❌ Car duplication failed")
-        return false
+    -- Check if any new cars were added
+    if player:FindFirstChild("Data") then
+        task.wait(1)
+        local newCarCount = 0
+        for _, data in pairs(player.Data:GetChildren()) do
+            if data.Name:find("Car") or data.Name:find("Vehicle") then
+                if not table.find(ownedCars, data.Name) then
+                    newCarCount = newCarCount + 1
+                end
+            end
+        end
+        
+        if newCarCount > 0 then
+            print("🎉 ADDED " .. newCarCount .. " NEW CARS!")
+            return true
+        end
     end
+    
+    print("Duplicated " .. successCount .. " times (check inventory)")
+    return successCount > 0
 end
 
--- 4. Unlock Everything
+-- FIX 4: Unlock with better detection
 local function unlockEverything()
     print("\n🔓 Unlocking all dealership features...")
     
-    local events = findRealEvents()
-    local success = false
+    local events = {"UpgradeDealership", "UnlockDealership", "BuyDealership"}
+    local anySuccess = false
     
-    for _, eventData in pairs(events) do
-        local eventName = eventData.Name:lower()
-        
-        if eventName:find("unlock") or eventName:find("upgrade") or eventName:find("buydealership") then
-            local event = eventData.Object
+    -- First check current dealership level
+    local currentLevel = 1
+    if player:FindFirstChild("DealershipLevel") then
+        currentLevel = player.DealershipLevel.Value
+        print("Current dealership level: " .. currentLevel)
+    end
+    
+    for _, eventName in pairs(events) do
+        local event = ReplicatedStorage:FindFirstChild(eventName)
+        if event then
+            print("Trying event: " .. eventName)
             
-            -- Try to unlock all levels
+            -- Try to unlock max levels
             for level = 1, 10 do
-                local attempts = {
-                    {level},
-                    {player, level},
-                    {"unlock", level},
-                    {"upgrade", level}
-                }
+                local success, errorMsg = pcall(function()
+                    if event:IsA("RemoteEvent") then
+                        event:FireServer(level)
+                    else
+                        event:InvokeServer(level)
+                    end
+                end)
                 
-                for _, args in pairs(attempts) do
-                    local worked = pcall(function()
-                        if eventData.Type == "RemoteEvent" then
-                            event:FireServer(unpack(args))
-                        else
-                            event:InvokeServer(unpack(args))
-                        end
-                    end)
-                    
-                    if worked then
-                        print("✅ Unlocked level " .. level .. " via " .. eventData.Name)
-                        success = true
+                if success then
+                    print("✅ Sent level " .. level .. " to " .. eventName)
+                    anySuccess = true
+                    task.wait(0.1)
+                else
+                    if not errorMsg:find("Not connected") then
+                        print("❌ Failed: " .. errorMsg)
                     end
                 end
             end
         end
     end
     
-    if success then
-        print("\n🎉 UNLOCK SUCCESSFUL!")
-    else
-        print("\n❌ Unlock failed")
-    end
-    
-    return success
-end
-
--- 5. Auto-execute everything
-local function autoHack()
-    print("\n" .. string.rep("=", 50))
-    print("🚀 STARTING AUTO-HACK SEQUENCE")
-    print(string.rep("=", 50))
-    
-    -- Step 1: Find events
-    local events = findRealEvents()
-    print("Found " .. #events .. " potential exploit points")
-    
-    -- Step 2: Get money first (most important)
+    -- Check if level changed
     task.wait(1)
-    local moneySuccess = getFreeMoney()
-    
-    -- Step 3: Duplicate cars
-    task.wait(2)
-    if moneySuccess then
-        duplicateDealershipCars()
-    else
-        print("\n⚠️ Skipping car duplication - need money first!")
+    if player:FindFirstChild("DealershipLevel") then
+        local newLevel = player.DealershipLevel.Value
+        if newLevel > currentLevel then
+            print("🎉 Dealership level increased: " .. currentLevel .. " → " .. newLevel)
+            return true
+        end
     end
     
-    -- Step 4: Unlock everything
-    task.wait(2)
-    unlockEverything()
-    
-    print("\n" .. string.rep("=", 50))
-    print("✅ AUTO-HACK COMPLETE!")
-    print(string.rep("=", 50))
-    print("Check your game for:")
-    print("1. Money balance")
-    print("2. Car inventory")
-    print("3. Dealership upgrades")
-    print(string.rep("=", 50))
+    return anySuccess
 end
 
--- Create simple UI for execution
-local function createQuickUI()
-    local screenGui = Instance.new("ScreenGui")
-    screenGui.Parent = player:WaitForChild("PlayerGui")
-    
-    local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(0, 300, 0, 400)
-    frame.Position = UDim2.new(0.5, -150, 0.5, -200)
-    frame.BackgroundColor3 = Color3.fromRGB(25, 30, 40)
-    frame.BorderSizePixel = 0
-    frame.Parent = screenGui
-    
-    local title = Instance.new("TextLabel")
-    title.Text = "🏢 CAR DEALERSHIP HACK"
-    title.Size = UDim2.new(1, 0, 0, 40)
-    title.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
-    title.TextColor3 = Color3.new(1, 1, 1)
-    title.Font = Enum.Font.GothamBold
-    title.TextSize = 18
-    title.Parent = frame
-    
-    local status = Instance.new("TextLabel")
-    status.Text = "Car Dealership Tycoon Hack\n\nReady to execute..."
-    status.Size = UDim2.new(1, -20, 0, 200)
-    status.Position = UDim2.new(0, 10, 0, 50)
-    status.BackgroundTransparency = 1
-    status.TextColor3 = Color3.new(1, 1, 1)
-    status.Font = Enum.Font.Gotham
-    status.TextSize = 14
-    status.TextWrapped = true
-    status.Parent = frame
-    
-    -- Buttons
-    local buttons = {
-        {text = "💰 GET MONEY", y = 260, func = getFreeMoney},
-        {text = "🚗 DUPLICATE CARS", y = 300, func = duplicateDealershipCars},
-        {text = "🔓 UNLOCK ALL", y = 340, func = unlockEverything},
-        {text = "⚡ AUTO-HACK ALL", y = 380, func = autoHack}
-    }
-    
-    for _, btn in pairs(buttons) do
-        local button = Instance.new("TextButton")
-        button.Text = btn.text
-        button.Size = UDim2.new(1, -40, 0, 35)
-        button.Position = UDim2.new(0, 20, 0, btn.y)
-        button.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
-        button.TextColor3 = Color3.new(1, 1, 1)
-        button.Font = Enum.Font.GothamBold
-        button.TextSize = 14
-        button.Parent = frame
-        
-        button.MouseButton1Click:Connect(function()
-            status.Text = "Executing: " .. btn.text .. "\n\nPlease wait..."
-            task.spawn(function()
-                btn.func()
-                status.Text = "✅ " .. btn.text .. " completed!\n\nCheck your game."
-            end)
-        end)
-    end
-    
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 10)
-    corner.Parent = frame
-    
-    return screenGui, status
-end
-
--- Main execution
+-- MAIN EXECUTION
 task.wait(2)
-local gui, status = createQuickUI()
+print("\n🚀 STARTING EXECUTION...")
 
--- Auto-start money hack
-task.wait(3)
-status.Text = "🚀 Starting automatic money exploit...\n\nPlease wait..."
-task.wait(1)
-
+-- Run in sequence
 local moneySuccess = getFreeMoney()
+
 if moneySuccess then
-    status.Text = "✅ MONEY HACK SUCCESSFUL!\n\nYou should now have lots of money!\n\nClick other buttons for more hacks."
+    print("\n💰 MONEY SUCCESSFUL! Proceeding to car duplication...")
+    task.wait(2)
+    duplicateDealershipCars()
 else
-    status.Text = "⚠️ Money hack might have failed\n\nTry clicking buttons manually\nor join a different server."
+    print("\n⚠️ Money failed, trying cars anyway...")
+    task.wait(1)
+    duplicateDealershipCars()
 end
 
-print("\n" .. string.rep("=", 60))
-print("CAR DEALERSHIP TYCOON HACK LOADED!")
-print("Game: " .. game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name)
-print("Place ID: " .. game.PlaceId)
-print("Player: " .. player.Name)
-print("UI created - Use buttons to hack!")
-print(string.rep("=", 60))
+task.wait(2)
+unlockEverything()
+
+print("\n" .. string.rep("=", 50))
+print("✅ SCRIPT COMPLETED!")
+print(string.rep("=", 50))
