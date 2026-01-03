@@ -1,7 +1,7 @@
--- 🚗 PURE CAR DUPLICATION ONLY
+-- 🚗 CAR DUPLICATION (Safe Version)
 -- Game ID: ffad7ea30d080c4aa1d7bf4b2f5f4381
 
-print("🚗 CAR DUPLICATION EXPLOIT")
+print("🚗 CAR DUPLICATION")
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -10,202 +10,180 @@ local player = Players.LocalPlayer
 repeat task.wait() until game:IsLoaded()
 
 local function duplicateCars()
-    print("\n🎯 Starting CAR DUPLICATION...")
+    print("\n🎯 Starting car duplication...")
     
-    -- FIND WHAT CARS YOU CURRENTLY OWN
+    -- FIND WHAT CARS YOU OWN (SAFELY)
     local ownedCars = {}
     
-    -- Check common data locations
-    local dataFolders = {
-        player:WaitForChild("Inventory"),
-        player:FindFirstChild("Cars"),
-        player:FindFirstChild("Garage"),
-        player:FindFirstChild("OwnedVehicles"),
-        player:FindFirstChild("PlayerData")
-    }
+    -- Check for inventory safely
+    local inventory = player:FindFirstChild("Inventory")
+    if inventory then
+        for _, item in pairs(inventory:GetChildren()) do
+            if not table.find(ownedCars, item.Name) then
+                table.insert(ownedCars, item.Name)
+                print("Owned in Inventory: " .. item.Name)
+            end
+        end
+    else
+        print("No Inventory folder found")
+    end
     
-    for _, folder in pairs(dataFolders) do
+    -- Check other possible locations
+    local possibleFolders = {"Cars", "Garage", "OwnedVehicles", "PlayerData", "Data"}
+    
+    for _, folderName in pairs(possibleFolders) do
+        local folder = player:FindFirstChild(folderName)
         if folder then
             for _, item in pairs(folder:GetChildren()) do
                 if not table.find(ownedCars, item.Name) then
                     table.insert(ownedCars, item.Name)
-                    print("Owned: " .. item.Name)
+                    print("Owned in " .. folderName .. ": " .. item.Name)
                 end
             end
         end
     end
     
     if #ownedCars == 0 then
-        print("⚠️ No owned cars found!")
-        print("Buy at least ONE car legitimately first!")
+        print("⚠️ No owned cars detected!")
+        print("You need to buy at least one car first.")
+        print("Try buying the cheapest car in the store.")
         return false
     end
     
-    -- FIND DUPLICATION EVENTS
-    print("\n🔍 Finding duplication events...")
+    print("\nFound " .. #ownedCars .. " owned cars")
     
-    local dupEvents = {}
+    -- FIND DUPLICATION/PURCHASE EVENTS
+    local carEvents = {}
     
-    -- Look for duplication/save/load events
+    -- Search ReplicatedStorage for car-related events
     for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
         if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
             local name = obj.Name:lower()
-            if name:find("duplicate") or name:find("copy") or 
-               name:find("clone") or name:find("save") or
-               name:find("load") or name:find("data") then
+            if name:find("car") or name:find("vehicle") or 
+               name:find("buy") or name:find("purchase") or
+               name:find("add") or name:find("spawn") then
                 
-                table.insert(dupEvents, {
+                table.insert(carEvents, {
                     Object = obj,
                     Name = obj.Name,
                     Type = obj.ClassName
                 })
-                print("Found dup event: " .. obj.Name)
+                print("Found event: " .. obj.Name .. " (" .. obj.ClassName .. ")")
             end
         end
     end
     
-    -- Also check for car spawning events
-    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
-        if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
-            local name = obj.Name:lower()
-            if name:find("spawn") and name:find("car") then
-                if not table.find(dupEvents, obj) then
-                    table.insert(dupEvents, {
-                        Object = obj,
-                        Name = obj.Name,
-                        Type = obj.ClassName
-                    })
-                    print("Found spawn event: " .. obj.Name)
+    -- Also check common folders
+    local checkFolders = {
+        ReplicatedStorage:FindFirstChild("Events"),
+        ReplicatedStorage:FindFirstChild("Remotes"),
+        ReplicatedStorage:FindFirstChild("Functions")
+    }
+    
+    for _, folder in pairs(checkFolders) do
+        if folder then
+            for _, obj in pairs(folder:GetDescendants()) do
+                if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
+                    if not table.find(carEvents, obj) then
+                        table.insert(carEvents, {
+                            Object = obj,
+                            Name = obj.Name,
+                            Type = obj.ClassName
+                        })
+                        print("Found in folder: " .. obj.Name)
+                    end
                 end
             end
         end
     end
     
-    if #dupEvents == 0 then
-        print("❌ No duplication events found!")
-        print("Trying purchase events instead...")
-        
-        -- Try purchase events as fallback
-        for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
-            if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
-                local name = obj.Name:lower()
-                if name:find("buy") or name:find("purchase") then
-                    table.insert(dupEvents, {
-                        Object = obj,
-                        Name = obj.Name,
-                        Type = obj.ClassName
-                    })
-                    print("Using purchase event: " .. obj.Name)
-                end
-            end
-        end
-    end
-    
-    if #dupEvents == 0 then
-        print("❌ NO EVENTS FOUND!")
+    if #carEvents == 0 then
+        print("❌ No car-related events found!")
         return false
     end
     
-    -- ATTEMPT DUPLICATION
-    print("\n🔄 Attempting to duplicate " .. #ownedCars .. " cars...")
-    local successfulAttempts = 0
+    print("\n🔄 Attempting duplication...")
     
+    -- Try to duplicate each car
     for _, carName in pairs(ownedCars) do
-        print("\nDuplicating: " .. carName)
+        print("\nTrying to duplicate: " .. carName)
         
-        for _, eventData in pairs(dupEvents) do
+        for _, eventData in pairs(carEvents) do
             local event = eventData.Object
             
-            -- Try different duplication methods
-            local methods = {
-                -- Simple duplication
-                {args = {carName}},
-                
-                -- With player reference
-                {args = {player, carName}},
-                
-                -- Duplicate command
-                {args = {"duplicate", carName}},
-                
-                -- Save/load method
-                {args = {"save", carName}},
-                {args = {"load", carName}},
-                
-                -- Spawn method
-                {args = {"spawn", carName}},
-                
-                -- Multiple copies
-                {args = {carName, 5}},
-                
-                -- Free purchase
-                {args = {carName, 0}},
-                {args = {carName, false}},
-                
-                -- Data table method
-                {args = {{Vehicle = carName, Action = "Duplicate"}}}
+            -- Different ways to request duplication
+            local attempts = {
+                {carName},  -- Just the car name
+                {player, carName},  -- With player
+                {carName, 0},  -- With price 0
+                {carName, 1},  -- With price 1
+                {"buy", carName},  -- As buy command
+                {"duplicate", carName},  -- As duplicate command
+                {vehicle = carName}  -- As table
             }
             
-            for methodIndex, method in pairs(methods) do
+            for i, args in pairs(attempts) do
                 local success, errorMsg = pcall(function()
                     if eventData.Type == "RemoteEvent" then
-                        event:FireServer(unpack(method.args))
+                        event:FireServer(unpack(args))
                     else
-                        event:InvokeServer(unpack(method.args))
+                        event:InvokeServer(unpack(args))
                     end
                 end)
                 
                 if success then
-                    print("✅ Attempt " .. methodIndex .. " via " .. eventData.Name)
-                    successfulAttempts = successfulAttempts + 1
-                    
-                    -- Wait briefly to avoid rate limits
-                    task.wait(0.05)
+                    print("✅ Attempt " .. i .. " via " .. eventData.Name)
+                else
+                    -- Show helpful errors
+                    if errorMsg and not errorMsg:find("Not connected") then
+                        print("❌ Error: " .. tostring(errorMsg):sub(1, 50))
+                    end
                 end
+                
+                task.wait(0.1)
             end
         end
     end
     
-    -- CHECK RESULTS
-    print("\n" .. string.rep("=", 50))
-    print("RESULTS:")
-    print(string.rep("=", 50))
-    print("Attempts made: " .. successfulAttempts)
-    print("Cars tried: " .. #ownedCars)
-    
-    -- Count cars after duplication
+    -- Wait and check results
+    print("\n⏳ Waiting for server response...")
     task.wait(2)
     
+    -- Check current car count
     local finalCarCount = 0
-    for _, folder in pairs(dataFolders) do
+    for _, folderName in pairs(possibleFolders) do
+        local folder = player:FindFirstChild(folderName)
         if folder then
             finalCarCount = finalCarCount + #folder:GetChildren()
         end
     end
     
-    local initialCount = #ownedCars
-    local newCount = finalCarCount
-    
-    print("Cars before: " .. initialCount)
-    print("Cars after: " .. newCount)
-    
-    if newCount > initialCount then
-        print("\n🎉 SUCCESS! Duplicated " .. (newCount - initialCount) .. " cars!")
-        print("Check your garage/inventory!")
-        return true
-    else
-        print("\n❌ No new cars detected")
-        print("Possible reasons:")
-        print("1. Server rejects duplication attempts")
-        print("2. Wrong event/arguments")
-        print("3. Need to buy cars first")
-        return false
+    if inventory then
+        finalCarCount = finalCarCount + #inventory:GetChildren()
     end
+    
+    print("\n" .. string.rep("=", 40))
+    print("RESULT:")
+    print("Cars before: " .. #ownedCars)
+    print("Cars after: " .. finalCarCount)
+    
+    if finalCarCount > #ownedCars then
+        print("🎉 SUCCESS! Gained " .. (finalCarCount - #ownedCars) .. " cars!")
+    else
+        print("❌ No new cars gained")
+        print("Server may be rejecting requests.")
+    end
+    
+    print(string.rep("=", 40))
+    
+    return finalCarCount > #ownedCars
 end
 
--- AUTO-RUN
-task.wait(3)
+-- Run the function
+task.wait(2)
 duplicateCars()
 
-print("\n" .. string.rep("=", 50))
-print("CAR DUPLICATION COMPLETE")
-print(string.rep("=", 50))
+print("\n💡 TIP: If this doesn't work, you need to:")
+print("1. Buy at least one car first")
+print("2. Look at the game's actual event names")
+print("3. Check server scripts for correct arguments")
