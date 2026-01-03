@@ -1,287 +1,265 @@
--- 🚗 WORKING CAR DUPLICATOR
+-- 💾 CAR SAVE/LOAD EXPLOIT
 -- Game ID: ffad7ea30d080c4aa1d7bf4b2f5f4381
 
-print("🚗 WORKING DUPLICATOR - TARGETING YOUR CARS")
+print("💾 SAVE/LOAD EXPLOIT")
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local HttpService = game:GetService("HttpService")
 local player = Players.LocalPlayer
 
 repeat task.wait() until game:IsLoaded()
 task.wait(2)
 
--- YOUR ACTUAL CAR NAMES from the image
-local YOUR_CARS = {
-    "LirrMedMuseumCar",  -- This is your actual car!
-    "Prices",  -- Price data
-    "CarReplication"  -- Might be duplication system
-}
-
--- ===== FIND THE CORRECT EVENT =====
-local function findCarEvents()
-    print("\n🔍 Finding car events...")
+-- ===== FIND SAVE/LOAD EVENTS =====
+local function findSaveLoadEvents()
+    print("\n🔍 Finding Save/Load events...")
     
     local events = {}
     
-    -- Look for events with your car names
+    -- Look for save/load/data events
     for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
         if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
-            print("Found: " .. obj.Name .. " (" .. obj.ClassName .. ")")
-            table.insert(events, {
-                Object = obj,
-                Name = obj.Name,
-                Type = obj.ClassName
-            })
+            local name = obj.Name:lower()
+            if name:find("save") or name:find("load") or name:find("data") then
+                print("Found: " .. obj.Name)
+                table.insert(events, {
+                    Object = obj,
+                    Name = obj.Name,
+                    Type = obj.ClassName
+                })
+            end
         end
     end
     
     return events
 end
 
--- ===== TRY TO DUPLICATE LirrMedMuseumCar =====
-local function duplicateLirrCar()
-    print("\n⚡ ATTEMPTING TO DUPLICATE: LirrMedMuseumCar")
+-- ===== GET YOUR CURRENT CAR DATA =====
+local function getCarData()
+    print("\n📊 Getting your car data...")
     
-    local events = findCarEvents()
-    local targetCar = "LirrMedMuseumCar"
-    local attempts = 0
+    local carData = {}
     
-    -- Try each event
+    -- Find LirrMedMuseumCar data
+    for _, folder in pairs(player:GetChildren()) do
+        if folder:IsA("Folder") then
+            for _, item in pairs(folder:GetChildren()) do
+                if item.Name == "LirrMedMuseumCar" then
+                    -- Get all properties
+                    local data = {
+                        Name = item.Name,
+                        ClassName = item.ClassName,
+                        Properties = {}
+                    }
+                    
+                    -- Try to get value if it's a ValueBase
+                    if item:IsA("ValueBase") then
+                        data.Value = item.Value
+                    end
+                    
+                    -- Get children
+                    data.Children = {}
+                    for _, child in pairs(item:GetChildren()) do
+                        table.insert(data.Children, {
+                            Name = child.Name,
+                            ClassName = child.ClassName
+                        })
+                    end
+                    
+                    table.insert(carData, data)
+                    print("Found LirrMedMuseumCar data")
+                end
+            end
+        end
+    end
+    
+    return carData
+end
+
+-- ===== ATTEMPT SAVE/LOAD EXPLOIT =====
+local function attemptSaveLoadExploit()
+    print("\n💾 Attempting Save/Load exploit...")
+    
+    local events = findSaveLoadEvents()
+    local carData = getCarData()
+    
+    if #events == 0 then
+        print("❌ No save/load events found!")
+        return false
+    end
+    
+    if #carData == 0 then
+        print("❌ No car data found!")
+        return false
+    end
+    
+    -- Create fake save data with duplicated cars
+    local fakeSaveData = {
+        Cars = {
+            "LirrMedMuseumCar",
+            "LirrMedMuseumCar",  -- Duplicated
+            "LirrMedMuseumCar",  -- Duplicated
+            "LirrMedMuseumCar"   -- Duplicated
+        },
+        Money = 9999999,
+        Timestamp = os.time(),
+        PlayerId = player.UserId,
+        Version = "1.0"
+    }
+    
+    -- Convert to JSON
+    local jsonData
+    pcall(function()
+        jsonData = HttpService:JSONEncode(fakeSaveData)
+    end)
+    
+    if not jsonData then
+        jsonData = "Cars=LirrMedMuseumCar,LirrMedMuseumCar,LirrMedMuseumCar"
+    end
+    
+    -- Try to send fake save data
     for _, eventData in pairs(events) do
         local event = eventData.Object
         
         print("\nTrying event: " .. eventData.Name)
         
-        -- Specialized arguments for THIS game
-        local argSets = {
-            -- Basic car duplication
-            {targetCar},
-            
-            -- With player
-            {player, targetCar},
-            
-            -- Purchase with price
-            {targetCar, 0},
-            {targetCar, 1},
-            {targetCar, 1000},
-            
-            -- Command style
-            {"BuyVehicle", targetCar},
-            {"PurchaseCar", targetCar},
-            {"AddCar", targetCar},
-            
-            -- Might need special format for LirrMedMuseumCar
-            {"LirrMedMuseum", "Car"},
-            {"Lirr", "MedMuseumCar"},
-            
-            -- Try CarReplication event (since you have this!)
-            {"replicate", targetCar},
-            {"duplicate", targetCar},
-            {"copy", targetCar},
-            
-            -- Table format
-            {VehicleName = targetCar},
-            {Car = targetCar, Action = "Buy"},
-            {Model = targetCar, Purchase = true},
-            
-            -- For "CarReplication" system
-            {targetCar, "duplicate"},
-            {targetCar, "clone"},
-            {targetCar, 2},  -- quantity 2
-            
-            -- Maybe it needs player data
-            {player.UserId, targetCar},
-            {player.Name, targetCar},
-            
-            -- Try free purchase
-            {targetCar, "free"},
-            {"free", targetCar},
-            {targetCar, false}  -- false = free
+        -- Different save data formats
+        local saveAttempts = {
+            {jsonData},
+            {player, jsonData},
+            {"load", jsonData},
+            {"setdata", jsonData},
+            {Data = jsonData},
+            {SaveData = jsonData},
+            {player.UserId, jsonData}
         }
         
-        for i, args in pairs(argSets) do
+        for i, args in pairs(saveAttempts) do
             local success, errorMsg = pcall(function()
                 if eventData.Type == "RemoteEvent" then
                     event:FireServer(unpack(args))
-                    return "Fired"
                 else
                     event:InvokeServer(unpack(args))
-                    return "Invoked"
                 end
             end)
             
             if success then
-                print("✅ Attempt " .. i .. " - CALL SENT")
-                attempts = attempts + 1
-                
-                -- Try rapid fire
-                for j = 1, 3 do
-                    pcall(function()
-                        if eventData.Type == "RemoteEvent" then
-                            event:FireServer(unpack(args))
-                        else
-                            event:InvokeServer(unpack(args))
-                        end
-                    end)
-                    task.wait(0.02)
+                print("✅ Save attempt " .. i .. " sent")
+            else
+                if errorMsg and #errorMsg > 0 then
+                    print("❌ Error: " .. errorMsg:sub(1, 50))
                 end
             end
             
-            task.wait(0.05)
+            task.wait(0.1)
         end
     end
     
-    return attempts
+    return true
 end
 
--- ===== CHECK CARREPLICATION SYSTEM =====
-local function checkCarReplication()
-    print("\n🔬 CHECKING CarReplication SYSTEM")
+-- ===== SERVER-SIDE EVENT LISTENER =====
+local function listenForServerEvents()
+    print("\n👂 Listening for server events...")
     
-    -- Look for CarReplication object
-    local carReplication = nil
+    -- Create a fake remote event to catch server responses
+    local listener = Instance.new("RemoteEvent")
+    listener.Name = "CarDuplicationListener_" .. player.UserId
+    listener.Parent = ReplicatedStorage
     
-    -- Check player folders
-    for _, folder in pairs(player:GetChildren()) do
-        if folder.Name == "CarReplication" then
-            carReplication = folder
-            print("Found CarReplication folder!")
-            break
-        end
-    end
-    
-    if carReplication then
-        print("CarReplication contents:")
-        for _, item in pairs(carReplication:GetChildren()) do
-            print("  - " .. item.Name .. " (" .. item.ClassName .. ")")
-            
-            -- If it's a RemoteEvent, use it!
-            if item:IsA("RemoteEvent") or item:IsA("RemoteFunction") then
-                print("  ⚡ Found replication event!")
-                
-                -- Try to use it
-                for i = 1, 5 do
-                    pcall(function()
-                        if item:IsA("RemoteEvent") then
-                            item:FireServer("LirrMedMuseumCar")
-                        else
-                            item:InvokeServer("LirrMedMuseumCar")
-                        end
-                        print("  ✅ Sent replication request " .. i)
-                    end)
-                    task.wait(0.1)
-                end
-            end
-        end
-    end
-    
-    return carReplication ~= nil
-end
-
--- ===== MAIN DUPLICATION =====
-local function mainDuplication()
-    print("\n" .. string.rep("=", 60))
-    print("🚗 DUPLICATING LirrMedMuseumCar")
-    print(string.rep("=", 60))
-    
-    -- First, check CarReplication system
-    local hasReplication = checkCarReplication()
-    
-    if hasReplication then
-        print("\n🎯 Using CarReplication system...")
-        task.wait(1)
-    end
-    
-    -- Then try standard duplication
-    print("\n🎯 Standard duplication attempts...")
-    local attempts = duplicateLirrCar()
-    
-    print("\n📊 Sent " .. attempts .. " duplication attempts")
-    
-    -- Check results
-    task.wait(2)
-    
-    print("\n🔍 Checking inventory...")
-    
-    -- Look for your cars again
-    local currentCars = {}
-    for _, folder in pairs(player:GetChildren()) do
-        for _, item in pairs(folder:GetChildren()) do
-            if item.Name:find("Car") or item.Name:find("Lirr") then
-                if not table.find(currentCars, item.Name) then
-                    table.insert(currentCars, item.Name)
-                end
-            end
-        end
-    end
-    
-    print("\n" .. string.rep("=", 50))
-    print("YOUR CARS NOW:")
-    for i, car in ipairs(currentCars) do
-        print(i .. ". " .. car)
-    end
-    
-    -- Check if we have multiple LirrMedMuseumCar
-    local lirrCount = 0
-    for _, car in pairs(currentCars) do
-        if car:find("Lirr") then
-            lirrCount = lirrCount + 1
-        end
-    end
-    
-    if lirrCount > 1 then
-        print("\n🎉 SUCCESS! You now have " .. lirrCount .. " LirrMedMuseumCars!")
-        print("Check your garage/inventory!")
-    else
-        print("\n⚠️ Still only 1 LirrMedMuseumCar")
-        print("\nTrying one more method...")
-        
-        -- Last resort: Direct event search
-        lastResortMethod()
-    end
-end
-
--- ===== LAST RESORT METHOD =====
-local function lastResortMethod()
-    print("\n💥 LAST RESORT: Direct event firing")
-    
-    -- Get ALL remote events
-    local allEvents = {}
-    for _, obj in pairs(game:GetDescendants()) do
+    -- Also try to intercept actual game events
+    for _, obj in pairs(ReplicatedStorage:GetChildren()) do
         if obj:IsA("RemoteEvent") then
-            table.insert(allEvents, obj)
-        end
-    end
-    
-    print("Found " .. #allEvents .. " RemoteEvents")
-    
-    -- Fire them all with car name
-    for i, event in ipairs(allEvents) do
-        if i <= 50 then  -- Limit to 50
+            -- Try to connect to see what the server sends
+            local connection
             pcall(function()
-                event:FireServer("LirrMedMuseumCar")
-                print("Fired: " .. event.Name)
+                connection = obj.OnClientEvent:Connect(function(...)
+                    print("\n📨 Server sent via " .. obj.Name .. ":")
+                    print("Args: ", ...)
+                end)
             end)
-            task.wait(0.01)
         end
     end
 end
 
--- ===== CREATE SIMPLE CONTROL =====
-local function createControlUI()
+-- ===== BRUTE FORCE ALL METHODS =====
+local function bruteForceAllMethods()
+    print("\n💥 BRUTE FORCE ALL METHODS")
+    
+    -- Method 1: Try to find and call module scripts
+    print("\n[1] Looking for module scripts...")
+    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+        if obj:IsA("ModuleScript") then
+            local name = obj.Name:lower()
+            if name:find("car") or name:find("vehicle") then
+                print("Found module: " .. obj.Name)
+                -- Try to require it
+                local success, module = pcall(function()
+                    return require(obj)
+                end)
+                if success and type(module) == "table" then
+                    -- Try to call functions
+                    for funcName, func in pairs(module) do
+                        if type(func) == "function" then
+                            pcall(function()
+                                func("LirrMedMuseumCar")
+                                print("Called: " .. funcName)
+                            end)
+                        end
+                    end
+                end
+            end
+        end
+    end
+    
+    -- Method 2: Try to trigger achievement/reward events
+    print("\n[2] Trying achievement events...")
+    local achievementEvents = {"AchievementComplete", "RewardPlayer", "GiveReward"}
+    for _, eventName in pairs(achievementEvents) do
+        local event = ReplicatedStorage:FindFirstChild(eventName)
+        if event then
+            pcall(function()
+                event:FireServer("CarDuplication", "LirrMedMuseumCar")
+                print("Triggered: " .. eventName)
+            end)
+        end
+    end
+    
+    -- Method 3: Try to find and use BindableEvents
+    print("\n[3] Looking for BindableEvents...")
+    for _, obj in pairs(game:GetDescendants()) do
+        if obj:IsA("BindableEvent") or obj:IsA("BindableFunction") then
+            local name = obj.Name:lower()
+            if name:find("car") or name:find("spawn") then
+                pcall(function()
+                    if obj:IsA("BindableEvent") then
+                        obj:Fire("LirrMedMuseumCar")
+                    else
+                        obj:Invoke("LirrMedMuseumCar")
+                    end
+                    print("Triggered Bindable: " .. obj.Name)
+                end)
+            end
+        end
+    end
+end
+
+-- ===== CREATE GUI =====
+local function createGUI()
     local gui = Instance.new("ScreenGui")
     gui.Parent = player:WaitForChild("PlayerGui")
     
     local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(0, 300, 0, 150)
-    frame.Position = UDim2.new(0.5, -150, 0.1, 0)
+    frame.Size = UDim2.new(0, 350, 0, 300)
+    frame.Position = UDim2.new(0.5, -175, 0.5, -150)
     frame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
     frame.BorderSizePixel = 0
     frame.Parent = gui
     
     local title = Instance.new("TextLabel")
-    title.Text = "🚗 DUPLICATE LirrMedMuseumCar"
-    title.Size = UDim2.new(1, 0, 0, 30)
+    title.Text = "💾 ADVANCED DUPLICATION METHODS"
+    title.Size = UDim2.new(1, 0, 0, 40)
     title.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
     title.TextColor3 = Color3.new(1, 1, 1)
     title.Font = Enum.Font.GothamBold
@@ -289,9 +267,9 @@ local function createControlUI()
     title.Parent = frame
     
     local status = Instance.new("TextLabel")
-    status.Text = "Found: LirrMedMuseumCar\nClick to duplicate!"
-    status.Size = UDim2.new(1, -20, 0, 50)
-    status.Position = UDim2.new(0, 10, 0, 35)
+    status.Text = "Target: LirrMedMuseumCar\n\nGame has strong protection.\nTrying alternative methods..."
+    status.Size = UDim2.new(1, -20, 0, 100)
+    status.Position = UDim2.new(0, 10, 0, 50)
     status.BackgroundTransparency = 1
     status.TextColor3 = Color3.new(1, 1, 1)
     status.Font = Enum.Font.Gotham
@@ -299,55 +277,106 @@ local function createControlUI()
     status.TextWrapped = true
     status.Parent = frame
     
-    local button = Instance.new("TextButton")
-    button.Text = "⚡ DUPLICATE NOW"
-    button.Size = UDim2.new(1, -40, 0, 40)
-    button.Position = UDim2.new(0, 20, 0, 90)
-    button.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-    button.TextColor3 = Color3.new(1, 1, 1)
-    button.Font = Enum.Font.GothamBold
-    button.TextSize = 16
-    button.Parent = frame
+    -- Method buttons
+    local methods = {
+        {
+            Text = "💾 SAVE/LOAD EXPLOIT",
+            Y = 160,
+            Action = function()
+                status.Text = "Trying save/load exploit..."
+                task.spawn(function()
+                    attemptSaveLoadExploit()
+                    task.wait(2)
+                    status.Text = "Save/load attempted.\nCheck if cars duplicated."
+                end)
+            end
+        },
+        {
+            Text = "👂 LISTEN FOR EVENTS",
+            Y = 210,
+            Action = function()
+                status.Text = "Listening for server events..."
+                task.spawn(function()
+                    listenForServerEvents()
+                    status.Text = "Listening active.\nCheck console for responses."
+                end)
+            end
+        },
+        {
+            Text = "💥 BRUTE FORCE ALL",
+            Y = 260,
+            Action = function()
+                status.Text = "Brute forcing all methods...\nThis may take a moment."
+                task.spawn(function()
+                    bruteForceAllMethods()
+                    task.wait(3)
+                    status.Text = "Brute force complete.\nCheck your garage."
+                end)
+            end
+        }
+    }
     
-    button.MouseButton1Click:Connect(function()
-        status.Text = "Duplicating...\nCheck console!"
-        button.Text = "WORKING..."
-        button.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
+    for _, method in pairs(methods) do
+        local button = Instance.new("TextButton")
+        button.Text = method.Text
+        button.Size = UDim2.new(1, -40, 0, 40)
+        button.Position = UDim2.new(0, 20, 0, method.Y)
+        button.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
+        button.TextColor3 = Color3.new(1, 1, 1)
+        button.Font = Enum.Font.GothamBold
+        button.TextSize = 14
+        button.Parent = frame
         
-        task.spawn(function()
-            mainDuplication()
-            task.wait(2)
-            status.Text = "Complete!\nCheck your cars."
-            button.Text = "TRY AGAIN"
-            button.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
-        end)
-    end)
+        button.MouseButton1Click:Connect(method.Action)
+    end
     
     local corner = Instance.new("UICorner")
     corner.CornerRadius = UDim.new(0, 10)
     corner.Parent = frame
     
-    return gui
+    return gui, status
 end
 
--- ===== AUTO-RUN =====
+-- ===== MAIN =====
 print("\n" .. string.rep("=", 60))
-print("YOUR CARS FOUND:")
-print("1. Prices (price data)")
-print("2. LirrMedMuseumCar (YOUR CAR!)")
-print("3. CarReplication (duplication system)")
+print("FINAL ATTEMPT: Alternative Methods")
 print(string.rep("=", 60))
+print("\nSince direct duplication fails,")
+print("trying alternative approaches...")
 
--- Create UI
+-- Create GUI
 task.wait(1)
-createControlUI()
+local gui, status = createGUI()
 
--- Auto-start after 3 seconds
+-- Auto-start method 1
 task.wait(3)
-print("\n⚡ Auto-starting duplication in 3... 2... 1...")
-mainDuplication()
+status.Text = "Auto-starting save/load exploit..."
+task.wait(1)
+attemptSaveLoadExploit()
 
-print("\n💡 TIPS:")
-print("1. Check if 'CarReplication' is a folder with events")
-print("2. Look for BuyCar, PurchaseVehicle events")
-print("3. Try buying/selling first, then duplicating")
+-- Auto-start method 2
+task.wait(2)
+status.Text = "Now listening for server events..."
+listenForServerEvents()
+
+-- Auto-start method 3
+task.wait(2)
+status.Text = "Finally, brute forcing all methods..."
+task.wait(1)
+bruteForceAllMethods()
+
+-- Final check
+task.wait(3)
+status.Text = "All methods attempted!\n\nCheck your garage now.\nIf nothing changed, the game\nhas impenetrable protection."
+
+print("\n" .. string.rep("=", 60))
+print("ALL METHODS EXHAUSTED")
+print(string.rep("=", 60))
+print("\nIf cars still didn't duplicate:")
+print("1. Game has server-side validation")
+print("2. All requests are being rejected")
+print("3. No client-side exploit is possible")
+print("\nYou would need:")
+print("• Server access")
+print("• A game vulnerability")
+print("• Or play legitimately")
