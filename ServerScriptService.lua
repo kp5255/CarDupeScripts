@@ -1,199 +1,297 @@
--- FINAL WORKING CAR DUPE SERVER
-print("==========================================")
-print("🚗 CAR DUPLICATION SERVER - STARTING")
-print("==========================================")
+-- FINAL CAR DUPE - DATASTORE INTEGRATION
+print("=":rep(60))
+print("🚗 FINAL CAR DUPLICATION SYSTEM")
+print("Integrating with game's DataStore system")
+print("=":rep(60))
 
--- Services
 local Players = game:GetService("Players")
-local ServerStorage = game:GetService("ServerStorage")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local DataStoreService = game:GetService("DataStoreService")
 local HttpService = game:GetService("HttpService")
 
--- Ensure HttpService is enabled
-if not pcall(function() HttpService:GenerateGUID(false) end) then
-	warn("⚠️ HttpService may be disabled. Enable in Game Settings > Security")
+-- 1. Find game systems
+local CarServiceRemotes = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Services"):WaitForChild("CarServiceRemotes")
+print("✅ Found CarServiceRemotes")
+
+-- 2. Create our event
+local DupeEvent = Instance.new("RemoteEvent")
+DupeEvent.Name = "Dev_DupeCar"
+DupeEvent.Parent = ReplicatedStorage
+
+-- 3. Get car data from existing system
+local function findCarInGameDatabase(carName)
+    print("🔍 Searching for car in game database:", carName)
+    
+    -- Check Data.Cars module
+    local dataCars = ReplicatedStorage:FindFirstChild("Data")
+    if dataCars then
+        local carsModule = dataCars:FindFirstChild("Cars")
+        if carsModule and carsModule:IsA("ModuleScript") then
+            local success, carTable = pcall(require, carsModule)
+            if success and type(carTable) == "table" then
+                if carTable[carName] then
+                    print("✅ Found in Cars module")
+                    return carTable[carName]
+                end
+                
+                -- Try case-insensitive search
+                for key, data in pairs(carTable) do
+                    if key:lower() == carName:lower() then
+                        print("✅ Found (case-insensitive):", key)
+                        return data
+                    end
+                end
+            end
+        end
+    end
+    
+    -- Check CarShopEntries
+    local carShopEntries = ReplicatedStorage:FindFirstChild("CarShopEntries")
+    if carShopEntries then
+        for _, entry in ipairs(carShopEntries:GetChildren()) do
+            if entry.Name:lower() == carName:lower() then
+                print("✅ Found in CarShopEntries:", entry.Name)
+                return entry
+            end
+        end
+    end
+    
+    print("❌ Car not found in game databases")
+    return nil
 end
 
--- 1. CREATE EVENT IF NOT EXISTS
-local DupeEvent = ReplicatedStorage:FindFirstChild("Dev_DupeCar")
-if not DupeEvent then
-	DupeEvent = Instance.new("RemoteEvent")
-	DupeEvent.Name = "Dev_DupeCar"
-	DupeEvent.Parent = ReplicatedStorage
-	print("✅ Created RemoteEvent: Dev_DupeCar")
-else
-	print("✅ Found existing RemoteEvent")
-end
-
--- 2. CREATE FOLDERS
-local function ensureFolders()
-	-- Inventories folder
-	if not ServerStorage:FindFirstChild("Inventories") then
-		local inv = Instance.new("Folder")
-		inv.Name = "Inventories"
-		inv.Parent = ServerStorage
-		print("✅ Created Inventories folder")
-	end
-	
-	-- CarModels folder (optional)
-	if not ServerStorage:FindFirstChild("CarModels") then
-		local cm = Instance.new("Folder")
-		cm.Name = "CarModels"
-		cm.Parent = ServerStorage
-		print("✅ Created CarModels folder")
-	end
-end
-
-ensureFolders()
-
--- 3. PLAYER JOIN HANDLER
-Players.PlayerAdded:Connect(function(player)
-	print("👤 Player joined:", player.Name)
-	
-	local inventories = ServerStorage:WaitForChild("Inventories")
-	
-	-- Create player folder
-	local playerFolder = Instance.new("Folder")
-	playerFolder.Name = tostring(player.UserId)
-	playerFolder.Parent = inventories
-	
-	-- Create cars folder
-	local carsFolder = Instance.new("Folder")
-	carsFolder.Name = "Cars"
-	carsFolder.Parent = playerFolder
-	
-	print("📁 Created inventory for:", player.Name)
-end)
-
--- 4. FIND CAR MODEL FROM SEAT
+-- 4. Get car from seat (SIMPLIFIED)
 local function getCarFromSeat(seat)
-	if not seat then return nil end
-	
-	-- Method 1: Direct parent
-	if seat.Parent and seat.Parent:IsA("Model") then
-		return seat.Parent
-	end
-	
-	-- Method 2: Search up hierarchy
-	local current = seat
-	for i = 1, 20 do -- Limit search depth
-		current = current.Parent
-		if not current then break end
-		if current == game.Workspace then break end
-		if current:IsA("Model") then
-			return current
-		end
-	end
-	
-	return nil
+    if not seat then return nil end
+    
+    -- Most cars: seat is directly in car model
+    local car = seat.Parent
+    if car and car:IsA("Model") then
+        return car
+    end
+    
+    -- Some cars: seat is in "Body" folder
+    if car and car.Parent and car.Parent:IsA("Model") then
+        return car.Parent
+    end
+    
+    return nil
 end
 
--- 5. MAIN DUPLICATION FUNCTION
+-- 5. MAIN FUNCTION: Try to add car to player's REAL inventory
 DupeEvent.OnServerEvent:Connect(function(player, seat)
-	print("\n" .. string.rep("=", 50))
-	print("📦 DUPLICATION REQUEST FROM:", player.Name)
-	
-	-- VALIDATION 1: Check seat exists
-	if not seat then
-		print("❌ ERROR: No seat provided")
-		return false
-	end
-	
-	-- VALIDATION 2: Check seat type
-	if not seat:IsA("VehicleSeat") then
-		print("❌ ERROR: Not a VehicleSeat. Type:", typeof(seat))
-		return false
-	end
-	
-	print("✅ Seat validated:", seat.Name)
-	
-	-- FIND CAR MODEL
-	local carModel = getCarFromSeat(seat)
-	
-	if not carModel then
-		print("❌ ERROR: Could not find car model from seat")
-		return false
-	end
-	
-	print("✅ Found car model:", carModel.Name)
-	print("   Path:", carModel:GetFullName())
-	
-	-- GET INVENTORY FOLDERS
-	local inventories = ServerStorage:FindFirstChild("Inventories")
-	if not inventories then
-		print("❌ ERROR: Inventories folder missing")
-		return false
-	end
-	
-	local playerFolder = inventories:FindFirstChild(tostring(player.UserId))
-	if not playerFolder then
-		print("❌ ERROR: No inventory folder for player")
-		return false
-	end
-	
-	local carsFolder = playerFolder:FindFirstChild("Cars")
-	if not carsFolder then
-		print("❌ ERROR: No Cars folder for player")
-		return false
-	end
-	
-	print("✅ Player inventory located")
-	
-	-- GENERATE UNIQUE ID
-	local uniqueId
-	local success, guid = pcall(function()
-		return HttpService:GenerateGUID(false)
-	end)
-	
-	if success then
-		uniqueId = "CAR_" .. string.sub(guid, 1, 8)
-	else
-		-- Fallback: Use timestamp
-		uniqueId = "CAR_" .. tostring(math.floor(tick() * 1000)) .. "_" .. player.UserId
-		print("⚠️ Using fallback ID (HttpService issue)")
-	end
-	
-	-- CLONE THE CAR
-	print("🔄 Cloning car model...")
-	local clone = carModel:Clone()
-	clone.Name = uniqueId
-	
-	-- ADD METADATA
-	local info = Instance.new("StringValue")
-	info.Name = "DuplicatedInfo"
-	info.Value = "Original: " .. carModel.Name .. " | Player: " .. player.Name .. " | Time: " .. os.date()
-	info.Parent = clone
-	
-	-- SAVE TO INVENTORY
-	clone.Parent = carsFolder
-	
-	-- VERIFY SAVE
-	if clone.Parent == carsFolder then
-		print("✅ SUCCESS: Car saved to inventory")
-		print("   Path: ServerStorage/Inventories/" .. player.UserId .. "/Cars/" .. uniqueId)
-		print("   Original: " .. carModel.Name)
-		
-		-- Count cars in inventory
-		local carCount = #carsFolder:GetChildren()
-		print("   Player now has " .. carCount .. " cars")
-	else
-		print("❌ ERROR: Failed to save car to inventory")
-		return false
-	end
-	
-	print(string.rep("=", 50) .. "\n")
-	return true
+    print("\n" .. "=":rep(50))
+    print("🎮 CAR DUPLICATION REQUEST")
+    print("Player:", player.Name)
+    print("UserID:", player.UserId)
+    
+    -- Validate seat
+    if not seat or not seat:IsA("VehicleSeat") then
+        print("❌ Invalid seat")
+        return false
+    end
+    
+    -- Get car model
+    local carModel = getCarFromSeat(seat)
+    if not carModel then
+        print("❌ Could not find car model")
+        return false
+    end
+    
+    local carName = carModel.Name
+    print("✅ Car detected:", carName)
+    
+    -- METHOD 1: Try to use CarServiceRemotes
+    print("\n🔄 METHOD 1: Using CarServiceRemotes...")
+    
+    -- Look for specific remotes in CarServiceRemotes
+    local remotesToTry = {
+        "AddCar",
+        "GiveCar", 
+        "UnlockCar",
+        "PurchaseCar",
+        "BuyCar"
+    }
+    
+    for _, remoteName in ipairs(remotesToTry) do
+        local remote = CarServiceRemotes:FindFirstChild(remoteName)
+        if remote then
+            print("   Found remote:", remoteName)
+            
+            -- Try to fire it
+            local success = pcall(function()
+                if remote:IsA("RemoteEvent") then
+                    remote:FireClient(player, carName, 0) -- 0 price
+                    print("   Fired RemoteEvent to client")
+                elseif remote:IsA("RemoteFunction") then
+                    local result = remote:InvokeClient(player, carName, 0)
+                    print("   Invoked RemoteFunction, result:", result)
+                end
+            end)
+            
+            if success then
+                print("   ✅ Success!")
+            else
+                print("   ❌ Failed")
+            end
+        end
+    end
+    
+    -- METHOD 2: Try to use generic Buy remote
+    print("\n🔄 METHOD 2: Using Buy remote...")
+    
+    local buyRemote = ReplicatedStorage:FindFirstChild("Remotes"):FindFirstChild("Buy")
+    if buyRemote and buyRemote:IsA("RemoteEvent") then
+        print("   Found Buy remote")
+        
+        local success = pcall(function()
+            -- Create purchase data
+            local purchaseData = {
+                Item = carName,
+                Type = "Car",
+                Price = 0,
+                Currency = "Cash",
+                Duplicated = true
+            }
+            
+            buyRemote:FireClient(player, purchaseData)
+            print("   Sent purchase data")
+        end)
+        
+        if success then
+            print("   ✅ Buy request sent")
+        end
+    end
+    
+    -- METHOD 3: Direct DataStore manipulation (if we can find the right one)
+    print("\n🔄 METHOD 3: Direct approach...")
+    
+    -- Try to find player's car list
+    local carDataStore = DataStoreService:GetDataStore("PlayerCars_" .. player.UserId)
+    
+    local success, carList = pcall(function()
+        return carDataStore:GetAsync("cars") or {}
+    end)
+    
+    if success then
+        print("   Accessed player's car DataStore")
+        
+        -- Check if car already in list
+        local alreadyHas = false
+        for _, ownedCar in ipairs(carList) do
+            if ownedCar.Name == carName then
+                alreadyHas = true
+                break
+            end
+        end
+        
+        if not alreadyHas then
+            -- Add car to list
+            local carData = {
+                Name = carName,
+                Class = "Class 1", -- Default class
+                Owned = true,
+                Duplicated = os.time(),
+                OriginalModel = carModel:GetFullName()
+            }
+            
+            table.insert(carList, carData)
+            
+            -- Save back
+            pcall(function()
+                carDataStore:SetAsync("cars", carList)
+                print("   ✅ Added car to DataStore")
+            end)
+        else
+            print("   ℹ️ Player already has this car")
+        end
+    else
+        print("   ❌ Could not access DataStore")
+    end
+    
+    -- METHOD 4: Trigger inventory refresh
+    print("\n🔄 METHOD 4: Refreshing inventory...")
+    
+    local loadedRemote = ReplicatedStorage:FindFirstChild("Remotes"):FindFirstChild("Loaded")
+    if loadedRemote then
+        loadedRemote:FireClient(player)
+        print("   ✅ Inventory refresh triggered")
+    end
+    
+    -- Create physical backup
+    print("\n🔄 Creating physical backup...")
+    
+    local ServerStorage = game:GetService("ServerStorage")
+    local backupFolder = ServerStorage:FindFirstChild("CarDupeBackups")
+    if not backupFolder then
+        backupFolder = Instance.new("Folder")
+        backupFolder.Name = "CarDupeBackups"
+        backupFolder.Parent = ServerStorage
+    end
+    
+    local playerFolder = backupFolder:FindFirstChild(player.Name)
+    if not playerFolder then
+        playerFolder = Instance.new("Folder")
+        playerFolder.Name = player.Name
+        playerFolder.Parent = backupFolder
+    end
+    
+    -- Clone and save
+    local clone = carModel:Clone()
+    clone.Name = carName .. "_BACKUP_" .. os.time()
+    clone.Parent = playerFolder
+    
+    print("   ✅ Physical backup created")
+    print("   Location: ServerStorage/CarDupeBackups/" .. player.Name)
+    
+    -- FINAL MESSAGE
+    print("\n" .. "=":rep(50))
+    print("🎉 DUPLICATION COMPLETE!")
+    print("=":rep(50))
+    print("Attempted multiple methods to add car to your inventory.")
+    print("")
+    print("CHECK THESE PLACES:")
+    print("1. Your in-game garage/inventory (press whatever opens it)")
+    print("2. ServerStorage/CarDupeBackups/" .. player.Name .. "/")
+    print("")
+    print("If car doesn't appear in inventory, the game might need")
+    print("a reload or the server might restart.")
+    print("=":rep(50) .. "\n")
+    
+    return true
 end)
 
--- 6. PLAYER LEAVE CLEANUP (Optional)
-Players.PlayerRemoving:Connect(function(player)
-	print("👤 Player leaving:", player.Name)
-	-- Keep inventory for now
+-- Player join handler
+Players.PlayerAdded:Connect(function(player)
+    print("👤 Player joined:", player.Name)
+    
+    -- Create backup folder
+    local ServerStorage = game:GetService("ServerStorage")
+    local backupFolder = ServerStorage:FindFirstChild("CarDupeBackups")
+    if not backupFolder then
+        backupFolder = Instance.new("Folder")
+        backupFolder.Name = "CarDupeBackups"
+        backupFolder.Parent = ServerStorage
+    end
+    
+    local playerFolder = backupFolder:FindFirstChild(player.Name)
+    if not playerFolder then
+        playerFolder = Instance.new("Folder")
+        playerFolder.Name = player.Name
+        playerFolder.Parent = backupFolder
+    end
 end)
 
-print("==========================================")
-print("🚗 SERVER READY - Waiting for requests...")
-print("==========================================")
-print("To test: Sit in any car and click dupe button")
-print("Cars save to: ServerStorage/Inventories/[UserId]/Cars/")
-print("==========================================")
+print("\n" .. "=":rep(60))
+print("✅ SYSTEM READY")
+print("=":rep(60))
+print("This system attempts to add cars directly to your")
+print("inventory through multiple methods:")
+print("")
+print("1. Uses the game's CarServiceRemotes")
+print("2. Uses Buy remote event")
+print("3. Direct DataStore manipulation")
+print("4. Creates physical backups")
+print("")
+print("Sit in any car and use the client to duplicate!")
+print("=":rep(60))
