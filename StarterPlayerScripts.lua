@@ -1,60 +1,60 @@
--- 🥷 STEALTH CAR GIVER
--- Minimal, undetectable version
+-- 🥷 STEALTH CAR GIVER (FIXED)
+-- Module returns table, not function
 
--- No prints, no warnings
 local game = game
 local player = game.Players.LocalPlayer
 
 -- Silent wait
-for i = 1, 60 do
+for i = 1, 50 do
     if game:IsLoaded() then break end
     task.wait(0.1)
 end
 
-task.wait(5)
+task.wait(4)
 
--- Main function (completely silent)
-local function silentGiveCars()
-    -- Get modules quietly
+-- Main function
+local function giveCarsStealth()
     local rs = game:GetService("ReplicatedStorage")
-    local cmdr = rs:FindFirstChild("CmdrClient")
+    local cmdr = rs.CmdrClient
     if not cmdr then return end
     
-    local commands = cmdr:FindFirstChild("Commands")
+    local commands = cmdr.Commands
     if not commands then return end
     
-    -- Get GiveCar
-    local giveCar = commands:FindFirstChild("GiveCar")
+    -- Get GiveCar module
+    local giveCar = commands.GiveCar
     if not giveCar then return end
     
-    -- Load quietly
-    local func
+    -- Load module (returns TABLE)
+    local moduleTable
     local success, result = pcall(function()
         return require(giveCar)
     end)
     
     if not success then return end
-    func = result
+    moduleTable = result
     
     -- Get GiveAllCars
-    local giveAll = commands:FindFirstChild("GiveAllCars")
+    local giveAll = commands.GiveAllCars
     if giveAll then
         pcall(function()
-            local allFunc = require(giveAll)
-            if type(allFunc) == "function" then
-                allFunc(player)
-            elseif type(allFunc) == "table" then
-                for _, f in pairs(allFunc) do
-                    if type(f) == "function" then
-                        f(player)
+            local allTable = require(giveAll)
+            -- Try to find execute function
+            if type(allTable) == "table" then
+                for _, func in pairs(allTable) do
+                    if type(func) == "function" then
+                        func(player)
                         break
                     end
                 end
+            elseif type(allTable) == "function" then
+                allTable(player)
             end
         end)
+        task.wait(1)
     end
     
-    -- Working IDs from your test
+    -- Working IDs
     local ids = {
         "car_1",
         "vehicle_1",
@@ -68,34 +68,41 @@ local function silentGiveCars()
         "corsarot8"
     }
     
-    -- Give cars with random delays
+    -- Give each car
     for _, id in pairs(ids) do
-        -- Random delay 0.3-0.7 seconds
-        task.wait(0.3 + math.random() * 0.4)
+        task.wait(0.4 + math.random() * 0.3) -- Random delay
         
+        -- Try to call function from table
         pcall(function()
-            if type(func) == "function" then
-                func(player, id)
-            elseif type(func) == "table" then
-                for _, f in pairs(func) do
-                    if type(f) == "function" then
-                        f(player, id)
-                        break
+            if type(moduleTable) == "table" then
+                -- Look for Execute function
+                if moduleTable.Execute and type(moduleTable.Execute) == "function" then
+                    moduleTable.Execute(player, id)
+                -- Look for Run function
+                elseif moduleTable.Run and type(moduleTable.Run) == "function" then
+                    moduleTable.Run(player, id)
+                -- Try any function in table
+                else
+                    for _, func in pairs(moduleTable) do
+                        if type(func) == "function" then
+                            func(player, id)
+                            break
+                        end
                     end
                 end
+            elseif type(moduleTable) == "function" then
+                moduleTable(player, id)
             end
         end)
     end
 end
 
--- Run in background thread
+-- Run in background
 task.spawn(function()
-    task.wait(8) -- Wait longer
-    silentGiveCars()
+    task.wait(6)
+    giveCarsStealth()
     
-    -- Second attempt after 15 seconds
-    task.wait(15)
-    silentGiveCars()
+    -- Try again after 20 seconds
+    task.wait(20)
+    giveCarsStealth()
 end)
-
--- Return nothing
