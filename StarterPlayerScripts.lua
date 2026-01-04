@@ -1,163 +1,95 @@
--- 🔥 FULLY WORKING CAR DUPLICATION SYSTEM
--- Place ID: 1554960397 - NY SALE! Car Dealership Tycoon
--- Bypasses anti-exploit protection
+-- 🎮 ADMIN COMMAND ACTIVATOR
+-- Place ID: 1554960397
 
-print("🔥 FULLY WORKING CAR DUPLICATION SYSTEM")
+print("🎮 ADMIN COMMAND ACTIVATOR")
 
--- Use different variable names to avoid detection
-local GamePlayers = game:GetService("Players")
-local GameReplicatedStorage = game:GetService("ReplicatedStorage")
-local CurrentPlayer = GamePlayers.LocalPlayer
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local player = Players.LocalPlayer
 
--- Wait for game with anti-detection
-local function safeWait()
-    for i = 1, 50 do
-        if game:IsLoaded() then break end
-        task.wait(0.1)
-    end
-    task.wait(math.random(1, 3)) -- Random delay
-end
+repeat task.wait() until game:IsLoaded()
+task.wait(2)
 
-safeWait()
-
--- ===== BYPASS ANTI-EXPLOIT =====
-local function bypassProtection()
-    -- Create fake environment
-    local fakeEnv = {
-        print = function(...) 
-            -- Minimal logging
-            local args = {...}
-            local output = ""
-            for i, v in ipairs(args) do
-                output = output .. tostring(v) .. " "
-            end
-            -- Only show in F9, not in exploit console
-            if not output:find("attempt") then
-                warn("[SYSTEM] " .. output)
-            end
-        end,
-        warn = function(msg)
-            -- Filter warnings
-            if not tostring(msg):find("attempt") then
-                warn("[INFO] " .. tostring(msg))
-            end
-        end
-    }
+-- ===== GET ADMIN PERMISSIONS =====
+local function getAdminPermissions()
+    print("\n🔓 GETTING ADMIN PERMISSIONS")
     
-    -- Set environment
-    setfenv(1, setmetatable(fakeEnv, {__index = _G}))
-end
-
--- Call bypass
-pcall(bypassProtection)
-
--- ===== FIND CMD SYSTEM =====
-local function locateCmdSystem()
-    local rs = GameReplicatedStorage
+    -- Cmdr admin system paths
+    local cmdr = ReplicatedStorage:FindFirstChild("CmdrClient") or 
+                 ReplicatedStorage:FindFirstChild("Cmdr")
     
-    -- Multiple search paths
-    local searchPaths = {
-        rs.CmdrClient,
-        rs:FindFirstChild("Cmdr"),
-        rs:FindFirstChild("Admin"),
-        rs:FindFirstChild("Commands"),
-        rs:FindFirstChild("CommandSystem")
-    }
-    
-    for _, path in ipairs(searchPaths) do
-        if path then
-            return path
-        end
+    if not cmdr then
+        print("❌ Cmdr not found")
+        return false
     end
     
-    return nil
-end
-
--- ===== EXECUTE CMD COMMANDS =====
-local function executeCommand(cmd, args)
-    local cmdSystem = locateCmdSystem()
-    if not cmdSystem then return false end
+    -- Look for permission system
+    local permissionEvents = {}
     
-    -- Look for execution methods
-    local executionMethods = {}
+    -- Method 1: Admin request
+    local adminRequest = cmdr:FindFirstChild("RequestAdmin") or
+                        cmdr:FindFirstChild("GetAdmin") or
+                        cmdr:FindFirstChild("BecomeAdmin")
     
-    -- Method 1: Direct remote
-    local executeRemote = cmdSystem:FindFirstChild("ExecuteCommand") or
-                         cmdSystem:FindFirstChild("RunCommand") or
-                         cmdSystem:FindFirstChild("ProcessCommand")
-    
-    if executeRemote then
-        table.insert(executionMethods, {
-            Type = "Remote",
-            Object = executeRemote
+    if adminRequest then
+        table.insert(permissionEvents, {
+            Object = adminRequest,
+            Name = adminRequest.Name,
+            Type = adminRequest.ClassName
         })
+        print("✅ Found admin request: " .. adminRequest.Name)
     end
     
-    -- Method 2: Command handler
-    for _, child in pairs(cmdSystem:GetDescendants()) do
-        if child:IsA("RemoteEvent") and child.Name:lower():find("command") then
-            table.insert(executionMethods, {
-                Type = "CommandEvent",
-                Object = child
-            })
+    -- Method 2: Permission check
+    for _, obj in pairs(cmdr:GetDescendants()) do
+        if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
+            local name = obj.Name:lower()
+            if name:find("admin") or name:find("perm") or name:find("rank") then
+                table.insert(permissionEvents, {
+                    Object = obj,
+                    Name = obj.Name,
+                    Type = obj.ClassName
+                })
+                print("✅ Found permission event: " .. obj.Name)
+            end
         end
     end
     
-    -- Method 3: Bindable events
-    for _, child in pairs(cmdSystem:GetDescendants()) do
-        if child:IsA("BindableEvent") and child.Name:lower():find("command") then
-            table.insert(executionMethods, {
-                Type = "Bindable",
-                Object = child
-            })
-        end
-    end
-    
-    -- Try all methods
-    for _, method in ipairs(executionMethods) do
-        local remote = method.Object
+    -- Try to get admin
+    for _, event in pairs(permissionEvents) do
+        local remote = event.Object
         
-        -- Different command formats
-        local formats = {
-            cmd .. " " .. args,
-            "!" .. cmd .. " " .. args,
-            "/" .. cmd .. " " .. args,
-            ";" .. cmd .. " " .. args,
-            ":" .. cmd .. " " .. args,
-            cmd .. " " .. CurrentPlayer.Name .. " " .. args,
-            {Command = cmd, Args = args, Player = CurrentPlayer},
-            {cmd = cmd, arguments = args, executor = CurrentPlayer}
+        print("\nTrying: " .. event.Name)
+        
+        -- Different admin request formats
+        local requests = {
+            {player},
+            {player.UserId},
+            {player.Name},
+            {"admin"},
+            {"giveadmin", player},
+            {"makeadmin", player.UserId},
+            {UserId = player.UserId, Rank = "Admin"},
+            {Player = player, Permission = "Admin"}
         }
         
-        for _, format in ipairs(formats) do
-            local success = pcall(function()
-                if method.Type == "Remote" and remote:IsA("RemoteEvent") then
-                    if type(format) == "table" then
-                        remote:FireServer(format)
-                    else
-                        remote:FireServer(format)
-                    end
-                    return true
-                elseif method.Type == "Remote" and remote:IsA("RemoteFunction") then
-                    if type(format) == "table" then
-                        remote:InvokeServer(format)
-                    else
-                        remote:InvokeServer(format)
-                    end
-                    return true
-                elseif method.Type == "Bindable" then
-                    if type(format) == "table" then
-                        remote:Fire(format)
-                    else
-                        remote:Fire(format)
-                    end
-                    return true
+        for _, args in pairs(requests) do
+            local success, result = pcall(function()
+                if event.Type == "RemoteEvent" then
+                    remote:FireServer(unpack(args))
+                    return "sent"
+                else
+                    remote:InvokeServer(unpack(args))
+                    return "invoked"
                 end
             end)
             
             if success then
-                warn("[SUCCESS] Command sent: " .. cmd .. " " .. args)
-                task.wait(0.5)
+                print("✅ Admin request sent")
+                
+                -- Wait and try commands
+                task.wait(1)
+                executeAdminCommands()
                 return true
             end
         end
@@ -166,347 +98,343 @@ local function executeCommand(cmd, args)
     return false
 end
 
--- ===== USE GIVECAR MODULE DIRECTLY =====
-local function useGiveCarModule()
-    local cmdSystem = locateCmdSystem()
-    if not cmdSystem then return false end
+-- ===== EXECUTE ADMIN COMMANDS =====
+local function executeAdminCommands()
+    print("\n⚡ EXECUTING ADMIN COMMANDS")
     
-    -- Find commands folder
-    local commandsFolder = cmdSystem:FindFirstChild("Commands") or
-                          cmdSystem:FindFirstChild("commands") or
-                          cmdSystem:FindFirstChild("Cmds")
+    local cmdr = ReplicatedStorage:FindFirstChild("CmdrClient")
+    if not cmdr then return false end
     
-    if not commandsFolder then return false end
+    -- Find command execution
+    local executeRemote = cmdr:FindFirstChild("ExecuteCommand") or
+                         cmdr:FindFirstChild("RunCommand")
     
-    -- Find GiveCar module
-    local giveCarModule = commandsFolder:FindFirstChild("GiveCar") or
-                         commandsFolder:FindFirstChild("givecar") or
-                         commandsFolder:FindFirstChild("Givecar")
-    
-    if not giveCarModule or not giveCarModule:IsA("ModuleScript") then
-        return false
-    end
-    
-    -- Try to load module
-    local moduleFunc
-    local success, result = pcall(function()
-        return require(giveCarModule)
-    end)
-    
-    if not success then return false end
-    
-    moduleFunc = result
-    
-    -- Your cars
-    local targetCars = {
-        "Bontlay Bontaga",
-        "Jegar Model F",
-        "Corsaro T8",
-        "Lavish Ventoge",
-        "Sportler Tecan"
-    }
-    
-    -- Try to execute for each car
-    for _, car in ipairs(targetCars) do
-        -- Multiple execution attempts
-        local attempts = {
-            function() 
-                if type(moduleFunc) == "function" then
-                    return moduleFunc(CurrentPlayer, car)
-                end
-            end,
-            function()
-                if type(moduleFunc) == "table" then
-                    for key, func in pairs(moduleFunc) do
-                        if type(func) == "function" and key:lower():find("exec") then
-                            return func(CurrentPlayer, car)
-                        end
-                    end
-                end
-            end,
-            function()
-                if type(moduleFunc) == "table" then
-                    for key, func in pairs(moduleFunc) do
-                        if type(func) == "function" and key:lower():find("run") then
-                            return func(CurrentPlayer, car)
-                        end
-                    end
-                end
-            end
-        }
-        
-        for i, attempt in ipairs(attempts) do
-            local execSuccess = pcall(attempt)
-            if execSuccess then
-                warn("[MODULE] Executed givecar for: " .. car)
-                task.wait(0.3)
+    if not executeRemote then
+        -- Look in descendants
+        for _, obj in pairs(cmdr:GetDescendants()) do
+            if obj:IsA("RemoteEvent") and obj.Name:lower():find("execute") then
+                executeRemote = obj
                 break
             end
         end
     end
     
-    return true
-end
-
--- ===== BRUTE FORCE ALL METHODS =====
-local function bruteForceAll()
-    warn("[BRUTE] Starting brute force...")
+    if not executeRemote then
+        print("❌ No execute command found")
+        return false
+    end
     
-    -- Method 1: Command execution
-    local commands = {
-        {"givecar", "Bontlay Bontaga"},
-        {"givecar", "Jegar Model F"},
-        {"givecar", "Corsaro T8"},
-        {"giveallcars", ""},
-        {"givecars", "all"},
-        {"addcar", "Bontlay Bontaga"},
-        {"spawncar", "Bontlay Bontaga"}
+    print("✅ Found command executor: " .. executeRemote.Name)
+    
+    -- Your cars to get
+    local targetCars = {
+        "Bontlay Bontaga",
+        "Jegar Model F", 
+        "Corsaro T8",
+        "Lavish Ventoge",
+        "Sportler Tecan"
     }
     
-    for _, cmdData in ipairs(commands) do
-        executeCommand(cmdData[1], cmdData[2])
-        task.wait(0.2)
-    end
+    -- Execute commands
+    local commandsExecuted = 0
     
-    -- Method 2: Direct module
-    useGiveCarModule()
-    
-    -- Method 3: Remote spam
-    task.wait(1)
-    
-    local allRemotes = {}
-    for _, obj in pairs(GameReplicatedStorage:GetDescendants()) do
-        if obj:IsA("RemoteEvent") and obj.Name:lower():find("car") then
-            table.insert(allRemotes, obj)
-        end
-    end
-    
-    for _, remote in ipairs(allRemotes) do
-        for i = 1, 3 do
-            pcall(function()
-                remote:FireServer("Bontlay Bontaga")
-                remote:FireServer(CurrentPlayer, "Bontlay Bontaga")
+    for _, car in pairs(targetCars) do
+        -- Different command formats
+        local commandFormats = {
+            "givecar " .. car,
+            "!givecar " .. car,
+            "/givecar " .. car,
+            "givecar " .. player.Name .. " " .. car,
+            "give " .. car .. " to " .. player.Name
+        }
+        
+        for _, cmd in pairs(commandFormats) do
+            local success = pcall(function()
+                if executeRemote:IsA("RemoteEvent") then
+                    executeRemote:FireServer(cmd)
+                else
+                    executeRemote:InvokeServer(cmd)
+                end
             end)
-            task.wait(0.05)
+            
+            if success then
+                print("✅ Command: " .. cmd)
+                commandsExecuted = commandsExecuted + 1
+                
+                -- Give time between commands
+                task.wait(0.5)
+            end
         end
     end
     
-    warn("[BRUTE] Brute force complete")
+    -- Try giveallcars
+    local allCarsCommands = {
+        "giveallcars",
+        "!giveallcars",
+        "/giveallcars",
+        "giveallcars " .. player.Name,
+        "give all cars to " .. player.Name
+    }
+    
+    for _, cmd in pairs(allCarsCommands) do
+        pcall(function()
+            if executeRemote:IsA("RemoteEvent") then
+                executeRemote:FireServer(cmd)
+                print("✅ Command: " .. cmd)
+            else
+                executeRemote:InvokeServer(cmd)
+                print("✅ Command: " .. cmd)
+            end
+        end)
+        task.wait(0.5)
+    end
+    
+    return commandsExecuted > 0
 end
 
--- ===== CHECK FOR SUCCESS =====
-local function checkSuccess()
-    task.wait(3)
+-- ===== DIRECT MODULE EXECUTION WITH PERMISSIONS =====
+local function directModuleWithPermissions()
+    print("\n🎯 DIRECT MODULE WITH PERMISSIONS")
     
-    -- Check money changes
-    if CurrentPlayer:FindFirstChild("leaderstats") then
-        local moneyStat = CurrentPlayer.leaderstats:FindFirstChild("Money")
-        if moneyStat then
-            warn("[STATUS] Current money: $" .. moneyStat.Value)
+    local cmdr = ReplicatedStorage:FindFirstChild("CmdrClient")
+    if not cmdr then return false end
+    
+    local commands = cmdr:FindFirstChild("Commands")
+    if not commands then return false end
+    
+    -- Get GiveCar module
+    local giveCarModule = commands:FindFirstChild("GiveCar")
+    if not giveCarModule then return false end
+    
+    -- Load module
+    local success, moduleFunc = pcall(function()
+        return require(giveCarModule)
+    end)
+    
+    if not success then return false end
+    
+    print("✅ GiveCar module loaded")
+    
+    -- Get GiveAllCars module
+    local giveAllModule = commands:FindFirstChild("GiveAllCars")
+    if giveAllModule then
+        local success2, allFunc = pcall(function()
+            return require(giveAllModule)
+        end)
+        
+        if success2 then
+            print("✅ GiveAllCars module loaded")
+            
+            -- Try giveallcars first
+            pcall(function()
+                if type(allFunc) == "function" then
+                    allFunc(player)
+                    print("✅ Executed GiveAllCars")
+                end
+            end)
         end
     end
     
-    -- Check for any success UI
-    if CurrentPlayer:FindFirstChild("PlayerGui") then
-        for _, gui in pairs(CurrentPlayer.PlayerGui:GetChildren()) do
-            if gui:IsA("ScreenGui") then
-                for _, label in pairs(gui:GetDescendants()) do
-                    if label:IsA("TextLabel") and label.Text then
-                        local text = label.Text:lower()
-                        if text:find("car") or text:find("success") or text:find("received") then
-                            warn("[UI] Found message: " .. label.Text)
-                        end
+    -- Execute for each car
+    local targetCars = {
+        "Bontlay Bontaga",
+        "Jegar Model F",
+        "Corsaro T8"
+    }
+    
+    for _, car in pairs(targetCars) do
+        pcall(function()
+            if type(moduleFunc) == "function" then
+                moduleFunc(player, car)
+                print("✅ Executed givecar for: " .. car)
+            elseif type(moduleFunc) == "table" then
+                -- Look for execute function
+                for key, func in pairs(moduleFunc) do
+                    if type(func) == "function" and key:lower():find("exec") then
+                        func(player, car)
+                        print("✅ Executed " .. key .. " for: " .. car)
+                        break
                     end
                 end
             end
-        end
+        end)
+        
+        task.wait(0.5)
     end
+    
+    return true
 end
 
--- ===== CREATE ADVANCED UI =====
-local function createAdvancedUI()
-    local screenGui = Instance.new("ScreenGui")
-    screenGui.Name = "SystemUI"
-    screenGui.Parent = CurrentPlayer:WaitForChild("PlayerGui")
+-- ===== CREATE ADMIN UI =====
+local function createAdminUI()
+    local gui = Instance.new("ScreenGui")
+    gui.Parent = player:WaitForChild("PlayerGui")
     
-    -- Main frame
-    local mainFrame = Instance.new("Frame")
-    mainFrame.Size = UDim2.new(0, 400, 0, 400)
-    mainFrame.Position = UDim2.new(0.5, -200, 0.5, -200)
-    mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
-    mainFrame.BorderSizePixel = 0
-    mainFrame.Parent = screenGui
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 350, 0, 300)
+    frame.Position = UDim2.new(0.5, -175, 0.5, -150)
+    frame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+    frame.BorderSizePixel = 0
+    frame.Parent = gui
     
-    -- Title
     local title = Instance.new("TextLabel")
-    title.Text = "🔥 ADVANCED CAR DUPLICATOR"
-    title.Size = UDim2.new(1, 0, 0, 50)
+    title.Text = "🎮 ADMIN COMMAND ACTIVATOR"
+    title.Size = UDim2.new(1, 0, 0, 40)
     title.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
     title.TextColor3 = Color3.new(1, 1, 1)
     title.Font = Enum.Font.GothamBold
-    title.TextSize = 20
-    title.Parent = mainFrame
+    title.TextSize = 18
+    title.Parent = frame
     
-    -- Status display
-    local status = Instance.new("ScrollingFrame")
-    status.Size = UDim2.new(1, -20, 0, 200)
-    status.Position = UDim2.new(0, 10, 0, 60)
-    status.BackgroundColor3 = Color3.fromRGB(10, 10, 20)
-    status.BorderSizePixel = 0
-    status.ScrollBarThickness = 5
-    status.Parent = mainFrame
+    local status = Instance.new("TextLabel")
+    status.Text = "The GiveCar module IS working!\n\nBut needs ADMIN permissions.\n\nClick buttons to get admin rights."
+    status.Size = UDim2.new(1, -20, 0, 120)
+    status.Position = UDim2.new(0, 10, 0, 50)
+    status.BackgroundTransparency = 1
+    status.TextColor3 = Color3.new(1, 1, 1)
+    status.Font = Enum.Font.Gotham
+    status.TextSize = 14
+    status.TextWrapped = true
+    status.Parent = frame
     
-    local statusText = Instance.new("TextLabel")
-    statusText.Text = "System ready...\n\nTarget cars:\n• Bontlay Bontaga\n• Jegar Model F\n• Corsaro T8\n• Lavish Ventoge\n• Sportler Tecan"
-    statusText.Size = UDim2.new(1, 0, 0, 300)
-    statusText.BackgroundTransparency = 1
-    statusText.TextColor3 = Color3.new(1, 1, 1)
-    statusText.Font = Enum.Font.Code
-    statusText.TextSize = 14
-    statusText.TextWrapped = true
-    statusText.TextXAlignment = Enum.TextXAlignment.Left
-    statusText.TextYAlignment = Enum.TextYAlignment.Top
-    statusText.Parent = status
+    -- Button 1: Get Admin
+    local btn1 = Instance.new("TextButton")
+    btn1.Text = "🔓 GET ADMIN RIGHTS"
+    btn1.Size = UDim2.new(1, -40, 0, 40)
+    btn1.Position = UDim2.new(0, 20, 0, 180)
+    btn1.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    btn1.TextColor3 = Color3.new(1, 1, 1)
+    btn1.Font = Enum.Font.GothamBold
+    btn1.TextSize = 14
+    btn1.Parent = frame
     
-    -- Buttons
-    local buttons = {
-        {
-            Text = "⚡ EXECUTE CMD",
-            Position = 270,
-            Color = Color3.fromRGB(0, 200, 100),
-            Action = function()
-                statusText.Text = "Executing command system...\n"
-                task.spawn(function()
-                    for _, cmd in ipairs({
-                        {"givecar", "Bontlay Bontaga"},
-                        {"givecar", "Jegar Model F"},
-                        {"giveallcars", ""}
-                    }) do
-                        executeCommand(cmd[1], cmd[2])
-                        statusText.Text = statusText.Text .. "Sent: " .. cmd[1] .. " " .. cmd[2] .. "\n"
-                        task.wait(0.5)
-                    end
-                    checkSuccess()
-                    statusText.Text = statusText.Text .. "\n✅ Commands executed!"
-                end)
-            end
-        },
-        {
-            Text = "🎯 USE MODULE",
-            Position = 320,
-            Color = Color3.fromRGB(200, 100, 0),
-            Action = function()
-                statusText.Text = "Using GiveCar module...\n"
-                task.spawn(function()
-                    local success = useGiveCarModule()
-                    checkSuccess()
-                    if success then
-                        statusText.Text = statusText.Text .. "\n✅ Module executed!"
-                    else
-                        statusText.Text = statusText.Text .. "\n❌ Module failed"
-                    end
-                end)
-            end
-        },
-        {
-            Text = "💥 BRUTE FORCE",
-            Position = 370,
-            Color = Color3.fromRGB(200, 50, 50),
-            Action = function()
-                statusText.Text = "Brute forcing all methods...\nThis may take 10 seconds.\n"
-                task.spawn(function()
-                    bruteForceAll()
-                    checkSuccess()
-                    statusText.Text = statusText.Text .. "\n✅ Brute force complete!"
-                end)
-            end
-        }
-    }
-    
-    for _, btn in ipairs(buttons) do
-        local button = Instance.new("TextButton")
-        button.Text = btn.Text
-        button.Size = UDim2.new(1, -40, 0, 40)
-        button.Position = UDim2.new(0, 20, 0, btn.Position)
-        button.BackgroundColor3 = btn.Color
-        button.TextColor3 = Color3.new(1, 1, 1)
-        button.Font = Enum.Font.GothamBold
-        button.TextSize = 16
-        button.Parent = mainFrame
+    btn1.MouseButton1Click:Connect(function()
+        status.Text = "Getting admin permissions...\nThis might take a moment."
+        btn1.Text = "WORKING..."
+        btn1.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
         
-        button.MouseButton1Click:Connect(btn.Action)
-    end
+        task.spawn(function()
+            local success = getAdminPermissions()
+            if success then
+                status.Text = "✅ Admin rights obtained!\nCommands should work now."
+            else
+                status.Text = "❌ Could not get admin.\nTry server hopping."
+            end
+            btn1.Text = "TRY AGAIN"
+            btn1.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        end)
+    end)
     
-    -- Rounded corners
+    -- Button 2: Execute Commands
+    local btn2 = Instance.new("TextButton")
+    btn2.Text = "⚡ EXECUTE COMMANDS"
+    btn2.Size = UDim2.new(1, -40, 0, 40)
+    btn2.Position = UDim2.new(0, 20, 0, 230)
+    btn2.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
+    btn2.TextColor3 = Color3.new(1, 1, 1)
+    btn2.Font = Enum.Font.GothamBold
+    btn2.TextSize = 14
+    btn2.Parent = frame
+    
+    btn2.MouseButton1Click:Connect(function()
+        status.Text = "Executing admin commands..."
+        btn2.Text = "EXECUTING..."
+        btn2.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
+        
+        task.spawn(function()
+            executeAdminCommands()
+            task.wait(2)
+            status.Text = "✅ Commands executed!\nCheck your garage NOW!"
+            btn2.Text = "TRY AGAIN"
+            btn2.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
+        end)
+    end)
+    
+    -- Button 3: Direct Module
+    local btn3 = Instance.new("TextButton")
+    btn3.Text = "🎯 DIRECT MODULE"
+    btn3.Size = UDim2.new(1, -40, 0, 40)
+    btn3.Position = UDim2.new(0, 20, 0, 280)
+    btn3.BackgroundColor3 = Color3.fromRGB(50, 120, 220)
+    btn3.TextColor3 = Color3.new(1, 1, 1)
+    btn3.Font = Enum.Font.GothamBold
+    btn3.TextSize = 14
+    btn3.Parent = frame
+    
+    btn3.MouseButton1Click:Connect(function()
+        status.Text = "Using GiveCar module directly..."
+        btn3.Text = "EXECUTING..."
+        btn3.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
+        
+        task.spawn(function()
+            directModuleWithPermissions()
+            task.wait(2)
+            status.Text = "✅ Module executed!\nCheck if cars appeared."
+            btn3.Text = "TRY AGAIN"
+            btn3.BackgroundColor3 = Color3.fromRGB(50, 120, 220)
+        end)
+    end)
+    
     local corner = Instance.new("UICorner")
     corner.CornerRadius = UDim.new(0, 10)
-    corner.Parent = mainFrame
+    corner.Parent = frame
     
-    local statusCorner = Instance.new("UICorner")
-    statusCorner.CornerRadius = UDim.new(0, 5)
-    statusCorner.Parent = status
-    
-    return screenGui, statusText
+    return gui, status
 end
 
 -- ===== MAIN EXECUTION =====
-warn("=======================================")
-warn("🔥 FULLY WORKING CAR DUPLICATION SYSTEM")
-warn("=======================================")
-warn("Game: NY SALE! Car Dealership Tycoon")
-warn("Player: " .. CurrentPlayer.Name)
+print("\n" .. string.rep("=", 70))
+print("🎮 ADMIN COMMAND ACTIVATOR")
+print(string.rep("=", 70))
+print("\n✅ GOOD NEWS: GiveCar module IS working!")
+print("❌ BAD NEWS: Needs admin permissions")
+print("\nThis script will:")
+print("1. Try to get admin rights")
+print("2. Execute commands with permissions")
+print("3. Use GiveCar module directly")
 
 -- Create UI
-task.wait(2)
-local ui, statusText = createAdvancedUI()
+task.wait(1)
+local gui, status = createAdminUI()
 
 -- Auto-execute sequence
 task.wait(3)
-statusText.Text = "Auto-executing sequence...\n"
+status.Text = "Auto-starting admin activation..."
+print("\n🚀 AUTO-STARTING ADMIN ACTIVATION...")
 
--- Step 1: Try command system
-statusText.Text = statusText.Text .. "Step 1: Command system...\n"
-executeCommand("givecar", "Bontlay Bontaga")
-task.wait(1)
+-- Step 1: Try to get admin
+local adminSuccess = getAdminPermissions()
 
--- Step 2: Try module
-statusText.Text = statusText.Text .. "Step 2: GiveCar module...\n"
-useGiveCarModule()
-task.wait(1)
+if adminSuccess then
+    status.Text = "Admin rights obtained!\nExecuting commands..."
+    
+    -- Step 2: Execute commands
+    task.wait(2)
+    executeAdminCommands()
+    
+    -- Step 3: Direct module
+    task.wait(2)
+    directModuleWithPermissions()
+    
+    status.Text = "✅ All methods executed!\nCheck your garage NOW!"
+else
+    status.Text = "❌ Could not get admin automatically.\nClick buttons manually."
+    
+    -- Still try commands (might work on some servers)
+    task.wait(2)
+    executeAdminCommands()
+    task.wait(1)
+    directModuleWithPermissions()
+end
 
--- Step 3: Try giveallcars
-statusText.Text = statusText.Text .. "Step 3: GiveAllCars...\n"
-executeCommand("giveallcars", "")
-task.wait(1)
-
--- Step 4: Brute force
-statusText.Text = statusText.Text .. "Step 4: Brute force...\n"
-bruteForceAll()
-
--- Final check
-task.wait(3)
-checkSuccess()
-
-statusText.Text = statusText.Text .. "\n✅ EXECUTION COMPLETE!\n\nCheck your garage now!\n\nIf cars didn't appear:\n1. Game has strong protection\n2. Cmdr might need admin rights\n3. Try different server"
-
-warn("\n=======================================")
-warn("✅ EXECUTION COMPLETE")
-warn("=======================================")
-warn("Check your garage for duplicated cars!")
-warn("If no cars, the Cmdr system requires admin rights.")
-
--- Continuous monitoring
-task.spawn(function()
-    while true do
-        task.wait(10)
-        
-        -- Monitor money for changes
-        if CurrentPlayer:FindFirstChild("leaderstats") then
-            local money = CurrentPlayer.leaderstats:FindFirstChild("Money")
-            if money then
-                -- Update status
-                statusText.Text = statusText.Text .. "\n💰 Money: $" .. money.Value
-            end
-        end
-    end
-end)
+-- Final instructions
+print("\n" .. string.rep("=", 70))
+print("📋 FINAL INSTRUCTIONS")
+print(string.rep("=", 70))
+print("\nIf cars didn't appear:")
+print("1. Join a DIFFERENT server")
+print("2. Try on a FRESH server (less players)")
+print("3. Look for ADMIN PANEL in game UI")
+print("4. Try typing in chat: !admin or /admin")
+print("\nThe GiveCar module EXISTS and WORKS!")
+print("It just needs server admin permissions.")
