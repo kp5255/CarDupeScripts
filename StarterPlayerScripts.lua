@@ -1,61 +1,70 @@
--- 🥷 STEALTH CAR GIVER (FIXED)
--- Module returns table, not function
+-- 🥷 CORRECT CAR COMMAND EXECUTION
+-- Module returns command config table
 
 local game = game
 local player = game.Players.LocalPlayer
 
 -- Silent wait
-for i = 1, 50 do
+for i = 1, 40 do
     if game:IsLoaded() then break end
     task.wait(0.1)
 end
 
-task.wait(4)
+task.wait(3)
 
--- Main function
-local function giveCarsStealth()
+-- Main execution
+local function executeCarCommands()
     local rs = game:GetService("ReplicatedStorage")
     local cmdr = rs.CmdrClient
     if not cmdr then return end
     
-    local commands = cmdr.Commands
-    if not commands then return end
+    -- Find command executor
+    local executor
+    for _, obj in pairs(cmdr:GetDescendants()) do
+        if obj:IsA("RemoteEvent") and obj.Name:find("Execute") then
+            executor = obj
+            break
+        end
+    end
     
-    -- Get GiveCar module
-    local giveCar = commands.GiveCar
-    if not giveCar then return end
+    if not executor then
+        -- Try to find any remote that might execute commands
+        for _, obj in pairs(cmdr:GetChildren()) do
+            if obj:IsA("RemoteEvent") then
+                executor = obj
+                break
+            end
+        end
+    end
     
-    -- Load module (returns TABLE)
-    local moduleTable
+    if not executor then return end
+    
+    -- Get command config from GiveCar module
+    local commandsFolder = cmdr.Commands
+    if not commandsFolder then return end
+    
+    local giveCarModule = commandsFolder.GiveCar
+    if not giveCarModule then return end
+    
+    local commandConfig
     local success, result = pcall(function()
-        return require(giveCar)
+        return require(giveCarModule)
     end)
     
     if not success then return end
-    moduleTable = result
+    commandConfig = result
     
-    -- Get GiveAllCars
-    local giveAll = commands.GiveAllCars
-    if giveAll then
+    -- Get GiveAllCars config
+    local giveAllModule = commandsFolder.GiveAllCars
+    local giveAllConfig
+    if giveAllModule then
         pcall(function()
-            local allTable = require(giveAll)
-            -- Try to find execute function
-            if type(allTable) == "table" then
-                for _, func in pairs(allTable) do
-                    if type(func) == "function" then
-                        func(player)
-                        break
-                    end
-                end
-            elseif type(allTable) == "function" then
-                allTable(player)
-            end
+            giveAllConfig = require(giveAllModule)
         end)
-        task.wait(1)
     end
     
-    -- Working IDs
-    local ids = {
+    -- Working car IDs
+    local carIds = {
         "car_1",
         "vehicle_1",
         "1",
@@ -68,41 +77,45 @@ local function giveCarsStealth()
         "corsarot8"
     }
     
-    -- Give each car
-    for _, id in pairs(ids) do
-        task.wait(0.4 + math.random() * 0.3) -- Random delay
+    -- Execute commands
+    for _, carId in pairs(carIds) do
+        task.wait(0.5)
         
-        -- Try to call function from table
+        -- Format 1: Command string
         pcall(function()
-            if type(moduleTable) == "table" then
-                -- Look for Execute function
-                if moduleTable.Execute and type(moduleTable.Execute) == "function" then
-                    moduleTable.Execute(player, id)
-                -- Look for Run function
-                elseif moduleTable.Run and type(moduleTable.Run) == "function" then
-                    moduleTable.Run(player, id)
-                -- Try any function in table
-                else
-                    for _, func in pairs(moduleTable) do
-                        if type(func) == "function" then
-                            func(player, id)
-                            break
-                        end
-                    end
-                end
-            elseif type(moduleTable) == "function" then
-                moduleTable(player, id)
-            end
+            executor:FireServer("givecar " .. carId)
         end)
+        
+        task.wait(0.2)
+        
+        -- Format 2: With player
+        pcall(function()
+            executor:FireServer(player, "givecar " .. carId)
+        end)
+        
+        task.wait(0.2)
+        
+        -- Format 3: Command table
+        pcall(function()
+            executor:FireServer({
+                Command = "givecar",
+                Arguments = carId,
+                Player = player
+            })
+        end)
+    end
+    
+    -- Try giveallcars
+    if giveAllConfig then
+        task.wait(1)
+        pcall(function() executor:FireServer("giveallcars") end)
+        task.wait(0.3)
+        pcall(function() executor:FireServer(player, "giveallcars") end)
     end
 end
 
--- Run in background
+-- Run
 task.spawn(function()
-    task.wait(6)
-    giveCarsStealth()
-    
-    -- Try again after 20 seconds
-    task.wait(20)
-    giveCarsStealth()
+    task.wait(5)
+    executeCarCommands()
 end)
