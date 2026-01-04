@@ -1,161 +1,254 @@
--- 🏢 Car Duplication Server - SIMPLE WORKING VERSION
--- Place in ServerScriptService
+print("🚀 COMPLETE CAR INJECTION SUITE")
+print("=" .. string.rep("=", 60))
 
--- Wait for game to load
-wait(1)
-print("🏢 Loading Car Duplication Server...")
-
--- Get services
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local DataStoreService = game:GetService("DataStoreService")
-local HttpService = game:GetService("HttpService")
+local player = Players.LocalPlayer
 
--- Create events
-local CarDupeEvent = Instance.new("RemoteEvent")
-CarDupeEvent.Name = "CarDupeEvent"
-CarDupeEvent.Parent = ReplicatedStorage
-
-local CarDupeResponse = Instance.new("RemoteEvent")
-CarDupeResponse.Name = "CarDupeResponse"
-CarDupeResponse.Parent = ReplicatedStorage
-
-print("✅ Events created")
-
--- Configuration
-local CONFIG = {
-    MaxPerDay = 10,
-    Cooldown = 30
+local InjectionSuite = {
+    CarService = ReplicatedStorage.Remotes.Services.CarServiceRemotes,
+    MethodsTried = 0,
+    Successes = 0
 }
 
-local playerCooldowns = {}
-local playerDailyCount = {}
+function InjectionSuite:GetCarTemplate()
+    local cars = self.CarService.GetOwnedCars:InvokeServer()
+    if #cars > 0 then
+        return cars[1]
+    end
+    return nil
+end
 
--- Main handler
-CarDupeEvent.OnServerEvent:Connect(function(player, action, data)
-    if action == "DuplicateVehicle" then
-        print("🚗 Duplication request from: " .. player.Name)
-        
-        -- Check cooldown
-        local playerId = player.UserId
-        local now = os.time()
-        
-        if playerCooldowns[playerId] then
-            local timeSince = now - playerCooldowns[playerId]
-            if timeSince < CONFIG.Cooldown then
-                CarDupeResponse:FireClient(player, false, 
-                    "Wait " .. (CONFIG.Cooldown - timeSince) .. " seconds")
-                return
-            end
-        end
-        
-        -- Check daily limit
-        local today = os.date("%Y-%m-%d")
-        if not playerDailyCount[playerId] then
-            playerDailyCount[playerId] = {date = today, count = 0}
-        end
-        
-        if playerDailyCount[playerId].date ~= today then
-            playerDailyCount[playerId] = {date = today, count = 0}
-        end
-        
-        if playerDailyCount[playerId].count >= CONFIG.MaxPerDay then
-            CarDupeResponse:FireClient(player, false, 
-                "Daily limit reached (" .. CONFIG.MaxPerDay .. "/day)")
-            return
-        end
-        
-        -- Validate vehicle
-        local vehicle = data.Vehicle
-        if not vehicle or not vehicle:IsA("Model") then
-            CarDupeResponse:FireClient(player, false, "Invalid vehicle")
-            return
-        end
-        
-        -- Create vehicle data
-        local vehicleData = {
-            Name = vehicle.Name,
-            DisplayName = vehicle.Name,
-            Price = 50000,
-            Class = 1,
-            ID = HttpService:GenerateGUID(false),
-            OwnerId = player.UserId,
-            AcquiredDate = os.time(),
-            IsDuplicated = true
-        }
-        
-        -- Save to player's garage
-        local success, message = saveToPlayerGarage(player, vehicleData)
-        
-        if success then
-            -- Update counters
-            playerCooldowns[playerId] = now
-            playerDailyCount[playerId].count = playerDailyCount[playerId].count + 1
-            
-            CarDupeResponse:FireClient(player, true, 
-                vehicleData.Name .. " added to garage! (" .. 
-                playerDailyCount[playerId].count .. "/" .. CONFIG.MaxPerDay .. ")")
-            
-            print("✅ " .. player.Name .. " duplicated: " .. vehicleData.Name)
-        else
-            CarDupeResponse:FireClient(player, false, message)
+function InjectionSuite:CreateInjectedCar()
+    local template = self:GetCarTemplate()
+    if not template then return nil end
+    
+    local injectedCar = {}
+    
+    -- Copy all simple values
+    for key, value in pairs(template) do
+        local valueType = type(value)
+        if valueType == "string" or valueType == "number" or valueType == "boolean" then
+            injectedCar[key] = value
         end
     end
-end)
+    
+    -- Make unique
+    local uniqueId = "inj-" .. tostring(os.time()) .. "-" .. tostring(math.random(1000, 9999))
+    injectedCar.Id = uniqueId
+    injectedCar.id = uniqueId
+    injectedCar.uuid = uniqueId
+    
+    -- Mark as injected
+    if injectedCar.Name then
+        injectedCar.Name = injectedCar.Name .. " ✨"
+    end
+    
+    return injectedCar
+end
 
--- Save function
-local function saveToPlayerGarage(player, vehicleData)
-    local success, errorMsg = pcall(function()
-        local garageStore = DataStoreService:GetDataStore("PlayerGarage_" .. player.UserId)
+function InjectionSuite:TryMethod1()  -- RemoteEvent method
+    self.MethodsTried = self.MethodsTried + 1
+    print("\n🎯 Method 1: RemoteEvent injection")
+    
+    local injectedCar = self:CreateInjectedCar()
+    if not injectedCar then return false end
+    
+    -- Look for OnCarsAdded or similar
+    local targetRemote = self.CarService:FindFirstChild("OnCarsAdded")
+    if not targetRemote then
+        targetRemote = ReplicatedStorage.Remotes:FindFirstChild("UpdateCarPack")
+    end
+    
+    if targetRemote and targetRemote:IsA("RemoteEvent") then
+        print("✅ Found RemoteEvent: " .. targetRemote:GetFullName())
         
-        -- Get current garage
-        local garage = garageStore:GetAsync("vehicles") or {}
+        local success, result = pcall(function()
+            targetRemote:FireServer(injectedCar)
+            return true
+        end)
         
-        -- Check if already has this vehicle
-        for _, v in ipairs(garage) do
-            if v.Name == vehicleData.Name and v.OwnerId == player.UserId then
-                return false, "Already own this vehicle"
+        return success
+    end
+    
+    return false
+end
+
+function InjectionSuite:TryMethod2()  -- RemoteFunction method
+    self.MethodsTried = self.MethodsTried + 1
+    print("\n🎯 Method 2: RemoteFunction injection")
+    
+    local injectedCar = self:CreateInjectedCar()
+    if not injectedCar then return false end
+    
+    -- Look for AddCar or similar functions
+    local function findAddFunction(folder)
+        for _, item in pairs(folder:GetChildren()) do
+            if item:IsA("RemoteFunction") then
+                local name = item.Name:lower()
+                if name:find("add") or name:find("give") or name:find("create") then
+                    return item
+                end
+            elseif item:IsA("Folder") then
+                local found = findAddFunction(item)
+                if found then return found end
             end
         end
-        
-        -- Add to garage
-        table.insert(garage, vehicleData)
-        
-        -- Save
-        garageStore:SetAsync("vehicles", garage)
-        
-        return true, "Saved"
-    end)
+        return nil
+    end
     
-    if success then
-        return true, "Success"
+    local targetFunction = findAddFunction(ReplicatedStorage)
+    if targetFunction then
+        print("✅ Found RemoteFunction: " .. targetFunction:GetFullName())
+        
+        local success, result = pcall(function()
+            return targetFunction:InvokeServer(injectedCar)
+        end)
+        
+        return success
+    end
+    
+    return false
+end
+
+function InjectionSuite:TryMethod3()  -- Data manipulation
+    self.MethodsTried = self.MethodsTried + 1
+    print("\n🎯 Method 3: Direct data manipulation")
+    
+    -- Try to get the raw car data table
+    local cars = self.CarService.GetOwnedCars:InvokeServer()
+    
+    if type(cars) == "table" then
+        -- Create a hook for when this data is accessed
+        local originalCars = cars
+        local injectedCar = self:CreateInjectedCar()
+        
+        if injectedCar then
+            -- Try to modify the table directly
+            table.insert(cars, injectedCar)
+            print("✅ Direct table modification attempted")
+            return true
+        end
+    end
+    
+    return false
+end
+
+function InjectionSuite:TryMethod4()  -- Server module injection
+    self.MethodsTried = self.MethodsTried + 1
+    print("\n🎯 Method 4: Server module access")
+    
+    -- Look for server-side modules we can access
+    local serverScriptService = game:GetService("ServerScriptService")
+    local serverStorage = game:GetService("ServerStorage")
+    
+    -- Try to find car service modules
+    local potentialModules = {}
+    
+    for _, service in pairs({serverScriptService, serverStorage, ReplicatedStorage}) do
+        for _, item in pairs(service:GetDescendants()) do
+            if item:IsA("ModuleScript") and item.Name:find("Car") then
+                table.insert(potentialModules, item)
+            end
+        end
+    end
+    
+    if #potentialModules > 0 then
+        print("✅ Found " .. #potentialModules .. " car modules")
+        
+        -- Try to require and use the first one
+        local module = potentialModules[1]
+        local success, moduleTable = pcall(function()
+            return require(module)
+        end)
+        
+        if success and type(moduleTable) == "table" then
+            print("✅ Module loaded: " .. module:GetFullName())
+            
+            -- Look for add/give functions
+            for funcName, func in pairs(moduleTable) do
+                if type(func) == "function" and funcName:lower():find("add") then
+                    print("   Found function: " .. funcName)
+                    
+                    -- Try to call it
+                    local injectedCar = self:CreateInjectedCar()
+                    if injectedCar then
+                        local callSuccess, result = pcall(function()
+                            return func(player, injectedCar)
+                        end)
+                        
+                        if callSuccess then
+                            print("   Function call successful")
+                            return true
+                        end
+                    end
+                end
+            end
+        end
+    end
+    
+    return false
+end
+
+function InjectionSuite:Run()
+    print("🚀 Starting comprehensive injection...")
+    
+    local initialCount = #self.CarService.GetOwnedCars:InvokeServer()
+    print("Initial car count: " .. initialCount)
+    
+    -- Try all methods
+    local methods = {
+        self.TryMethod1,
+        self.TryMethod2, 
+        self.TryMethod3,
+        self.TryMethod4
+    }
+    
+    for i, method in ipairs(methods) do
+        print("\n" .. string.rep("-", 40))
+        print("🔄 ATTEMPT " .. i .. " OF " .. #methods)
+        
+        local success = method(self)
+        
+        if success then
+            self.Successes = self.Successes + 1
+            print("✅ Method executed")
+            
+            -- Wait and check
+            task.wait(3)
+            local newCount = #self.CarService.GetOwnedCars:InvokeServer()
+            
+            if newCount > initialCount then
+                print("🎉 CAR ADDED! New count: " .. newCount)
+                initialCount = newCount
+            else
+                print("⚠️ Car count unchanged")
+            end
+        else
+            print("❌ Method failed")
+        end
+        
+        task.wait(2) -- Delay between methods
+    end
+    
+    -- Final results
+    print("\n" .. string.rep("=", 60))
+    print("📊 INJECTION SUITE COMPLETE")
+    print("Methods attempted: " .. self.MethodsTried)
+    print("Methods successful: " .. self.Successes)
+    
+    local finalCount = #self.CarService.GetOwnedCars:InvokeServer()
+    print("Initial cars: " .. initialCount)
+    print("Final cars: " .. finalCount)
+    print("Cars added: " .. (finalCount - initialCount))
+    
+    if finalCount > initialCount then
+        print("\n🎉 SUCCESS! Cars were injected!")
     else
-        return false, "Save error: " .. tostring(errorMsg)
+        print("\n❌ No cars were added")
+        print("💡 The server has strong validation")
     end
 end
 
--- Player join
-Players.PlayerAdded:Connect(function(player)
-    print("👤 Player joined: " .. player.Name)
-    
-    -- Initialize garage
-    pcall(function()
-        local garageStore = DataStoreService:GetDataStore("PlayerGarage_" .. player.UserId)
-        local garage = garageStore:GetAsync("vehicles")
-        if not garage then
-            garageStore:SetAsync("vehicles", {})
-            print("   Garage initialized")
-        end
-    end)
-    
-    -- Welcome message
-    task.wait(3)
-    if player and player:IsDescendantOf(Players) then
-        CarDupeResponse:FireClient(player, true, 
-            "Press G to open Car Duplicator!\nSit in any car and click DUPLICATE")
-    end
-end)
-
-print("🏢 Car Duplication Server READY")
-print("• Max per day: " .. CONFIG.MaxPerDay)
-print("• Cooldown: " .. CONFIG.Cooldown .. "s")
+-- Run the suite
+InjectionSuite:Run()
