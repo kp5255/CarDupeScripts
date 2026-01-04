@@ -1,7 +1,6 @@
--- 🚗 CAR DUPLICATION SYSTEM
+-- 🚗 CAR DUPLICATION SYSTEM (FIXED VERSION)
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local TweenService = game:GetService("TweenService")
 
 local player = Players.LocalPlayer
 local carService = ReplicatedStorage.Remotes.Services.CarServiceRemotes
@@ -16,6 +15,7 @@ print("🚗 CAR DUPLICATION SYSTEM LOADED")
 local CarDuplicator = {
     OwnedCars = {},
     SelectedCar = nil,
+    SelectedCarIndex = nil,
     IsDuplicating = false
 }
 
@@ -38,7 +38,7 @@ function CarDuplicator:GetCarName(carData)
     
     -- Try different possible name fields
     return carData.Name or carData.name or carData.CarName or 
-           carData.DisplayName or carData.NameTag or "Unknown Car"
+           carData.DisplayName or carData.NameTag or "Car #" .. tostring(carData.id or "")
 end
 
 -- Get car class
@@ -78,12 +78,12 @@ function CarDuplicator:DuplicateCar()
             return false
         end,
         
-        -- Method 2: Try SetCarFavorite (might work for duplication)
+        -- Method 2: Try UpdateCar remote
         function()
-            local favoriteRemote = ReplicatedStorage.Remotes:FindFirstChild("SetCarFavorite")
-            if favoriteRemote then
-                favoriteRemote:FireServer(self.SelectedCar)
-                return true, "SetCarFavorite method"
+            local updateRemote = ReplicatedStorage.Remotes:FindFirstChild("UpdateCar")
+            if updateRemote then
+                updateRemote:FireServer(self.SelectedCar)
+                return true, "UpdateCar method"
             end
             return false
         end,
@@ -98,12 +98,12 @@ function CarDuplicator:DuplicateCar()
             return false
         end,
         
-        -- Method 4: Try UpdateCar remote
+        -- Method 4: Try Spawn remote (might work for cars)
         function()
-            local updateRemote = ReplicatedStorage.Remotes:FindFirstChild("UpdateCar")
-            if updateRemote then
-                updateRemote:FireServer(self.SelectedCar)
-                return true, "UpdateCar method"
+            local spawnRemote = ReplicatedStorage.Remotes:FindFirstChild("Spawn")
+            if spawnRemote then
+                spawnRemote:FireServer(self.SelectedCar)
+                return true, "Spawn method"
             end
             return false
         end
@@ -122,8 +122,8 @@ function CarDuplicator:DuplicateCar()
     self.IsDuplicating = false
     
     if success then
-        -- Refresh car list
-        task.wait(1)
+        -- Refresh car list after delay
+        task.wait(2)
         self:GetOwnedCars()
         return true, "Duplication attempted via " .. methodName
     else
@@ -131,7 +131,7 @@ function CarDuplicator:DuplicateCar()
     end
 end
 
--- ===== CREATE RESPONSIVE UI =====
+-- ===== CREATE SIMPLIFIED UI =====
 function CarDuplicator:CreateUI()
     -- Destroy old UI if exists
     if player.PlayerGui:FindFirstChild("CarDuplicatorUI") then
@@ -275,7 +275,7 @@ function CarDuplicator:CreateUI()
     refreshBtn.Parent = buttonFrame
     
     local duplicateBtn = Instance.new("TextButton")
-    duplicateBtn.Text = "🚗 Duplicate Car"
+    duplicateBtn.Text = "🚗 Duplicate"
     duplicateBtn.Size = UDim2.new(0.7, -5, 1, 0)
     duplicateBtn.Position = UDim2.new(0.3, 5, 0, 0)
     duplicateBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
@@ -348,6 +348,20 @@ function CarDuplicator:CreateUI()
         end
     end
     
+    local function clearSelection()
+        CarDuplicator.SelectedCar = nil
+        CarDuplicator.SelectedCarIndex = nil
+        
+        -- Reset all button colors
+        for _, child in pairs(scrollFrame:GetChildren()) do
+            if child:IsA("Frame") then
+                child.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+            end
+        end
+        
+        updateSelectedDisplay()
+    end
+    
     local function createCarButton(carData, index)
         local buttonFrame = Instance.new("Frame")
         buttonFrame.Size = UDim2.new(1, -10, 0, 50)
@@ -397,30 +411,19 @@ function CarDuplicator:CreateUI()
         
         addCorner(selectBtn, 4)
         
-        -- Selection indicator
-        local selectedIndicator = Instance.new("Frame")
-        selectedIndicator.Size = UDim2.new(0, 5, 1, 0)
-        selectedIndicator.Position = UDim2.new(0, 0, 0, 0)
-        selectedIndicator.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
-        selectedIndicator.Visible = false
-        selectedIndicator.Parent = buttonFrame
-        
-        addCorner(selectedIndicator, 2)
-        
-        -- Button click handlers
+        -- Button click handler
         selectBtn.MouseButton1Click:Connect(function()
             -- Deselect all other cars
             for _, child in pairs(scrollFrame:GetChildren()) do
-                if child:IsA("Frame") and child ~= buttonFrame then
-                    child.SelectedIndicator.Visible = false
+                if child:IsA("Frame") then
                     child.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
                 end
             end
             
             -- Select this car
             CarDuplicator.SelectedCar = carData
-            selectedIndicator.Visible = true
-            buttonFrame.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+            CarDuplicator.SelectedCarIndex = index
+            buttonFrame.BackgroundColor3 = Color3.fromRGB(60, 100, 180) -- Blue highlight
             
             updateSelectedDisplay()
             updateStatus("Selected: " .. carName, Color3.fromRGB(0, 200, 100))
@@ -438,6 +441,9 @@ function CarDuplicator:CreateUI()
                 child:Destroy()
             end
         end
+        
+        -- Clear selection
+        clearSelection()
         
         -- Load cars
         if CarDuplicator:GetOwnedCars() then
@@ -468,18 +474,18 @@ function CarDuplicator:CreateUI()
         end
         
         local carName = CarDuplicator:GetCarName(CarDuplicator.SelectedCar)
-        updateStatus("Duplicating " .. carName .. "...", Color3.fromRGB(255, 255, 0))
+        updateStatus("Attempting to duplicate " .. carName .. "...", Color3.fromRGB(255, 255, 0))
         
         local success, message = CarDuplicator:DuplicateCar()
         
         if success then
-            updateStatus("✓ " .. message, Color3.fromRGB(0, 200, 100))
+            updateStatus("✅ " .. message, Color3.fromRGB(0, 200, 100))
             
             -- Refresh after delay
-            task.wait(2)
+            task.wait(3)
             loadCars()
         else
-            updateStatus("✗ " .. message, Color3.fromRGB(255, 50, 50))
+            updateStatus("❌ " .. message, Color3.fromRGB(255, 50, 50))
         end
     end)
     
@@ -496,18 +502,15 @@ print("🚀 Initializing Car Duplication System...")
 local ui = CarDuplicator:CreateUI()
 
 print("✅ Car Duplication System Ready!")
-print("💡 Features:")
-print("• Scrollable list of your 56 cars")
-print("• Select any car to duplicate")
-print("• One-click duplication")
+print("📋 Instructions:")
+print("1. Select a car from the list")
+print("2. Click 'Duplicate' button")
+print("3. Wait for confirmation")
+print("4. Refresh to see updated count")
+print("")
+print("🎯 Features:")
+print("• Shows all 56 of your cars")
+print("• Simple selection system")
+print("• Multiple duplication methods")
 print("• Real-time status updates")
 print("• Drag and move window")
-
--- Auto-refresh every 30 seconds
-spawn(function()
-    while task.wait(30) do
-        if ui and ui.Parent then
-            CarDuplicator:GetOwnedCars()
-        end
-    end
-end)
