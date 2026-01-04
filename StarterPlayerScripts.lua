@@ -1,151 +1,203 @@
--- 🎯 SIMPLE CAR STORAGE FINDER
+-- 🎯 INSPECT MULTI-CAR SELECTION GUI
 local Players = game:GetService("Players")
 local player = Players.LocalPlayer
 
 repeat task.wait() until game:IsLoaded()
 task.wait(2)
 
-print("🎯 FIND YOUR 54 CARS")
+print("🎯 INSPECTING MULTI-CAR SELECTION")
 print("=" .. string.rep("=", 50))
 
--- ===== SIMPLE SCAN =====
-local function simpleScan()
-    print("\n🔍 Simple scan starting...")
+-- ===== ANALYZE MULTI-CAR SELECTION =====
+local function analyzeCarGUI()
+    print("\n🔍 Analyzing MultiCarSelection GUI...")
     
-    -- Check all player children
-    for _, child in pairs(player:GetChildren()) do
-        print("📁 " .. child.Name .. " (" .. child.ClassName .. ")")
+    local gui = player.PlayerGui:FindFirstChild("MultiCarSelection")
+    if not gui then
+        print("❌ MultiCarSelection not found")
+        return
+    end
+    
+    print("✅ Found MultiCarSelection GUI")
+    print("   Contains " .. #gui:GetChildren() .. " children")
+    
+    -- Look for car list
+    local carList = nil
+    local buttonCount = 0
+    local frameCount = 0
+    
+    for _, obj in pairs(gui:GetDescendants()) do
+        if obj:IsA("ScrollingFrame") then
+            carList = obj
+            print("📜 Found ScrollingFrame: " .. obj.Name)
+            print("   Children: " .. #obj:GetChildren())
+        elseif obj:IsA("TextButton") or obj:IsA("ImageButton") then
+            buttonCount = buttonCount + 1
+            if obj.Name:lower():find("car") then
+                print("🚗 Car button: " .. obj.Name)
+            end
+        elseif obj:IsA("Frame") then
+            frameCount = frameCount + 1
+        end
+    end
+    
+    print("\n📊 GUI Statistics:")
+    print("   Total frames: " .. frameCount)
+    print("   Total buttons: " .. buttonCount)
+    
+    -- Try to extract car names from the GUI
+    if carList then
+        print("\n🔎 Checking car list contents...")
         
-        if child:IsA("Folder") then
-            print("   Contains " .. #child:GetChildren() .. " items")
-            
-            -- Check contents
-            local stringValues = 0
-            for _, item in pairs(child:GetChildren()) do
-                if item:IsA("StringValue") or item:IsA("IntValue") then
-                    stringValues = stringValues + 1
+        local carEntries = {}
+        for _, child in pairs(carList:GetChildren()) do
+            if child:IsA("Frame") or child:IsA("TextButton") then
+                -- Look for text labels
+                for _, label in pairs(child:GetDescendants()) do
+                    if label:IsA("TextLabel") and #label.Text > 2 then
+                        table.insert(carEntries, {
+                            Frame = child.Name,
+                            Text = label.Text,
+                            Path = label:GetFullName()
+                        })
+                    end
                 end
             end
-            
-            if stringValues > 0 then
-                print("   🚗 Found " .. stringValues .. " value objects (possible cars)")
+        end
+        
+        if #carEntries > 0 then
+            print("🎯 Found " .. #carEntries .. " car entries:")
+            for i, entry in ipairs(carEntries) do
+                if i <= 10 then  -- Show first 10
+                    print("   " .. i .. ". " .. entry.Text .. " (" .. entry.Frame .. ")")
+                end
             end
         end
     end
+    
+    return gui
 end
 
--- ===== CHECK VALUES =====
-local function checkValues()
-    print("\n📊 Checking value objects...")
+-- ===== FIND CAR DATA IN GUI =====
+local function extractCarData()
+    print("\n📖 Extracting car data from GUI...")
     
-    local valuesFound = {}
+    local gui = player.PlayerGui:FindFirstChild("MultiCarSelection")
+    if not gui then return {} end
     
-    for _, obj in pairs(player:GetDescendants()) do
-        if obj:IsA("StringValue") or obj:IsA("IntValue") then
+    local carData = {}
+    
+    -- Function to recursively search for data
+    local function searchForData(obj, path)
+        if obj:IsA("TextLabel") and #obj.Text > 2 then
+            local text = obj.Text
+            -- Check if it looks like a car name
+            if text:find("Bontlay") or text:find("Jegar") or text:find("Corsaro") or
+               text:find("Lavish") or text:find("Sportler") or
+               text:find("Car") or text:find("Model") then
+                table.insert(carData, {
+                    Type = "Car Name",
+                    Path = obj:GetFullName(),
+                    Value = text
+                })
+            end
+        elseif obj:IsA("StringValue") or obj:IsA("IntValue") then
             local success, value = pcall(function()
                 return obj.Value
             end)
-            
-            if success then
-                table.insert(valuesFound, {
-                    Path = obj:GetFullName(),
+            if success and tostring(value):len() > 5 then
+                table.insert(carData, {
                     Type = obj.ClassName,
+                    Path = obj:GetFullName(),
                     Value = tostring(value)
                 })
             end
         end
-    end
-    
-    print("Found " .. #valuesFound .. " value objects")
-    
-    -- Show interesting ones
-    local interesting = {}
-    for _, v in pairs(valuesFound) do
-        if #v.Value > 10 then
-            table.insert(interesting, v)
+        
+        -- Continue searching children
+        for _, child in pairs(obj:GetChildren()) do
+            searchForData(child, path .. "/" .. child.Name)
         end
     end
     
-    if #interesting > 0 then
-        print("\n🎯 INTERESTING VALUES (long data):")
-        for i, v in ipairs(interesting) do
-            if i <= 5 then
-                print(i .. ". " .. v.Path)
-                print("   Type: " .. v.Type)
-                print("   Value: " .. v.Value:sub(1, 50) .. (#v.Value > 50 and "..." or ""))
-            end
-        end
-    end
+    searchForData(gui, "MultiCarSelection")
     
-    return valuesFound
+    return carData
 end
 
--- ===== FIND GARAGE =====
-local function findGarage()
-    print("\n🏠 Looking for garage...")
+-- ===== CLONE CAR BUTTONS =====
+local function cloneCarButtons()
+    print("\n🎯 Attempting to clone car selection...")
     
-    -- Check PlayerGui
-    local gui = player:FindFirstChild("PlayerGui")
-    if gui then
-        for _, screenGui in pairs(gui:GetChildren()) do
-            local nameLower = screenGui.Name:lower()
-            if nameLower:find("garage") or nameLower:find("inventory") or 
-               nameLower:find("car") or nameLower:find("vehicle") then
-                print("✅ Found: " .. screenGui.Name)
+    local gui = player.PlayerGui:FindFirstChild("MultiCarSelection")
+    if not gui then
+        print("❌ GUI not found")
+        return false
+    end
+    
+    -- Find car buttons
+    local carButtons = {}
+    for _, obj in pairs(gui:GetDescendants()) do
+        if (obj:IsA("TextButton") or obj:IsA("ImageButton")) and 
+           (obj.Name:lower():find("car") or obj.Name:lower():find("select")) then
+            table.insert(carButtons, obj)
+        end
+    end
+    
+    print("Found " .. #carButtons .. " car buttons")
+    
+    if #carButtons > 0 then
+        -- Try to click them
+        for i, button in ipairs(carButtons) do
+            if i <= 5 then  -- Try first 5 buttons
+                print("Clicking button: " .. button.Name)
                 
-                -- Count frames
-                local frames = 0
-                for _ in pairs(screenGui:GetDescendants()) do
-                    frames = frames + 1
+                -- Simulate click
+                local success = pcall(function()
+                    -- Try to fire click event
+                    for _, connection in pairs(getconnections(button.MouseButton1Click)) do
+                        connection:Fire()
+                        print("   ✅ Fired click event")
+                    end
+                    
+                    -- Also try to call Activated if it exists
+                    if button:IsA("TextButton") then
+                        button.Activated:Fire()
+                        print("   ✅ Fired Activated event")
+                    end
+                end)
+                
+                if success then
+                    print("   Success!")
+                else
+                    print("   Failed")
                 end
-                print("   Contains " .. frames .. " objects")
+                
+                task.wait(0.5)
             end
         end
+        return true
     end
     
-    -- Check for leaderstats
-    if player:FindFirstChild("leaderstats") then
-        print("\n💰 Leaderstats found:")
-        for _, stat in pairs(player.leaderstats:GetChildren()) do
-            print("   " .. stat.Name .. ": " .. tostring(stat.Value))
-        end
-    end
+    return false
 end
 
--- ===== MANUAL CHECK =====
-local function manualCheck()
-    print("\n👤 MANUAL CHECK COMMANDS:")
-    print("Copy and paste these in F9 console:")
-    print("")
-    print("-- Check all player children")
-    print('for i,v in pairs(game.Players.LocalPlayer:GetChildren()) do print(v.Name, v.ClassName) end')
-    print("")
-    print("-- Check StringValues")
-    print('for i,v in pairs(game.Players.LocalPlayer:GetDescendants()) do if v:IsA("StringValue") then print(v:GetFullName(), v.Value) end end')
-    print("")
-    print("-- Check IntValues")
-    print('for i,v in pairs(game.Players.LocalPlayer:GetDescendants()) do if v:IsA("IntValue") then print(v:GetFullName(), v.Value) end end')
-    print("")
-    print("-- Check for folders with many items")
-    print('for i,v in pairs(game.Players.LocalPlayer:GetChildren()) do if v:IsA("Folder") and #v:GetChildren() > 10 then print("FOLDER:", v.Name, "ITEMS:", #v:GetChildren()) end end')
-end
-
--- ===== SIMPLE UI =====
-local function createSimpleUI()
+-- ===== CREATE CAR DUPLICATOR =====
+local function createCarDuplicator()
     local gui = Instance.new("ScreenGui")
-    gui.Name = "CarFinder"
+    gui.Name = "CarDuplicatorTool"
     gui.Parent = player:WaitForChild("PlayerGui")
     
     -- Main window
     local main = Instance.new("Frame")
-    main.Size = UDim2.new(0, 300, 0, 300)
-    main.Position = UDim2.new(0.5, -150, 0.5, -150)
+    main.Size = UDim2.new(0, 320, 0, 350)
+    main.Position = UDim2.new(0, 10, 0, 50)
     main.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
     main.Parent = gui
     
     -- Title
     local title = Instance.new("TextLabel")
-    title.Text = "🎯 FIND 54 CARS"
+    title.Text = "🎯 CAR DUPLICATOR"
     title.Size = UDim2.new(1, 0, 0, 40)
     title.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
     title.TextColor3 = Color3.new(1, 1, 1)
@@ -162,8 +214,8 @@ local function createSimpleUI()
     
     -- Status
     local status = Instance.new("TextLabel")
-    status.Text = "You have 54 cars. Let's find them!"
-    status.Size = UDim2.new(1, -20, 0, 40)
+    status.Text = "MultiCarSelection GUI found!\nThis likely contains your 54 cars."
+    status.Size = UDim2.new(1, -20, 0, 50)
     status.Position = UDim2.new(0, 10, 0, 10)
     status.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
     status.TextColor3 = Color3.new(1, 1, 1)
@@ -172,55 +224,45 @@ local function createSimpleUI()
     status.TextWrapped = true
     status.Parent = content
     
-    -- Results
+    -- Results display
     local results = Instance.new("ScrollingFrame")
-    results.Size = UDim2.new(1, -20, 0, 150)
-    results.Position = UDim2.new(0, 10, 1, -170)
+    results.Size = UDim2.new(1, -20, 0, 120)
+    results.Position = UDim2.new(0, 10, 1, -180)
     results.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
     results.BorderSizePixel = 0
     results.ScrollBarThickness = 6
     results.Parent = content
     
     -- Buttons
-    local scanBtn = Instance.new("TextButton")
-    scanBtn.Text = "🔍 SCAN"
-    scanBtn.Size = UDim2.new(0.5, -7, 0, 35)
-    scanBtn.Position = UDim2.new(0, 10, 0, 60)
-    scanBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 220)
-    scanBtn.TextColor3 = Color3.new(1, 1, 1)
-    scanBtn.Font = Enum.Font.GothamBold
-    scanBtn.TextSize = 14
-    scanBtn.Parent = content
+    local analyzeBtn = Instance.new("TextButton")
+    analyzeBtn.Text = "🔍 ANALYZE GUI"
+    analyzeBtn.Size = UDim2.new(1, -20, 0, 35)
+    analyzeBtn.Position = UDim2.new(0, 10, 0, 70)
+    analyzeBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 220)
+    analyzeBtn.TextColor3 = Color3.new(1, 1, 1)
+    analyzeBtn.Font = Enum.Font.GothamBold
+    analyzeBtn.TextSize = 14
+    analyzeBtn.Parent = content
     
-    local valueBtn = Instance.new("TextButton")
-    valueBtn.Text = "📊 VALUES"
-    valueBtn.Size = UDim2.new(0.5, -7, 0, 35)
-    valueBtn.Position = UDim2.new(0.5, 2, 0, 60)
-    valueBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 100)
-    valueBtn.TextColor3 = Color3.new(1, 1, 1)
-    valueBtn.Font = Enum.Font.GothamBold
-    valueBtn.TextSize = 14
-    valueBtn.Parent = content
+    local extractBtn = Instance.new("TextButton")
+    extractBtn.Text = "📖 EXTRACT DATA"
+    extractBtn.Size = UDim2.new(1, -20, 0, 35)
+    extractBtn.Position = UDim2.new(0, 10, 0, 115)
+    extractBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 100)
+    extractBtn.TextColor3 = Color3.new(1, 1, 1)
+    extractBtn.Font = Enum.Font.GothamBold
+    extractBtn.TextSize = 14
+    extractBtn.Parent = content
     
-    local garageBtn = Instance.new("TextButton")
-    garageBtn.Text = "🏠 GARAGE"
-    garageBtn.Size = UDim2.new(0.5, -7, 0, 35)
-    garageBtn.Position = UDim2.new(0, 10, 0, 105)
-    garageBtn.BackgroundColor3 = Color3.fromRGB(200, 100, 0)
-    garageBtn.TextColor3 = Color3.new(1, 1, 1)
-    garageBtn.Font = Enum.Font.GothamBold
-    garageBtn.TextSize = 14
-    garageBtn.Parent = content
-    
-    local manualBtn = Instance.new("TextButton")
-    manualBtn.Text = "👤 MANUAL"
-    manualBtn.Size = UDim2.new(0.5, -7, 0, 35)
-    manualBtn.Position = UDim2.new(0.5, 2, 0, 105)
-    manualBtn.BackgroundColor3 = Color3.fromRGB(150, 0, 200)
-    manualBtn.TextColor3 = Color3.new(1, 1, 1)
-    manualBtn.Font = Enum.Font.GothamBold
-    manualBtn.TextSize = 14
-    manualBtn.Parent = content
+    local cloneBtn = Instance.new("TextButton")
+    cloneBtn.Text = "🎯 CLONE CARS"
+    cloneBtn.Size = UDim2.new(1, -20, 0, 35)
+    cloneBtn.Position = UDim2.new(0, 10, 0, 160)
+    cloneBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    cloneBtn.TextColor3 = Color3.new(1, 1, 1)
+    cloneBtn.Font = Enum.Font.GothamBold
+    cloneBtn.TextSize = 14
+    cloneBtn.Parent = content
     
     -- Add corners
     local function addCorner(obj)
@@ -233,13 +275,12 @@ local function createSimpleUI()
     addCorner(title)
     addCorner(status)
     addCorner(results)
-    addCorner(scanBtn)
-    addCorner(valueBtn)
-    addCorner(garageBtn)
-    addCorner(manualBtn)
+    addCorner(analyzeBtn)
+    addCorner(extractBtn)
+    addCorner(cloneBtn)
     
     -- Functions
-    local function updateResults(text)
+    local function updateResults(text, color)
         results:ClearAllChildren()
         
         local label = Instance.new("TextLabel")
@@ -247,7 +288,7 @@ local function createSimpleUI()
         label.Size = UDim2.new(1, -10, 1, -10)
         label.Position = UDim2.new(0, 5, 0, 5)
         label.BackgroundTransparency = 1
-        label.TextColor3 = Color3.new(1, 1, 1)
+        label.TextColor3 = color or Color3.new(1, 1, 1)
         label.Font = Enum.Font.Code
         label.TextSize = 10
         label.TextWrapped = true
@@ -257,90 +298,109 @@ local function createSimpleUI()
     end
     
     -- Button actions
-    scanBtn.MouseButton1Click:Connect(function()
-        scanBtn.Text = "..."
-        scanBtn.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
-        status.Text = "Scanning player data..."
+    analyzeBtn.MouseButton1Click:Connect(function()
+        analyzeBtn.Text = "ANALYZING..."
+        analyzeBtn.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
+        status.Text = "Analyzing MultiCarSelection GUI..."
         
         task.spawn(function()
-            simpleScan()
-            status.Text = "Scan complete! Check console."
-            updateResults("Scan complete.\nCheck ROBLOX console for results.")
+            analyzeCarGUI()
+            status.Text = "Analysis complete! Check console."
+            updateResults("GUI analysis complete.\nCheck ROBLOX console for details.")
             
-            scanBtn.Text = "🔍 SCAN"
-            scanBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 220)
+            analyzeBtn.Text = "🔍 ANALYZE GUI"
+            analyzeBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 220)
         end)
     end)
     
-    valueBtn.MouseButton1Click:Connect(function()
-        valueBtn.Text = "..."
-        valueBtn.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
-        status.Text = "Checking value objects..."
+    extractBtn.MouseButton1Click:Connect(function()
+        extractBtn.Text = "EXTRACTING..."
+        extractBtn.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
+        status.Text = "Extracting car data from GUI..."
         
         task.spawn(function()
-            local values = checkValues()
+            local carData = extractCarData()
             
-            if #values > 0 then
-                status.Text = "Found " .. #values .. " value objects"
-                updateResults("Found " .. #values .. " value objects.\nCheck console for details.")
+            if #carData > 0 then
+                local resultText = "🎯 EXTRACTED " .. #carData .. " ITEMS:\n\n"
+                
+                for i, data in ipairs(carData) do
+                    if i <= 8 then
+                        resultText = resultText .. i .. ". " .. data.Type .. "\n"
+                        resultText = resultText .. "   " .. data.Path .. "\n"
+                        resultText = resultText .. "   Value: " .. data.Value:sub(1, 30) .. "\n\n"
+                    end
+                end
+                
+                updateResults(resultText, Color3.fromRGB(0, 255, 150))
+                status.Text = "✅ Extracted " .. #carData .. " data items"
             else
-                status.Text = "No value objects found"
-                updateResults("No value objects found")
+                updateResults("❌ No car data found in GUI", Color3.fromRGB(255, 100, 100))
+                status.Text = "❌ No car data found"
             end
             
-            valueBtn.Text = "📊 VALUES"
-            valueBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 100)
+            extractBtn.Text = "📖 EXTRACT DATA"
+            extractBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 100)
         end)
     end)
     
-    garageBtn.MouseButton1Click:Connect(function()
-        garageBtn.Text = "..."
-        garageBtn.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
-        status.Text = "Looking for garage..."
+    cloneBtn.MouseButton1Click:Connect(function()
+        cloneBtn.Text = "CLONING..."
+        cloneBtn.BackgroundColor3 = Color3.fromRGB(255, 100, 0)
+        status.Text = "Attempting to clone car selection..."
+        updateResults("Cloning car buttons...", Color3.fromRGB(255, 200, 100))
         
         task.spawn(function()
-            findGarage()
-            status.Text = "Garage search complete"
-            updateResults("Garage search complete.\nCheck console.")
+            local success = cloneCarButtons()
             
-            garageBtn.Text = "🏠 GARAGE"
-            garageBtn.BackgroundColor3 = Color3.fromRGB(200, 100, 0)
+            if success then
+                status.Text = "✅ Clone attempt complete!"
+                updateResults("Clone attempts sent.\nCheck if cars were added!", Color3.fromRGB(0, 255, 0))
+            else
+                status.Text = "❌ Clone failed"
+                updateResults("Could not clone cars.", Color3.fromRGB(255, 100, 100))
+            end
+            
+            cloneBtn.Text = "🎯 CLONE CARS"
+            cloneBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
         end)
     end)
     
-    manualBtn.MouseButton1Click:Connect(function()
-        manualBtn.Text = "COPIED"
-        manualBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
-        status.Text = "Commands copied to console"
-        updateResults("Commands ready in console.\nOpen F9 and paste them.")
-        
-        manualCheck()
-        
-        task.wait(2)
-        manualBtn.Text = "👤 MANUAL"
-        manualBtn.BackgroundColor3 = Color3.fromRGB(150, 0, 200)
-    end)
-    
-    -- Initial
-    updateResults("Click buttons to find where\nyour 54 cars are stored.")
+    -- Initial display
+    updateResults("MultiCarSelection GUI found!\nClick ANALYZE to start.", Color3.fromRGB(150, 150, 150))
     
     return gui
 end
 
--- ===== RUN =====
-print("\n🚀 Starting car finder...")
+-- ===== QUICK ANALYSIS =====
+print("\n🚀 Quick analysis starting...")
+
+-- First, analyze the GUI
+analyzeCarGUI()
+
+task.wait(1)
+
+-- Extract data
+local carData = extractCarData()
+if #carData > 0 then
+    print("\n🎯 Found " .. #carData .. " potential car data items")
+    for i, data in ipairs(carData) do
+        if i <= 3 then
+            print(i .. ". " .. data.Type .. ": " .. data.Value:sub(1, 30))
+        end
+    end
+end
 
 -- Create UI
-local ui = createSimpleUI()
+task.wait(1)
+local ui = createCarDuplicator()
 
-print("\n✅ UI Created!")
-print("\n💡 Click these buttons IN ORDER:")
-print("1. SCAN - Find folders and structures")
-print("2. VALUES - Check String/Int values")
-print("3. GARAGE - Look for garage UI")
-print("4. MANUAL - Get console commands")
+print("\n✅ Duplicator Tool Created!")
+print("\n💡 Click these buttons:")
+print("1. ANALYZE GUI - Detailed analysis")
+print("2. EXTRACT DATA - Find car names/IDs")
+print("3. CLONE CARS - Try to duplicate selection")
 
-print("\n🎯 After scanning, tell me:")
-print("• Any folders found")
-print("• Number of value objects")
-print("• Any interesting data found")
+print("\n🎯 MultiCarSelection is YOUR CAR GARAGE!")
+print("This is where your 54 cars are displayed.")
+print("Now we need to figure out how to ADD more!")
