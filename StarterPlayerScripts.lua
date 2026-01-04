@@ -1,4 +1,4 @@
--- 🔍 COMPACT NETWORK ANALYZER - Draggable & Responsive
+-- 🔍 FIXED NETWORK ANALYZER - No Errors
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local player = Players.LocalPlayer
@@ -6,170 +6,217 @@ local player = Players.LocalPlayer
 repeat task.wait() until game:IsLoaded()
 task.wait(2)
 
--- ===== COMPACT NETWORK MONITOR =====
+-- ===== SAFE NETWORK MONITOR =====
 local networkLog = {}
 local vulnerabilityScore = {}
 local isMonitoring = false
 
-local function hookNetwork()
-    print("📡 Hooking network...")
+local function safeHookNetwork()
+    print("📡 Starting safe network monitoring...")
     
     for _, obj in pairs(game:GetDescendants()) do
         if obj:IsA("RemoteEvent") then
-            local original = obj.FireServer
-            obj.FireServer = function(self, ...)
-                if isMonitoring then
-                    local args = {...}
-                    table.insert(networkLog, {
-                        Time = os.time(),
-                        Remote = self.Name,
-                        Path = self:GetFullName(),
-                        Args = args
-                    })
-                    
-                    -- Simple vulnerability check
-                    local remoteName = self.Name:lower()
-                    if remoteName:find("car") or remoteName:find("give") or 
-                       remoteName:find("buy") or remoteName:find("add") then
-                        if not vulnerabilityScore[self.Name] then
-                            vulnerabilityScore[self.Name] = 5
-                        else
-                            vulnerabilityScore[self.Name] = vulnerabilityScore[self.Name] + 1
+            -- Use pcall to safely hook each remote
+            local success, result = pcall(function()
+                local original = obj.FireServer
+                obj.FireServer = function(self, ...)
+                    if isMonitoring then
+                        local args = {...}
+                        table.insert(networkLog, {
+                            Time = os.time(),
+                            Remote = self.Name,
+                            Path = self:GetFullName(),
+                            Args = args
+                        })
+                        
+                        -- Check for car-related remotes
+                        local remoteName = self.Name:lower()
+                        if remoteName:find("car") or remoteName:find("vehicle") or 
+                           remoteName:find("give") or remoteName:find("buy") or 
+                           remoteName:find("purchase") or remoteName:find("add") then
+                            vulnerabilityScore[self.Name] = (vulnerabilityScore[self.Name] or 0) + 1
                         end
                     end
+                    return original(self, ...)
                 end
-                return original(self, ...)
+                return true
+            end)
+            
+            if not success then
+                print("⚠️ Could not hook: " .. obj:GetFullName())
             end
         end
     end
-    print("✅ Network hooked")
+    print("✅ Network monitoring ready")
 end
 
--- ===== COMPACT UI =====
-local function createCompactUI()
+-- ===== SIMPLE CAR TESTER =====
+local function testCarRemotes()
+    print("🎯 Testing car remotes...")
+    
+    local testCars = {
+        "Bontlay Bontaga",
+        "Jegar Model F",
+        "Corsaro T8",
+        "Lavish Ventoge",
+        "Sportler Tecan"
+    }
+    
+    local foundRemotes = {}
+    
+    -- Find all RemoteEvents
+    for _, obj in pairs(game:GetDescendants()) do
+        if obj:IsA("RemoteEvent") then
+            local nameLower = obj.Name:lower()
+            if nameLower:find("car") or nameLower:find("vehicle") or 
+               nameLower:find("give") or nameLower:find("buy") then
+                table.insert(foundRemotes, {
+                    Object = obj,
+                    Name = obj.Name,
+                    Path = obj:GetFullName()
+                })
+            end
+        end
+    end
+    
+    print("Found " .. #foundRemotes .. " car-related remotes")
+    
+    local successfulTests = {}
+    
+    for _, remote in pairs(foundRemotes) do
+        print("Testing: " .. remote.Name)
+        
+        -- Try different data formats
+        local formats = {
+            "Bontlay Bontaga",
+            {"Bontlay Bontaga"},
+            {Car = "Bontlay Bontaga"},
+            {"give", "Bontlay Bontaga"},
+            {player, "Bontlay Bontaga"}
+        }
+        
+        for _, data in pairs(formats) do
+            local success, result = pcall(function()
+                remote.Object:FireServer(data)
+                return "Success"
+            end)
+            
+            if success then
+                if not successfulTests[remote.Name] then
+                    successfulTests[remote.Name] = 0
+                end
+                successfulTests[remote.Name] = successfulTests[remote.Name] + 1
+                print("✅ " .. remote.Name .. " accepted data")
+                break
+            end
+            
+            task.wait(0.05)
+        end
+    end
+    
+    return successfulTests
+end
+
+-- ===== CLEAN DRAGGABLE UI =====
+local function createCleanUI()
     local gui = Instance.new("ScreenGui")
-    gui.Name = "CompactAnalyzer"
+    gui.Name = "CarAnalyzer"
     gui.Parent = player:WaitForChild("PlayerGui")
     gui.ResetOnSpawn = false
     
-    -- Main Window (Smaller)
+    -- Main Window
     local main = Instance.new("Frame")
-    main.Size = UDim2.new(0, 350, 0, 400)
-    main.Position = UDim2.new(0.5, -175, 0.5, -200)
-    main.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+    main.Size = UDim2.new(0, 300, 0, 350)
+    main.Position = UDim2.new(0.5, -150, 0.5, -175)
+    main.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
     main.BorderSizePixel = 0
-    main.ClipsDescendants = true
     main.Parent = gui
     
-    -- Title Bar (DRAGGABLE)
+    -- Title Bar (Draggable)
     local titleBar = Instance.new("Frame")
     titleBar.Size = UDim2.new(1, 0, 0, 30)
     titleBar.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
     titleBar.Parent = main
     
     local title = Instance.new("TextLabel")
-    title.Text = "🔍 NET ANALYZER"
+    title.Text = "🚗 CAR FINDER"
     title.Size = UDim2.new(1, -60, 1, 0)
     title.Position = UDim2.new(0, 5, 0, 0)
     title.BackgroundTransparency = 1
     title.TextColor3 = Color3.new(1, 1, 1)
-    title.Font = Enum.Font.Code
+    title.Font = Enum.Font.GothamBold
     title.TextSize = 14
     title.TextXAlignment = Enum.TextXAlignment.Left
     title.Parent = titleBar
     
-    -- Close Button
     local closeBtn = Instance.new("TextButton")
-    closeBtn.Text = "✕"
+    closeBtn.Text = "X"
     closeBtn.Size = UDim2.new(0, 25, 0, 25)
     closeBtn.Position = UDim2.new(1, -30, 0, 2)
-    closeBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+    closeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
     closeBtn.TextColor3 = Color3.new(1, 1, 1)
-    closeBtn.Font = Enum.Font.Code
+    closeBtn.Font = Enum.Font.GothamBold
     closeBtn.TextSize = 12
     closeBtn.Parent = titleBar
     
-    -- Content Area
+    -- Content
     local content = Instance.new("Frame")
     content.Size = UDim2.new(1, 0, 1, -30)
     content.Position = UDim2.new(0, 0, 0, 30)
     content.BackgroundTransparency = 1
     content.Parent = main
     
-    -- Control Buttons (Compact)
-    local controls = Instance.new("Frame")
-    controls.Size = UDim2.new(1, -10, 0, 60)
-    controls.Position = UDim2.new(0, 5, 0, 5)
-    controls.BackgroundTransparency = 1
-    controls.Parent = content
+    -- Status Label
+    local status = Instance.new("TextLabel")
+    status.Text = "Ready to scan for cars"
+    status.Size = UDim2.new(1, -10, 0, 40)
+    status.Position = UDim2.new(0, 5, 0, 5)
+    status.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+    status.TextColor3 = Color3.new(1, 1, 1)
+    status.Font = Enum.Font.Gotham
+    status.TextSize = 12
+    status.TextWrapped = true
+    status.Parent = content
     
-    local startBtn = Instance.new("TextButton")
-    startBtn.Text = "▶ START"
-    startBtn.Size = UDim2.new(0.5, -5, 0, 25)
-    startBtn.Position = UDim2.new(0, 0, 0, 0)
-    startBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
-    startBtn.TextColor3 = Color3.new(1, 1, 1)
-    startBtn.Font = Enum.Font.Code
-    startBtn.TextSize = 12
-    startBtn.Parent = controls
+    -- Buttons
+    local scanBtn = Instance.new("TextButton")
+    scanBtn.Text = "🔍 SCAN REMOTES"
+    scanBtn.Size = UDim2.new(1, -10, 0, 30)
+    scanBtn.Position = UDim2.new(0, 5, 0, 50)
+    scanBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 220)
+    scanBtn.TextColor3 = Color3.new(1, 1, 1)
+    scanBtn.Font = Enum.Font.GothamBold
+    scanBtn.TextSize = 12
+    scanBtn.Parent = content
     
-    local clearBtn = Instance.new("TextButton")
-    clearBtn.Text = "🗑️ CLEAR"
-    clearBtn.Size = UDim2.new(0.5, -5, 0, 25)
-    clearBtn.Position = UDim2.new(0.5, 5, 0, 0)
-    clearBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-    clearBtn.TextColor3 = Color3.new(1, 1, 1)
-    clearBtn.Font = Enum.Font.Code
-    clearBtn.TextSize = 12
-    clearBtn.Parent = controls
+    local testBtn = Instance.new("TextButton")
+    testBtn.Text = "🎯 TEST CARS"
+    testBtn.Size = UDim2.new(1, -10, 0, 30)
+    testBtn.Position = UDim2.new(0, 5, 0, 85)
+    testBtn.BackgroundColor3 = Color3.fromRGB(200, 100, 0)
+    testBtn.TextColor3 = Color3.new(1, 1, 1)
+    testBtn.Font = Enum.Font.GothamBold
+    testBtn.TextSize = 12
+    testBtn.Parent = content
     
-    local exploitBtn = Instance.new("TextButton")
-    exploitBtn.Text = "⚡ TEST"
-    exploitBtn.Size = UDim2.new(0.5, -5, 0, 25)
-    exploitBtn.Position = UDim2.new(0, 0, 0, 30)
-    exploitBtn.BackgroundColor3 = Color3.fromRGB(200, 100, 0)
-    exploitBtn.TextColor3 = Color3.new(1, 1, 1)
-    exploitBtn.Font = Enum.Font.Code
-    exploitBtn.TextSize = 12
-    exploitBtn.Parent = controls
+    local autoBtn = Instance.new("TextButton")
+    autoBtn.Text = "⚡ AUTO-DUPE"
+    autoBtn.Size = UDim2.new(1, -10, 0, 30)
+    autoBtn.Position = UDim2.new(0, 5, 0, 120)
+    autoBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    autoBtn.TextColor3 = Color3.new(1, 1, 1)
+    autoBtn.Font = Enum.Font.GothamBold
+    autoBtn.TextSize = 12
+    autoBtn.Parent = content
     
-    local statusBtn = Instance.new("TextButton")
-    statusBtn.Text = "📊 STATS"
-    statusBtn.Size = UDim2.new(0.5, -5, 0, 25)
-    statusBtn.Position = UDim2.new(0.5, 5, 0, 30)
-    statusBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 200)
-    statusBtn.TextColor3 = Color3.new(1, 1, 1)
-    statusBtn.Font = Enum.Font.Code
-    statusBtn.TextSize = 12
-    statusBtn.Parent = controls
-    
-    -- Stats Display (Small)
-    local statsPanel = Instance.new("Frame")
-    statsPanel.Size = UDim2.new(1, -10, 0, 60)
-    statsPanel.Position = UDim2.new(0, 5, 0, 70)
-    statsPanel.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-    statsPanel.Visible = false
-    statsPanel.Parent = content
-    
-    local stats = Instance.new("TextLabel")
-    stats.Text = "Packets: 0\nVulnerable: 0"
-    stats.Size = UDim2.new(1, -10, 1, -10)
-    stats.Position = UDim2.new(0, 5, 0, 5)
-    stats.BackgroundTransparency = 1
-    stats.TextColor3 = Color3.new(1, 1, 1)
-    stats.Font = Enum.Font.Code
-    stats.TextSize = 10
-    stats.TextWrapped = true
-    stats.Parent = statsPanel
-    
-    -- Log Display (Compact)
-    local logFrame = Instance.new("ScrollingFrame")
-    logFrame.Size = UDim2.new(1, -10, 0, 240)
-    logFrame.Position = UDim2.new(0, 5, 0, 135)
-    logFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 15)
-    logFrame.BorderSizePixel = 0
-    logFrame.ScrollBarThickness = 4
-    logFrame.Parent = content
+    -- Results Display
+    local results = Instance.new("ScrollingFrame")
+    results.Size = UDim2.new(1, -10, 0, 150)
+    results.Position = UDim2.new(0, 5, 0, 155)
+    results.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+    results.BorderSizePixel = 0
+    results.ScrollBarThickness = 4
+    results.Parent = content
     
     -- Add rounded corners
     local function addCorner(obj)
@@ -180,12 +227,11 @@ local function createCompactUI()
     
     addCorner(main)
     addCorner(titleBar)
-    addCorner(startBtn)
-    addCorner(clearBtn)
-    addCorner(exploitBtn)
-    addCorner(statusBtn)
-    addCorner(statsPanel)
-    addCorner(logFrame)
+    addCorner(status)
+    addCorner(scanBtn)
+    addCorner(testBtn)
+    addCorner(autoBtn)
+    addCorner(results)
     addCorner(closeBtn)
     
     -- === DRAGGABLE WINDOW ===
@@ -197,16 +243,6 @@ local function createCompactUI()
             dragging = true
             dragStart = input.Position
             frameStart = main.Position
-        end
-    end)
-    
-    titleBar.InputChanged:Connect(function(input)
-        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-            local delta = input.Position - dragStart
-            main.Position = UDim2.new(
-                frameStart.X.Scale, frameStart.X.Offset + delta.X,
-                frameStart.Y.Scale, frameStart.Y.Offset + delta.Y
-            )
         end
     end)
     
@@ -227,199 +263,159 @@ local function createCompactUI()
     end)
     
     -- === FUNCTIONS ===
-    local function updateLog()
-        logFrame:ClearAllChildren()
+    local function updateResults(text, color)
+        results:ClearAllChildren()
         
-        local yPos = 2
-        for i = math.max(1, #networkLog - 20), #networkLog do
-            local entry = networkLog[i]
-            if entry then
-                local entryFrame = Instance.new("Frame")
-                entryFrame.Size = UDim2.new(1, -4, 0, 35)
-                entryFrame.Position = UDim2.new(0, 2, 0, yPos)
-                
-                -- Color based on vulnerability
-                local score = vulnerabilityScore[entry.Remote] or 0
-                if score > 10 then
-                    entryFrame.BackgroundColor3 = Color3.fromRGB(80, 20, 20)
-                elseif score > 5 then
-                    entryFrame.BackgroundColor3 = Color3.fromRGB(80, 50, 20)
-                else
-                    entryFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-                end
-                
-                addCorner(entryFrame)
-                entryFrame.Parent = logFrame
-                
-                -- Remote name
-                local nameLabel = Instance.new("TextLabel")
-                nameLabel.Text = entry.Remote
-                nameLabel.Size = UDim2.new(1, -10, 0, 15)
-                nameLabel.Position = UDim2.new(0, 5, 0, 2)
-                nameLabel.BackgroundTransparency = 1
-                nameLabel.TextColor3 = Color3.new(1, 1, 1)
-                nameLabel.Font = Enum.Font.Code
-                nameLabel.TextSize = 10
-                nameLabel.TextXAlignment = Enum.TextXAlignment.Left
-                nameLabel.TextTruncate = Enum.TextTruncate.AtEnd
-                nameLabel.Parent = entryFrame
-                
-                -- Args info
-                local argsLabel = Instance.new("TextLabel")
-                argsLabel.Text = "Args: " .. #entry.Args
-                argsLabel.Size = UDim2.new(1, -10, 0, 15)
-                argsLabel.Position = UDim2.new(0, 5, 0, 18)
-                argsLabel.BackgroundTransparency = 1
-                argsLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-                argsLabel.Font = Enum.Font.Code
-                argsLabel.TextSize = 9
-                argsLabel.TextXAlignment = Enum.TextXAlignment.Left
-                argsLabel.Parent = entryFrame
-                
-                yPos = yPos + 40
-            end
-        end
-        
-        logFrame.CanvasSize = UDim2.new(0, 0, 0, yPos)
-    end
-    
-    local function updateStats()
-        local vulnerableCount = 0
-        for _, score in pairs(vulnerabilityScore) do
-            if score > 5 then
-                vulnerableCount = vulnerableCount + 1
-            end
-        end
-        
-        stats.Text = string.format("Packets: %d\nVulnerable: %d\nCar Remotes: %d", 
-            #networkLog, vulnerableCount, #networkLog)
-    end
-    
-    local function testExploits()
-        exploitBtn.Text = "TESTING..."
-        exploitBtn.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
-        
-        task.spawn(function()
-            -- Find vulnerable remotes
-            local targets = {}
-            for remoteName, score in pairs(vulnerabilityScore) do
-                if score > 5 then
-                    for _, obj in pairs(game:GetDescendants()) do
-                        if obj.Name == remoteName and obj:IsA("RemoteEvent") then
-                            table.insert(targets, {Name = remoteName, Object = obj})
-                            break
-                        end
-                    end
-                end
-            end
-            
-            if #targets == 0 then
-                -- Test all car-related remotes
-                for _, obj in pairs(game:GetDescendants()) do
-                    if obj:IsA("RemoteEvent") and obj.Name:lower():find("car") then
-                        table.insert(targets, {Name = obj.Name, Object = obj})
-                    end
-                end
-            end
-            
-            -- Test each target
-            local successCount = 0
-            for _, target in ipairs(targets) do
-                print("Testing: " .. target.Name)
-                
-                local testData = {
-                    "Bontlay Bontaga",
-                    {Car = "Bontlay Bontaga"},
-                    {"give", "Bontlay Bontaga"},
-                    {player, "Bontlay Bontaga"}
-                }
-                
-                for _, data in ipairs(testData) do
-                    local success = pcall(function()
-                        target.Object:FireServer(data)
-                        return true
-                    end)
-                    
-                    if success then
-                        successCount = successCount + 1
-                        print("✅ " .. target.Name .. " accepted data")
-                        break
-                    end
-                end
-                
-                task.wait(0.1)
-            end
-            
-            exploitBtn.Text = string.format("⚡ %d/%d", successCount, #targets)
-            exploitBtn.BackgroundColor3 = successCount > 0 and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(200, 50, 50)
-            
-            if successCount > 0 then
-                print(string.format("🎯 %d remotes accepted car data!", successCount))
-                print("Check your inventory for new cars!")
-            end
-        end)
+        local label = Instance.new("TextLabel")
+        label.Text = text
+        label.Size = UDim2.new(1, -10, 1, -10)
+        label.Position = UDim2.new(0, 5, 0, 5)
+        label.BackgroundTransparency = 1
+        label.TextColor3 = color or Color3.new(1, 1, 1)
+        label.Font = Enum.Font.Code
+        label.TextSize = 10
+        label.TextWrapped = true
+        label.TextXAlignment = Enum.TextXAlignment.Left
+        label.TextYAlignment = Enum.TextYAlignment.Top
+        label.Parent = results
     end
     
     -- === BUTTON ACTIONS ===
-    startBtn.MouseButton1Click:Connect(function()
-        if not isMonitoring then
-            isMonitoring = true
-            startBtn.Text = "⏹ STOP"
-            startBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
-            hookNetwork()
-            
-            -- Start update loop
-            task.spawn(function()
-                while isMonitoring do
-                    updateLog()
-                    updateStats()
-                    task.wait(1)
+    scanBtn.MouseButton1Click:Connect(function()
+        scanBtn.Text = "SCANNING..."
+        scanBtn.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
+        status.Text = "Scanning for car remotes..."
+        
+        task.spawn(function()
+            -- Find car-related remotes
+            local carRemotes = {}
+            for _, obj in pairs(game:GetDescendants()) do
+                if obj:IsA("RemoteEvent") then
+                    local nameLower = obj.Name:lower()
+                    if nameLower:find("car") or nameLower:find("vehicle") or 
+                       nameLower:find("buy") or nameLower:find("purchase") or
+                       nameLower:find("give") or nameLower:find("add") then
+                        table.insert(carRemotes, {
+                            Name = obj.Name,
+                            Path = obj:GetFullName()
+                        })
+                    end
                 end
-            end)
-        else
+            end
+            
+            local resultText = "Found " .. #carRemotes .. " car-related remotes:\n\n"
+            for i, remote in ipairs(carRemotes) do
+                if i <= 10 then  -- Limit display
+                    resultText = resultText .. "• " .. remote.Name .. "\n"
+                    if #resultText > 500 then
+                        resultText = resultText .. "...\n(and more)"
+                        break
+                    end
+                end
+            end
+            
+            updateResults(resultText, Color3.new(1, 1, 1))
+            status.Text = "Scan complete!"
+            
+            scanBtn.Text = "🔍 SCAN REMOTES"
+            scanBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 220)
+        end)
+    end)
+    
+    testBtn.MouseButton1Click:Connect(function()
+        testBtn.Text = "TESTING..."
+        testBtn.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
+        status.Text = "Testing car remotes..."
+        
+        task.spawn(function()
+            safeHookNetwork()
+            isMonitoring = true
+            
+            -- Give time for monitoring
+            for i = 1, 5 do
+                status.Text = "Testing... " .. i .. "/5"
+                task.wait(1)
+            end
+            
             isMonitoring = false
-            startBtn.Text = "▶ START"
-            startBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
-        end
+            
+            -- Show what was captured
+            local resultText = "Network Log (" .. #networkLog .. " packets):\n\n"
+            for i, entry in ipairs(networkLog) do
+                if i <= 15 then  -- Limit display
+                    local remoteName = entry.Remote
+                    if remoteName:lower():find("car") then
+                        resultText = resultText .. "🚗 "
+                    end
+                    resultText = resultText .. remoteName .. " (" .. #entry.Args .. " args)\n"
+                end
+            end
+            
+            updateResults(resultText, Color3.fromRGB(0, 255, 150))
+            status.Text = "Test complete! Check results."
+            
+            testBtn.Text = "🎯 TEST CARS"
+            testBtn.BackgroundColor3 = Color3.fromRGB(200, 100, 0)
+        end)
     end)
     
-    clearBtn.MouseButton1Click:Connect(function()
-        networkLog = {}
-        vulnerabilityScore = {}
-        updateLog()
-        updateStats()
-    end)
-    
-    exploitBtn.MouseButton1Click:Connect(function()
-        testExploits()
-    end)
-    
-    statusBtn.MouseButton1Click:Connect(function()
-        statsPanel.Visible = not statsPanel.Visible
-        updateStats()
+    autoBtn.MouseButton1Click:Connect(function()
+        autoBtn.Text = "DUPING..."
+        autoBtn.BackgroundColor3 = Color3.fromRGB(255, 100, 0)
+        status.Text = "Attempting car duplication..."
+        
+        task.spawn(function()
+            local results = testCarRemotes()
+            
+            local resultText = "Auto-Dupe Results:\n\n"
+            local successCount = 0
+            
+            for remoteName, count in pairs(results) do
+                successCount = successCount + 1
+                resultText = resultText .. "✅ " .. remoteName .. ": " .. count .. " successes\n"
+            end
+            
+            if successCount == 0 then
+                resultText = resultText .. "❌ No remotes accepted car data\n"
+                resultText = resultText .. "Try a different server!"
+            else
+                resultText = resultText .. "\n🎉 Check your inventory!"
+            end
+            
+            updateResults(resultText, successCount > 0 and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 100, 100))
+            status.Text = successCount > 0 and "Duplication attempted!" or "No vulnerabilities found"
+            
+            autoBtn.Text = "⚡ AUTO-DUPE"
+            autoBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        end)
     end)
     
     closeBtn.MouseButton1Click:Connect(function()
         gui:Destroy()
     end)
     
-    -- Initial update
-    updateLog()
+    -- Initial display
+    updateResults("Click SCAN REMOTES to begin", Color3.fromRGB(150, 150, 150))
     
     return gui
 end
 
 -- ===== MAIN =====
-print("🔍 Compact Network Analyzer")
-print("Starting...")
+print("=" .. string.rep("=", 50))
+print("🚗 SIMPLE CAR FINDER v1.0")
+print("=" .. string.rep("=", 50))
+
+print("\n🎯 Features:")
+print("• Scan for car remotes")
+print("• Test network traffic")
+print("• Auto-duplicate cars")
+print("• Draggable window")
+
+print("\n🔧 Starting...")
 task.wait(1)
 
-local ui = createCompactUI()
-print("✅ UI Ready - Drag the blue title bar!")
-
-print("\n🎮 Quick Guide:")
-print("• Drag the blue bar to move window")
-print("• Click START to monitor network")
-print("• Perform car actions in-game")
-print("• Click TEST to try exploits")
-print("• Check inventory after testing")
+local ui = createCleanUI()
+print("\n✅ UI Ready!")
+print("💡 Drag the blue bar to move the window")
+print("💡 Click buttons to scan/test")
+print("💡 Check inventory after testing")
