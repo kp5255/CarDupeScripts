@@ -1,7 +1,7 @@
--- 💥 ULTIMATE FORCE EXECUTION SCRIPT
+-- 🔍 REAL CAR ID DISCOVERY SCRIPT
 -- Place ID: 1554960397
 
-print("💥 ULTIMATE FORCE EXECUTION")
+print("🔍 REAL CAR ID DISCOVERY")
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -10,490 +10,509 @@ local player = Players.LocalPlayer
 repeat task.wait() until game:IsLoaded()
 task.wait(2)
 
--- ===== FORCE MODULE EXECUTION =====
-local function forceModuleExecution()
-    print("\n💥 FORCING MODULE EXECUTION")
+-- ===== FIND ALL CAR DATA IN GAME =====
+local function discoverRealCarIds()
+    print("\n🔍 DISCOVERING REAL CAR IDs")
     
-    -- Get GiveCar module
-    local giveCar = ReplicatedStorage:FindFirstChild("CmdrClient")
-    if giveCar then
-        giveCar = giveCar:FindFirstChild("Commands")
-        if giveCar then
-            giveCar = giveCar:FindFirstChild("GiveCar")
+    -- Look for car databases, catalogs, shops
+    local carDataFound = {}
+    
+    -- 1. Check ReplicatedStorage for car catalogs
+    print("\n📦 Checking ReplicatedStorage...")
+    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+        if obj:IsA("Folder") and obj.Name:lower():find("car") then
+            print("Found car folder: " .. obj.Name)
+            for _, item in pairs(obj:GetChildren()) do
+                print("  - " .. item.Name .. " (" .. item.ClassName .. ")")
+                if item:IsA("Configuration") or item:IsA("ModuleScript") then
+                    table.insert(carDataFound, {
+                        Path = obj:GetFullName(),
+                        Name = item.Name,
+                        Type = "Catalog"
+                    })
+                end
+            end
         end
     end
     
-    if not giveCar or not giveCar:IsA("ModuleScript") then
-        print("❌ GiveCar module not found")
-        return false
+    -- 2. Check for car shop data
+    print("\n🏪 Checking car shop data...")
+    local shopModules = {}
+    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+        if obj:IsA("ModuleScript") then
+            local name = obj.Name:lower()
+            if name:find("shop") or name:find("store") or name:find("catalog") then
+                table.insert(shopModules, obj)
+                print("Found shop module: " .. obj.Name)
+            end
+        end
     end
     
-    print("✅ GiveCar module found: " .. giveCar:GetFullName())
+    -- Try to load shop modules
+    for _, module in pairs(shopModules) do
+        local success, moduleTable = pcall(function()
+            return require(module)
+        end)
+        
+        if success and type(moduleTable) == "table" then
+            print("\n✅ Loaded shop module: " .. module.Name)
+            
+            -- Look for car lists
+            for key, value in pairs(moduleTable) do
+                if type(value) == "table" then
+                    -- Check if it's a car list
+                    if key:lower():find("car") or key:lower():find("vehicle") then
+                        print("Found car table: " .. key)
+                        
+                        -- Display first few cars
+                        local count = 0
+                        for carKey, carData in pairs(value) do
+                            if count < 10 then
+                                print("  Car: " .. tostring(carKey))
+                                if type(carData) == "table" then
+                                    print("    Data: " .. tostring(carData))
+                                end
+                                count = count + 1
+                            end
+                        end
+                    end
+                elseif type(value) == "string" and value:find("Car") then
+                    print("Car string: " .. key .. " = " .. value)
+                end
+            end
+        end
+    end
     
-    -- Force load module
-    local moduleFunc
-    local success, result = pcall(function()
-        return require(giveCar)
+    -- 3. Look for car spawner/garage data
+    print("\n🏢 Checking garage/spawner data...")
+    if Workspace:FindFirstChild("Cars") then
+        print("Found Cars in Workspace")
+        for _, car in pairs(Workspace.Cars:GetChildren()) do
+            if car:IsA("Model") then
+                print("  Model: " .. car.Name)
+                
+                -- Check for car ID
+                local carId = car:GetAttribute("CarId") or 
+                             car:FindFirstChild("CarId") or
+                             car:FindFirstChild("ID")
+                
+                if carId then
+                    print("    ID: " .. tostring(carId.Value or carId))
+                end
+            end
+        end
+    end
+    
+    return carDataFound
+end
+
+-- ===== TEST WITH DIFFERENT CAR FORMATS =====
+local function testAllCarFormats()
+    print("\n🧪 TESTING ALL CAR FORMATS")
+    
+    -- Get GiveCar module
+    local giveCarModule = ReplicatedStorage:FindFirstChild("CmdrClient")
+    if giveCarModule then
+        giveCarModule = giveCarModule:FindFirstChild("Commands")
+        if giveCarModule then
+            giveCarModule = giveCarModule:FindFirstChild("GiveCar")
+        end
+    end
+    
+    if not giveCarModule then
+        print("❌ GiveCar module not found")
+        return
+    end
+    
+    -- Load module
+    local success, moduleFunc = pcall(function()
+        return require(giveCarModule)
     end)
     
     if not success then
         print("❌ Failed to load module")
-        return false
+        return
     end
     
-    moduleFunc = result
-    print("✅ Module loaded successfully")
+    print("✅ GiveCar module loaded")
     
-    -- Get GiveAllCars module
-    local giveAll = ReplicatedStorage:FindFirstChild("CmdrClient")
-    if giveAll then
-        giveAll = giveAll:FindFirstChild("Commands")
-        if giveAll then
-            giveAll = giveAll:FindFirstChild("GiveAllCars")
-        end
-    end
+    -- Test MANY different car ID formats
+    local testFormats = {
+        -- Basic formats
+        "bontlay_bontaga",
+        "bontlaybontaga",
+        "BontlayBontaga",
+        "Bontlay_Bontaga",
+        
+        -- ID formats
+        "car_1",
+        "car1",
+        "car_001",
+        "vehicle_1",
+        
+        -- Short codes
+        "bb",
+        "bb1",
+        "bontlay",
+        "bontaga",
+        
+        -- Number formats
+        "1",
+        "100",
+        "1000",
+        "1001",
+        
+        -- Shop formats
+        "Car_Bontlay_Bontaga",
+        "Vehicle_Bontlay_Bontaga",
+        "BontlayBontagaCar",
+        "BontlayBontagaVehicle",
+        
+        -- Database formats
+        "car_bontlay_bontaga_01",
+        "vehicle_bontlay_bontaga_v1",
+        "bontlay_bontaga_v1",
+        "bb_v1",
+        
+        -- Try common car IDs
+        "lamborghini",
+        "ferrari",
+        "bugatti",
+        "mclaren",
+        "porsche",
+        "audi",
+        "bmw",
+        "mercedes",
+        
+        -- Game-specific
+        "hypercar",
+        "supercar",
+        "sportscar",
+        "driftcar",
+        
+        -- Try your other cars
+        "jegar_modelf",
+        "jegar_model_f",
+        "JegarModelF",
+        "jegar",
+        
+        "corsaro_t8",
+        "corsarot8",
+        "CorsaroT8",
+        "corsaro",
+        
+        "lavish_ventoge",
+        "lavishventoge",
+        "LavishVentoge",
+        "lavish",
+        
+        "sportler_tecan",
+        "sportlertecan",
+        "SportlerTecan",
+        "sportler"
+    }
     
-    if giveAll and giveAll:IsA("ModuleScript") then
-        local success2, allFunc = pcall(function()
-            return require(giveAll)
+    print("Testing " .. #testFormats .. " car ID formats...")
+    
+    local successfulCalls = 0
+    
+    for _, carId in pairs(testFormats) do
+        -- Try to execute
+        local callSuccess = pcall(function()
+            if type(moduleFunc) == "function" then
+                moduleFunc(player, carId)
+                return true
+            elseif type(moduleFunc) == "table" then
+                -- Look for execute function
+                for key, func in pairs(moduleFunc) do
+                    if type(func) == "function" and key:lower():find("exec") then
+                        func(player, carId)
+                        return true
+                    end
+                end
+            end
+            return false
         end)
         
-        if success2 then
-            print("✅ GiveAllCars module loaded")
+        if callSuccess then
+            print("✅ Called with: " .. carId)
+            successfulCalls = successfulCalls + 1
             
-            -- Try to execute GiveAllCars FIRST (might bypass permission check)
-            print("\n🎯 ATTEMPTING GIVEALLCARS...")
-            for i = 1, 5 do
-                pcall(function()
-                    if type(allFunc) == "function" then
-                        allFunc(player)
-                        print("✅ GiveAllCars attempt " .. i)
-                    elseif type(allFunc) == "table" then
-                        for key, func in pairs(allFunc) do
-                            if type(func) == "function" then
-                                func(player)
-                                print("✅ " .. key .. " attempt " .. i)
-                                break
-                            end
-                        end
-                    end
-                end)
-                task.wait(0.3)
-            end
+            -- Wait a bit between successful calls
+            task.wait(0.1)
         end
-    end
-    
-    -- Target cars
-    local targetCars = {
-        "Bontlay Bontaga",
-        "Jegar Model F",
-        "Corsaro T8",
-        "Lavish Ventoge",
-        "Sportler Tecan"
-    }
-    
-    print("\n🎯 FORCING GIVECAR EXECUTION...")
-    
-    -- Method 1: Direct function call
-    if type(moduleFunc) == "function" then
-        print("Module is a function, attempting calls...")
-        for _, car in pairs(targetCars) do
-            for i = 1, 3 do
-                pcall(function()
-                    moduleFunc(player, car)
-                    print("✅ Direct call: " .. car .. " (attempt " .. i .. ")")
-                end)
-                task.wait(0.2)
-            end
-        end
-    end
-    
-    -- Method 2: Table with execute function
-    if type(moduleFunc) == "table" then
-        print("Module is a table, searching for execute functions...")
         
-        -- Look for execute/run functions
-        for key, func in pairs(moduleFunc) do
-            if type(func) == "function" then
-                print("Found function: " .. key)
-                
-                for _, car in pairs(targetCars) do
-                    for i = 1, 2 do
-                        pcall(function()
-                            func(player, car)
-                            print("✅ " .. key .. ": " .. car .. " (attempt " .. i .. ")")
-                        end)
-                        task.wait(0.2)
-                    end
-                end
-            end
-        end
+        -- Small delay to avoid rate limits
+        task.wait(0.05)
     end
     
-    -- Method 3: Try to find and call Execute method
-    if type(moduleFunc) == "table" and moduleFunc.Execute then
-        print("Found Execute method")
-        for _, car in pairs(targetCars) do
-            pcall(function()
-                moduleFunc.Execute(player, car)
-                print("✅ Execute method: " .. car)
-            end)
-            task.wait(0.2)
-        end
-    end
+    print("\n📊 RESULTS: " .. successfulCalls .. " successful calls out of " .. #testFormats .. " attempts")
     
-    -- Method 4: Try to find and call Run method
-    if type(moduleFunc) == "table" and moduleFunc.Run then
-        print("Found Run method")
-        for _, car in pairs(targetCars) do
-            pcall(function()
-                moduleFunc.Run(player, car)
-                print("✅ Run method: " .. car)
-            end)
-            task.wait(0.2)
-        end
+    if successfulCalls == 0 then
+        print("\n❌ NO car IDs worked!")
+        print("The module might need specific server-side IDs.")
     end
-    
-    return true
 end
 
--- ===== BYPASS PERMISSION CHECK =====
-local function bypassPermissionCheck()
-    print("\n🔓 ATTEMPTING PERMISSION BYPASS")
+-- ===== FIND CAR DATABASE =====
+local function findCarDatabase()
+    print("\n🗄️ FINDING CAR DATABASE")
     
-    -- Try to fake admin status
-    local cmdr = ReplicatedStorage:FindFirstChild("CmdrClient")
-    if not cmdr then return false end
+    -- Look for DataStore or database modules
+    local dataModules = {}
     
-    -- Look for permission/rank systems
-    local permissionSystems = {}
-    
-    for _, obj in pairs(cmdr:GetDescendants()) do
-        if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
+    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+        if obj:IsA("ModuleScript") then
             local name = obj.Name:lower()
-            if name:find("perm") or name:find("rank") or name:find("admin") then
-                table.insert(permissionSystems, obj)
-                print("Found permission system: " .. obj.Name)
+            if name:find("data") or name:find("database") or name:find("store") then
+                table.insert(dataModules, obj)
             end
         end
     end
     
-    -- Try to set fake admin
-    for _, remote in pairs(permissionSystems) do
-        -- Fake admin data
-        local fakeAdminData = {
-            Player = player,
-            UserId = player.UserId,
-            Rank = "Admin",
-            Level = 999,
-            Permissions = {"GiveCar", "GiveAllCars", "Admin"},
-            IsAdmin = true
-        }
+    print("Found " .. #dataModules .. " data modules")
+    
+    -- Try to find car IDs in data
+    for _, module in pairs(dataModules) do
+        local success, moduleTable = pcall(function()
+            return require(module)
+        end)
         
-        -- Try to send
-        for i = 1, 3 do
-            pcall(function()
-                if remote:IsA("RemoteEvent") then
-                    remote:FireServer(fakeAdminData)
-                    print("✅ Sent fake admin data to " .. remote.Name .. " (attempt " .. i .. ")")
-                else
-                    remote:InvokeServer(fakeAdminData)
-                    print("✅ Invoked fake admin data to " .. remote.Name .. " (attempt " .. i .. ")")
-                end
-            end)
-            task.wait(0.3)
-        end
-    end
-    
-    -- Also try to modify player attributes
-    pcall(function()
-        player:SetAttribute("IsAdmin", true)
-        player:SetAttribute("Rank", "Admin")
-        player:SetAttribute("Permissions", "GiveCar,GiveAllCars")
-        print("✅ Set admin attributes on player")
-    end)
-    
-    return #permissionSystems > 0
-end
-
--- ===== CREATE FAKE ADMIN EVENT =====
-local function createFakeAdminEvent()
-    print("\n🎭 CREATING FAKE ADMIN EVENT")
-    
-    -- Create a fake remote that might be picked up by the system
-    local fakeEvent = Instance.new("RemoteEvent")
-    fakeEvent.Name = "AdminPermissionGranted"
-    fakeEvent.Parent = ReplicatedStorage
-    
-    -- Fire it with admin data
-    pcall(function()
-        fakeEvent:FireServer({
-            Player = player,
-            Action = "GrantAdmin",
-            Level = 999,
-            Permissions = {"GiveCar", "GiveAllCars"}
-        })
-        print("✅ Fired fake admin event")
-    end)
-    
-    -- Also create bindable
-    local bindable = Instance.new("BindableEvent")
-    bindable.Name = "PermissionUpdate"
-    bindable.Parent = ReplicatedStorage
-    
-    pcall(function()
-        bindable:Fire({
-            Player = player,
-            IsAdmin = true,
-            CanGiveCars = true
-        })
-        print("✅ Fired bindable permission event")
-    end)
-end
-
--- ===== SPAM COMMAND SYSTEM =====
-local function spamCommandSystem()
-    print("\n📨 SPAMMING COMMAND SYSTEM")
-    
-    local cmdr = ReplicatedStorage:FindFirstChild("CmdrClient")
-    if not cmdr then return end
-    
-    -- Get ALL remotes in Cmdr
-    local allRemotes = {}
-    for _, obj in pairs(cmdr:GetDescendants()) do
-        if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
-            table.insert(allRemotes, obj)
-        end
-    end
-    
-    print("Found " .. #allRemotes .. " Cmdr remotes")
-    
-    -- Commands to spam
-    local commands = {
-        "givecar Bontlay Bontaga",
-        "givecar Jegar Model F",
-        "givecar Corsaro T8",
-        "giveallcars",
-        "admin givecar Bontlay Bontaga",
-        "sudo givecar Bontlay Bontaga"
-    }
-    
-    -- Spam all remotes
-    for _, remote in pairs(allRemotes) do
-        for _, cmd in pairs(commands) do
-            for i = 1, 3 do
-                pcall(function()
-                    if remote:IsA("RemoteEvent") then
-                        remote:FireServer(cmd)
-                        remote:FireServer(player, cmd)
-                        remote:FireServer(cmd, player)
-                    else
-                        remote:InvokeServer(cmd)
-                        remote:InvokeServer(player, cmd)
+        if success and type(moduleTable) == "table" then
+            -- Look for car definitions
+            for key, value in pairs(moduleTable) do
+                if type(value) == "table" then
+                    -- Check if it contains car data
+                    if value.Name and (value.Name:find("Car") or value.Name:find("Vehicle")) then
+                        print("Found car definition:")
+                        print("  Key: " .. key)
+                        for k, v in pairs(value) do
+                            print("  " .. k .. ": " .. tostring(v))
+                        }
                     end
-                    print("✅ Spammed " .. remote.Name .. " with: " .. cmd)
-                end)
-                task.wait(0.05)
+                    
+                    -- Check for car IDs
+                    if value.CarId or value.VehicleId or value.ID then
+                        print("Found car ID in " .. key .. ": " .. tostring(value.CarId or value.VehicleId or value.ID))
+                    end
+                end
             end
         end
     end
 end
 
--- ===== CHECK FOR SUCCESS =====
-local function checkCarSuccess()
-    print("\n🔍 CHECKING FOR CAR SUCCESS")
-    task.wait(3)
+-- ===== BRUTE FORCE NUMERIC IDs =====
+local function bruteForceNumericIds()
+    print("\n🔢 BRUTE FORCING NUMERIC IDs")
     
-    -- Check money (should increase if cars were "bought" for free)
-    if player:FindFirstChild("leaderstats") then
-        local money = player.leaderstats:FindFirstChild("Money")
-        if money then
-            print("💰 Current money: $" .. money.Value)
+    local giveCarModule = ReplicatedStorage:FindFirstChild("CmdrClient")
+    if giveCarModule then
+        giveCarModule = giveCarModule:FindFirstChild("Commands")
+        if giveCarModule then
+            giveCarModule = giveCarModule:FindFirstChild("GiveCar")
         end
     end
     
-    -- Listen for any car-related messages
-    for _, remote in pairs(ReplicatedStorage:GetChildren()) do
-        if remote:IsA("RemoteEvent") then
-            pcall(function()
-                remote.OnClientEvent:Connect(function(...)
-                    local args = {...}
-                    for _, arg in pairs(args) do
-                        if type(arg) == "string" then
-                            if arg:find("Bontlay") or arg:find("Jegar") or arg:find("Corsaro") then
-                                print("\n🎉 CAR SUCCESS DETECTED!")
-                                print("Message: " .. arg)
-                            elseif arg:find("car") or arg:find("vehicle") then
-                                print("Car-related message: " .. arg)
-                            end
-                        end
-                    end
-                end)
-            end)
+    if not giveCarModule then return end
+    
+    local success, moduleFunc = pcall(function()
+        return require(giveCarModule)
+    end)
+    
+    if not success then return end
+    
+    print("Testing numeric IDs 1-1000...")
+    
+    local foundIds = {}
+    
+    -- Test IDs 1-1000
+    for id = 1, 1000 do
+        if id % 100 == 0 then
+            print("Testing ID " .. id .. "...")
         end
+        
+        local callSuccess = pcall(function()
+            if type(moduleFunc) == "function" then
+                moduleFunc(player, tostring(id))
+                return true
+            elseif type(moduleFunc) == "table" then
+                for key, func in pairs(moduleFunc) do
+                    if type(func) == "function" and key:lower():find("exec") then
+                        func(player, tostring(id))
+                        return true
+                    end
+                end
+            end
+            return false
+        end)
+        
+        if callSuccess then
+            table.insert(foundIds, id)
+            print("✅ ID " .. id .. " accepted!")
+        end
+        
+        task.wait(0.01) -- Fast but not too fast
+    end
+    
+    print("\n📊 NUMERIC ID RESULTS:")
+    if #foundIds > 0 then
+        print("Found " .. #foundIds .. " working IDs:")
+        for _, id in pairs(foundIds) do
+            print("  ID: " .. id)
+        end
+    else
+        print("❌ No numeric IDs worked")
     end
 end
 
--- ===== CREATE FINAL UI =====
-local function createFinalUI()
+-- ===== CREATE DISCOVERY UI =====
+local function createDiscoveryUI()
     local gui = Instance.new("ScreenGui")
     gui.Parent = player:WaitForChild("PlayerGui")
     
     local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(0, 400, 0, 350)
-    frame.Position = UDim2.new(0.5, -200, 0.5, -175)
+    frame.Size = UDim2.new(0, 400, 0, 400)
+    frame.Position = UDim2.new(0.5, -200, 0.5, -200)
     frame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
     frame.BorderSizePixel = 0
     frame.Parent = gui
     
     local title = Instance.new("TextLabel")
-    title.Text = "💥 ULTIMATE FORCE EXECUTION"
+    title.Text = "🔍 REAL CAR ID DISCOVERY"
     title.Size = UDim2.new(1, 0, 0, 50)
-    title.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    title.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
     title.TextColor3 = Color3.new(1, 1, 1)
     title.Font = Enum.Font.GothamBold
-    title.TextSize = 20
+    title.TextSize = 18
     title.Parent = frame
     
-    local status = Instance.new("TextLabel")
-    status.Text = "GiveCar module IS loaded!\n\nBut needs permission bypass.\n\nClick buttons to FORCE execution."
-    status.Size = UDim2.new(1, -20, 0, 120)
+    local status = Instance.new("ScrollingFrame")
+    status.Size = UDim2.new(1, -20, 0, 200)
     status.Position = UDim2.new(0, 10, 0, 60)
-    status.BackgroundTransparency = 1
-    status.TextColor3 = Color3.new(1, 1, 1)
-    status.Font = Enum.Font.Gotham
-    status.TextSize = 14
-    status.TextWrapped = true
+    status.BackgroundColor3 = Color3.fromRGB(10, 10, 20)
+    status.BorderSizePixel = 0
+    status.ScrollBarThickness = 5
     status.Parent = frame
     
-    -- Button 1: Force Module
-    local btn1 = Instance.new("TextButton")
-    btn1.Text = "💥 FORCE MODULE"
-    btn1.Size = UDim2.new(1, -40, 0, 40)
-    btn1.Position = UDim2.new(0, 20, 0, 190)
-    btn1.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-    btn1.TextColor3 = Color3.new(1, 1, 1)
-    btn1.Font = Enum.Font.GothamBold
-    btn1.TextSize = 16
-    btn1.Parent = frame
+    local statusText = Instance.new("TextLabel")
+    statusText.Text = "We need to find the REAL car IDs\nthat the server actually uses.\n\n'Bontlay Bontaga' might be just a display name!"
+    statusText.Size = UDim2.new(1, 0, 0, 300)
+    statusText.BackgroundTransparency = 1
+    statusText.TextColor3 = Color3.new(1, 1, 1)
+    statusText.Font = Enum.Font.Code
+    statusText.TextSize = 14
+    statusText.TextWrapped = true
+    statusText.TextXAlignment = Enum.TextXAlignment.Left
+    statusText.TextYAlignment = Enum.TextYAlignment.Top
+    statusText.Parent = status
     
-    btn1.MouseButton1Click:Connect(function()
-        status.Text = "Forcing module execution...\nThis is your BEST chance!"
-        btn1.Text = "FORCING..."
-        btn1.BackgroundColor3 = Color3.fromRGB(255, 100, 0)
+    -- Buttons
+    local buttons = {
+        {
+            Text = "🔍 DISCOVER CAR DATA",
+            Y = 270,
+            Action = function()
+                statusText.Text = "Discovering car data...\nCheck F9 console!"
+                task.spawn(function()
+                    discoverRealCarIds()
+                    statusText.Text = statusText.Text .. "\n\n✅ Discovery complete!\nCheck F9 for found data."
+                end)
+            end
+        },
+        {
+            Text = "🧪 TEST ALL FORMATS",
+            Y = 320,
+            Action = function()
+                statusText.Text = "Testing all car ID formats...\nThis may take 10 seconds.\nCheck F9!"
+                task.spawn(function()
+                    testAllCarFormats()
+                    statusText.Text = statusText.Text .. "\n\n✅ Format testing complete!"
+                end)
+            end
+        },
+        {
+            Text = "🔢 BRUTE FORCE IDs",
+            Y = 370,
+            Action = function()
+                statusText.Text = "Brute forcing numeric IDs 1-1000...\nThis will take 15-20 seconds.\nCheck F9!"
+                task.spawn(function()
+                    bruteForceNumericIds()
+                    statusText.Text = statusText.Text .. "\n\n✅ Brute force complete!"
+                end)
+            end
+        }
+    }
+    
+    for _, btn in pairs(buttons) do
+        local button = Instance.new("TextButton")
+        button.Text = btn.Text
+        button.Size = UDim2.new(1, -40, 0, 40)
+        button.Position = UDim2.new(0, 20, 0, btn.Y)
+        button.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
+        button.TextColor3 = Color3.new(1, 1, 1)
+        button.Font = Enum.Font.GothamBold
+        button.TextSize = 14
+        button.Parent = frame
         
-        task.spawn(function()
-            forceModuleExecution()
-            task.wait(2)
-            checkCarSuccess()
-            status.Text = "✅ Module forced!\nCheck garage NOW!"
-            btn1.Text = "TRY AGAIN"
-            btn1.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-        end)
-    end)
-    
-    -- Button 2: Bypass Permissions
-    local btn2 = Instance.new("TextButton")
-    btn2.Text = "🔓 BYPASS PERMISSIONS"
-    btn2.Size = UDim2.new(1, -40, 0, 40)
-    btn2.Position = UDim2.new(0, 20, 0, 240)
-    btn2.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
-    btn2.TextColor3 = Color3.new(1, 1, 1)
-    btn2.Font = Enum.Font.GothamBold
-    btn2.TextSize = 14
-    btn2.Parent = frame
-    
-    btn2.MouseButton1Click:Connect(function()
-        status.Text = "Attempting permission bypass..."
-        btn2.Text = "BYPASSING..."
-        btn2.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
-        
-        task.spawn(function()
-            bypassPermissionCheck()
-            createFakeAdminEvent()
-            status.Text = "✅ Permission bypass attempted!\nNow try Force Module."
-            btn2.Text = "TRY AGAIN"
-            btn2.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
-        end)
-    end)
-    
-    -- Button 3: Spam System
-    local btn3 = Instance.new("TextButton")
-    btn3.Text = "📨 SPAM SYSTEM"
-    btn3.Size = UDim2.new(1, -40, 0, 40)
-    btn3.Position = UDim2.new(0, 20, 0, 290)
-    btn3.BackgroundColor3 = Color3.fromRGB(50, 120, 220)
-    btn3.TextColor3 = Color3.new(1, 1, 1)
-    btn3.Font = Enum.Font.GothamBold
-    btn3.TextSize = 14
-    btn3.Parent = frame
-    
-    btn3.MouseButton1Click:Connect(function()
-        status.Text = "Spamming command system...\nMight trigger success!"
-        btn3.Text = "SPAMMING..."
-        btn3.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
-        
-        task.spawn(function()
-            spamCommandSystem()
-            task.wait(2)
-            checkCarSuccess()
-            status.Text = "✅ System spammed!\nCheck for cars."
-            btn3.Text = "TRY AGAIN"
-            btn3.BackgroundColor3 = Color3.fromRGB(50, 120, 220)
-        end)
-    end)
+        button.MouseButton1Click:Connect(btn.Action)
+    end
     
     local corner = Instance.new("UICorner")
     corner.CornerRadius = UDim.new(0, 10)
     corner.Parent = frame
     
-    return gui, status
+    local statusCorner = Instance.new("UICorner")
+    statusCorner.CornerRadius = UDim.new(0, 5)
+    statusCorner.Parent = status
+    
+    return gui, statusText
 end
 
 -- ===== MAIN EXECUTION =====
 print("\n" .. string.rep("=", 70))
-print("💥 ULTIMATE FORCE EXECUTION")
+print("🔍 REAL CAR ID DISCOVERY")
 print(string.rep("=", 70))
-print("\nMODULE STATUS: GiveCar and GiveAllCars ARE LOADED!")
-print("PROBLEM: Needs admin permissions")
-print("\nThis script FORCES execution anyway!")
+print("\nCRITICAL INSIGHT:")
+print("'Bontlay Bontaga' might be DISPLAY NAME only!")
+print("The server uses DIFFERENT internal IDs.")
+print("\nThis script will find REAL car IDs.")
 
 -- Create UI
 task.wait(1)
-local gui, status = createFinalUI()
+local gui, statusText = createDiscoveryUI()
 
--- Auto-execute EVERYTHING
+-- Auto-start discovery
 task.wait(3)
-status.Text = "Auto-executing ALL methods...\nFORCING execution!"
-print("\n🚀 AUTO-EXECUTING ALL METHODS...")
+statusText.Text = "Auto-starting car ID discovery...\nCheck F9 console!"
 
--- Step 1: Bypass permissions first
-print("\n1. ATTEMPTING PERMISSION BYPASS...")
-bypassPermissionCheck()
-createFakeAdminEvent()
+print("\n🚀 AUTO-DISCOVERING REAL CAR IDs...")
 
--- Step 2: Force module execution
+-- Step 1: Discover car data
+discoverRealCarIds()
+
+-- Step 2: Test all formats
 task.wait(2)
-print("\n2. FORCING MODULE EXECUTION...")
-forceModuleExecution()
+testAllCarFormats()
 
--- Step 3: Spam system
+-- Step 3: Find database
 task.wait(2)
-print("\n3. SPAMMING COMMAND SYSTEM...")
-spamCommandSystem()
+findCarDatabase()
 
--- Step 4: Check for success
+-- Step 4: Brute force
+task.wait(2)
+print("\n🚀 STARTING BRUTE FORCE...")
+bruteForceNumericIds()
+
+-- Final analysis
 task.wait(3)
-print("\n4. CHECKING FOR SUCCESS...")
-checkCarSuccess()
-
--- Final message
-status.Text = "✅ ALL METHODS EXECUTED!\n\nCheck your garage RIGHT NOW!\n\nIf no cars:\n1. Server has strong protection\n2. Need actual admin rights\n3. Try different server"
-
 print("\n" .. string.rep("=", 70))
-print("🎯 EXECUTION COMPLETE")
+print("📊 DISCOVERY COMPLETE")
 print(string.rep("=", 70))
-print("\nThe GiveCar module WAS loaded and called!")
-print("If cars didn't appear, the server's permission")
-print("system is blocking execution at server-side.")
-print("\n💡 Try: Different server with less security")
+
+statusText.Text = "✅ Discovery complete!\n\nIf no car IDs were found:\n1. Server uses complex IDs\n2. IDs might be in ServerStorage\n3. Need to decompile game\n\nCheck F9 for any found IDs!"
+
+print("\n💡 NEXT STEPS:")
+print("1. Check F9 for ANY successful calls")
+print("2. Look for patterns in successful IDs")
+print("3. Try IDs that the game ACCEPTED")
+print("4. If none worked, IDs are server-side only")
