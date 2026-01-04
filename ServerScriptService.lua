@@ -1,157 +1,173 @@
-print("🚗 SMART CAR INJECTION SYSTEM")
+print("💥 COMPLETE EXPLOIT SUITE")
 print("=" .. string.rep("=", 60))
 
--- Get services
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
--- Get player and car service
 local player = Players.LocalPlayer
-local carService = ReplicatedStorage.Remotes.Services.CarServiceRemotes
 
--- Get the OnCarsAdded remote
-local onCarsAdded = carService:FindFirstChild("OnCarsAdded")
-
-if not onCarsAdded then
-    print("❌ OnCarsAdded remote not found!")
-    return
-end
-
-print("✅ OnCarsAdded remote found!")
-
--- Get current cars
-local currentCars = carService.GetOwnedCars:InvokeServer()
-local initialCount = #currentCars
-print("📊 Initial car count: " .. initialCount)
-
-if #currentCars == 0 then
-    print("❌ No cars to use as template")
-    return
-end
-
--- Use first car as template
-local templateCar = currentCars[1]
-print("\n📋 Template car:")
-print("Name: " .. tostring(templateCar.Name or templateCar.name))
-print("ID: " .. tostring(templateCar.Id or templateCar.id))
-
--- Try different approaches
-print("\n🧪 Testing injection methods...")
-
-local methods = {
-    {
-        name = "Method 1: Clone with new ID",
-        func = function()
-            local newCar = {}
-            
-            -- Copy all fields from template
-            for key, value in pairs(templateCar) do
-                if type(value) == "string" or type(value) == "number" or type(value) == "boolean" then
-                    newCar[key] = value
-                end
-            end
-            
-            -- Change ID to make it unique
-            local newId = "inj-" .. tostring(os.time())
-            newCar.Id = newId
-            newCar.id = newId
-            
-            -- Change name
-            if newCar.Name then
-                newCar.Name = newCar.Name .. " [INJ]"
-            end
-            
-            return newCar
-        end
-    },
-    {
-        name = "Method 2: Simple car data",
-        func = function()
-            return {
-                Id = "simple-" .. tostring(os.time()),
-                Name = "Injected Car",
-                Class = 1,
-                DriveType = "RWD",
-                Owner = player.Name,
-                Purchased = true,
-                Timestamp = os.time()
-            }
-        end
-    },
-    {
-        name = "Method 3: Match template exactly",
-        func = function()
-            local newCar = {}
-            
-            -- Copy only essential fields
-            local essentialFields = {"Id", "id", "Name", "name", "Class", "class", "DriveType", "driveType"}
-            
-            for _, field in pairs(essentialFields) do
-                if templateCar[field] then
-                    newCar[field] = templateCar[field]
-                end
-            end
-            
-            -- Make ID unique
-            newCar.Id = "copy-" .. tostring(os.time())
-            newCar.id = newCar.Id
-            
-            return newCar
-        end
-    }
+local ExploitSuite = {
+    Successes = 0,
+    Attempts = 0
 }
 
--- Test each method
-local successfulMethods = {}
+function ExploitSuite:TryAllExploits()
+    print("🚀 Starting exploit attempts...")
+    
+    -- Get initial car count
+    local carService = ReplicatedStorage.Remotes.Services.CarServiceRemotes
+    local initialCars = carService.GetOwnedCars:InvokeServer()
+    local initialCount = #initialCars
+    print("Initial cars: " .. initialCount)
+    
+    -- EXPLOIT 1: SetOwnedState
+    self:AttemptExploit1(carService)
+    
+    -- EXPLOIT 2: ClaimGiveawayCar
+    self:AttemptExploit2(carService)
+    
+    -- EXPLOIT 3: Admin bypass
+    self:AttemptExploit3(carService)
+    
+    -- EXPLOIT 4: Spawn remote
+    self:AttemptExploit4(carService)
+    
+    -- Check results
+    task.wait(5)
+    local finalCars = carService.GetOwnedCars:InvokeServer()
+    local finalCount = #finalCars
+    
+    print("\n" .. string.rep("=", 60))
+    print("📊 EXPLOIT RESULTS:")
+    print("Attempts made: " .. self.Attempts)
+    print("Successes: " .. self.Successes)
+    print("Initial cars: " .. initialCount)
+    print("Final cars: " .. finalCount)
+    print("Cars added: " .. (finalCount - initialCount))
+    
+    if finalCount > initialCount then
+        print("🎉 SUCCESS! Exploits worked!")
+    else
+        print("❌ No cars added")
+        print("💡 Try different car names/IDs")
+    end
+end
 
-for i, method in ipairs(methods) do
-    print("\n" .. string.rep("-", 40))
-    print("🔄 Testing: " .. method.name)
+function ExploitSuite:AttemptExploit1(carService)
+    self.Attempts = self.Attempts + 1
+    print("\n🎯 EXPLOIT 1: SetOwnedState")
     
-    -- Create car data
-    local carData = method.func()
+    local module = ReplicatedStorage.Components.UI.Menus.Inventory.CarShopScrollList
+    if not module then return false end
     
-    -- Try to send to server
-    local success, errorMsg = pcall(function()
-        onCarsAdded:FireServer({carData})
+    local success, moduleTable = pcall(require, module)
+    if success and moduleTable and moduleTable.SetOwnedState then
+        -- Try to set cars as owned
+        local carsToOwn = {"Fion", "Bolide", "Chiron"}
+        
+        for _, carName in ipairs(carsToOwn) do
+            local callSuccess = pcall(function()
+                moduleTable.SetOwnedState(carName, true)
+                return true
+            end)
+            
+            if callSuccess then
+                print("✅ Set " .. carName .. " as owned")
+                return true
+            end
+        end
+    end
+    return false
+end
+
+function ExploitSuite:AttemptExploit2(carService)
+    self.Attempts = self.Attempts + 1
+    print("\n🎯 EXPLOIT 2: ClaimGiveawayCar")
+    
+    local remote = ReplicatedStorage.Remotes.Services.FreeCarGiveawayServiceRemotes
+    if not remote then return false end
+    
+    remote = remote:FindFirstChild("ClaimGiveawayCar")
+    if not remote then return false end
+    
+    -- Try to claim a car
+    local carData = {
+        Name = "Exploit Car",
+        Id = "exploit-" .. os.time(),
+        Class = 3,
+        RewardType = "Car"
+    }
+    
+    local success = pcall(function()
+        remote:FireServer(carData)
         return true
     end)
     
     if success then
-        print("✅ Remote fired successfully")
-        
-        -- Check if car was added
-        task.wait(2)
-        local newCars = carService.GetOwnedCars:InvokeServer()
-        local newCount = #newCars
-        
-        if newCount > initialCount then
-            table.insert(successfulMethods, method.name)
-            initialCount = newCount
-            print("🎉 SUCCESS! New car count: " .. newCount)
-        else
-            print("⚠️ Car count unchanged")
-        end
-    else
-        print("❌ Error: " .. errorMsg)
+        print("✅ Giveaway claim attempted")
+        return true
     end
+    return false
+end
+
+function ExploitSuite:AttemptExploit3(carService)
+    self.Attempts = self.Attempts + 1
+    print("\n🎯 EXPLOIT 3: Admin Bypass")
     
-    task.wait(1)
-end
-
--- Show results
-print("\n" .. string.rep("=", 60))
-print("📊 INJECTION RESULTS:")
-print("Methods tested: " .. #methods)
-print("Successful methods: " .. #successfulMethods)
-print("Final car count: " .. initialCount)
-
-if #successfulMethods > 0 then
-    print("\n🎉 SUCCESS! Working methods:")
-    for i, method in ipairs(successfulMethods) do
-        print(i .. ". " .. method)
+    local adminRemote = ReplicatedStorage.Remotes:FindFirstChild("IsLegacyAdmin")
+    if not adminRemote then return false end
+    
+    -- Try to get admin status
+    local success, isAdmin = pcall(function()
+        return adminRemote:InvokeServer()
+    end)
+    
+    if success and isAdmin then
+        print("✅ You have admin access!")
+        
+        -- Try admin give car command
+        local giveRemote = ReplicatedStorage.Remotes:FindFirstChild("GiveCar")
+        if giveRemote then
+            local giveSuccess = pcall(function()
+                if giveRemote:IsA("RemoteEvent") then
+                    giveRemote:FireServer(player, "Fion")
+                else
+                    giveRemote:InvokeServer(player, "Fion")
+                end
+                return true
+            end)
+            
+            if giveSuccess then
+                print("✅ Admin give car command sent")
+                return true
+            end
+        end
     end
-else
-    print("\n❌ No methods worked")
-    print("💡 The server validates car ownership")
+    return false
 end
+
+function ExploitSuite:AttemptExploit4(carService)
+    self.Attempts = self.Attempts + 1
+    print("\n🎯 EXPLOIT 4: Spawn Remote")
+    
+    local spawnRemote = ReplicatedStorage.Remotes:FindFirstChild("Spawn")
+    if not spawnRemote then return false end
+    
+    -- Try different spawn commands
+    local commands = {"Fion", "Car", "givecar", "vehicle"}
+    
+    for _, cmd in ipairs(commands) do
+        local success = pcall(function()
+            spawnRemote:FireServer(cmd)
+            return true
+        end)
+        
+        if success then
+            print("✅ Spawn command sent: " .. cmd)
+            return true
+        end
+    end
+    return false
+end
+
+-- Run the exploit suite
+ExploitSuite:TryAllExploits()
