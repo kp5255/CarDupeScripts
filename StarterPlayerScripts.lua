@@ -1,4 +1,4 @@
--- 🎯 TARGETED CAR ACQUISITION - WORKING REMOTES
+-- 🎯 DIRECT CAR INJECTION - FIXED
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local player = Players.LocalPlayer
@@ -6,465 +6,214 @@ local player = Players.LocalPlayer
 repeat task.wait() until game:IsLoaded()
 task.wait(2)
 
--- ===== WORKING REMOTES =====
-local workingRemotes = {
-    "OnCarsAdded",                -- Adds cars to inventory
-    "OnSubscriptionCarAdded",     -- Subscription cars
-    "ClaimGiveawayCar",          -- Giveaway claims
-    "OnWrapsAdded"               -- Car wraps/upgrades
-}
+print("🎯 CAR INJECTION SYSTEM")
+print("=" .. string.rep("=", 50))
 
-local allCars = {
-    "Bontlay Bontaga", "Jegar Model F", "Corsaro T8", "Lavish Ventoge", "Sportler Tecan",
-    "Bontlay Cental RT", "Corsaro Roni", "Corsaro Pursane", "Corsaro G08", "Corsaro P 213",
-    "Bugatti Chiron", "Ferrari LaFerrari", "Lamborghini Aventador", "Porsche 911 Turbo S",
-    "McLaren P1", "Aston Martin DBS", "Mercedes AMG GT", "BMW M8", "Audi R8", "Lexus LFA",
-    "Tesla Roadster", "Koenigsegg Jesko", "Pagani Huayra", "Rolls Royce Phantom",
-    "Bentley Continental GT", "Ford GT", "Chevrolet Corvette", "Dodge Challenger"
-}
-
--- ===== FIND WORKING REMOTE OBJECTS =====
-local function findRemoteObjects()
-    print("🔍 Locating remote objects...")
+-- ===== DIRECT REMOTE FINDER =====
+local function findRemotesDirect()
+    print("🔍 Searching for remotes...")
     
     local remotesFound = {}
+    local remoteNames = {
+        "OnCarsAdded", "OnSubscriptionCarAdded", 
+        "ClaimGiveawayCar", "OnWrapsAdded"
+    }
     
-    for _, remoteName in pairs(workingRemotes) do
-        local remote = ReplicatedStorage:FindFirstChild(remoteName)
-        if remote and remote:IsA("RemoteEvent") then
-            table.insert(remotesFound, {
-                Name = remote.Name,
-                Object = remote,
-                Path = remote:GetFullName()
-            })
-            print("✅ Found: " .. remote.Name)
-        end
+    -- Search all locations
+    local searchLocations = {
+        ReplicatedStorage,
+        game:GetService("ServerScriptService"),
+        game:GetService("ServerStorage")
+    }
+    
+    for _, location in pairs(searchLocations) do
+        pcall(function()
+            for _, obj in pairs(location:GetDescendants()) do
+                if obj:IsA("RemoteEvent") then
+                    for _, remoteName in pairs(remoteNames) do
+                        if obj.Name == remoteName then
+                            table.insert(remotesFound, {
+                                Name = obj.Name,
+                                Object = obj,
+                                Path = obj:GetFullName()
+                            })
+                            print("✅ Found: " .. obj.Name)
+                        end
+                    end
+                end
+            end
+        end)
     end
     
     return remotesFound
 end
 
--- ===== ADVANCED CAR INJECTION =====
-local function injectCars(remoteObjects)
-    print("\n🎯 Injecting cars via working remotes...")
+-- ===== IMMEDIATE INJECTION =====
+local function injectNow()
+    print("\n🚀 STARTING IMMEDIATE INJECTION...")
     
-    local successfulInjections = {}
+    local remotes = findRemotesDirect()
     
-    for _, remote in pairs(remoteObjects) do
-        print("\n📤 Using remote: " .. remote.Name)
+    if #remotes == 0 then
+        print("❌ No remotes found")
+        return
+    end
+    
+    print("🎯 Targeting " .. #remotes .. " remotes")
+    
+    local cars = {
+        "Bontlay Bontaga", "Jegar Model F", "Corsaro T8", 
+        "Lavish Ventoge", "Sportler Tecan"
+    }
+    
+    for _, remote in pairs(remotes) do
+        print("\n📤 Using: " .. remote.Name)
         
-        -- Different data formats for different remotes
+        -- Try multiple formats
         local formats = {
-            -- For OnCarsAdded and similar
-            function(carName)
-                return {carName}
-            end,
-            
-            function(carName)
-                return {{Name = carName, Owned = true, Timestamp = os.time()}}
-            end,
-            
-            function(carName)
-                return {player, carName}
-            end,
-            
-            function(carName)
-                return {player.UserId, carName}
-            end,
-            
-            -- For ClaimGiveawayCar
-            function(carName)
-                return {"giveaway", carName, player.Name}
-            end,
-            
-            function(carName)
-                return {Car = carName, Player = player.Name, Claimed = true}
-            end,
-            
-            -- For subscription-style
-            function(carName)
-                return {carName, "premium", os.time()}
-            end,
-            
-            -- Simple string
-            function(carName)
-                return carName
-            end
+            function(car) return car end,
+            function(car) return {car} end,
+            function(car) return {player, car} end,
+            function(car) return {Car = car, Player = player.Name} end
         }
         
-        local carsSent = 0
-        
-        for _, carName in pairs(allCars) do
-            for i, formatFunc in pairs(formats) do
-                local data = formatFunc(carName)
+        for _, car in pairs(cars) do
+            for _, formatFunc in pairs(formats) do
+                local data = formatFunc(car)
                 
-                local success, result = pcall(function()
-                    remote.Object:FireServer(unpack({data}))
-                    return "Success"
+                local success = pcall(function()
+                    remote.Object:FireServer(data)
+                    return true
                 end)
                 
                 if success then
-                    carsSent = carsSent + 1
+                    print("✅ Sent: " .. car)
                     
-                    if not successfulInjections[remote.Name] then
-                        successfulInjections[remote.Name] = {
-                            Count = 0,
-                            Cars = {}
-                        }
-                    end
-                    
-                    successfulInjections[remote.Name].Count = successfulInjections[remote.Name].Count + 1
-                    table.insert(successfulInjections[remote.Name].Cars, carName)
-                    
-                    print("✅ Sent: " .. carName)
-                    
-                    -- Send multiple copies
-                    for j = 1, 3 do
+                    -- Send 3 more copies
+                    for i = 1, 3 do
                         pcall(function()
-                            remote.Object:FireServer(unpack({data}))
+                            remote.Object:FireServer(data)
                         end)
-                        task.wait(0.05)
                     end
                     
-                    break -- Move to next car
+                    break
                 end
-                
-                task.wait(0.05)
             end
             
-            if carsSent >= 10 then -- Limit to 10 cars per remote
-                break
-            end
+            task.wait(0.05)
         end
         
-        if carsSent > 0 then
-            print("🚗 Sent " .. carsSent .. " cars via " .. remote.Name)
-        end
-        
-        task.wait(0.5) -- Delay between remotes
+        task.wait(0.2)
     end
     
-    return successfulInjections
+    print("\n🎉 INJECTION COMPLETE!")
+    print("📦 CHECK YOUR INVENTORY NOW!")
 end
 
--- ===== RAPID FIRE =====
-local function rapidFire(remoteObjects)
-    print("\n⚡ RAPID FIRE MODE - Sending 50 requests...")
-    
-    local bestRemote = nil
-    local bestCar = "Bontlay Bontaga"
-    
-    -- Find the most promising remote
-    for _, remote in pairs(remoteObjects) do
-        if remote.Name == "OnCarsAdded" or remote.Name == "ClaimGiveawayCar" then
-            bestRemote = remote
-            break
-        end
-    end
-    
-    if not bestRemote and #remoteObjects > 0 then
-        bestRemote = remoteObjects[1]
-    end
-    
-    if bestRemote then
-        print("🎯 Targeting: " .. bestRemote.Name)
-        
-        -- Send rapid fire requests
-        for i = 1, 50 do
-            local formats = {
-                bestCar,
-                {bestCar},
-                {player, bestCar},
-                {Car = bestCar, Player = player.Name}
-            }
-            
-            for _, data in pairs(formats) do
-                pcall(function()
-                    bestRemote.Object:FireServer(data)
-                end)
-            end
-            
-            if i % 10 == 0 then
-                print("   Sent " .. i .. "/50 requests")
-            end
-            
-            task.wait(0.1) -- Controlled rate
-        end
-        
-        print("✅ Rapid fire complete!")
-        return true
-    end
-    
-    return false
-end
-
--- ===== STEALTH UI v2 =====
-local function createEnhancedUI()
+-- ===== SIMPLE UI =====
+local function createSimpleUI()
     local gui = Instance.new("ScreenGui")
-    gui.Name = "CarHelper"
-    gui.DisplayOrder = 999
+    gui.Name = "CarInjector"
     gui.Parent = player:WaitForChild("PlayerGui")
-    gui.ResetOnSpawn = false
     
-    -- Main window
-    local main = Instance.new("Frame")
-    main.Size = UDim2.new(0, 280, 0, 250)
-    main.Position = UDim2.new(0, 10, 0, 10)
-    main.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
-    main.BorderSizePixel = 0
-    main.Parent = gui
+    -- Tiny button in corner
+    local button = Instance.new("TextButton")
+    button.Text = "🚗"
+    button.Size = UDim2.new(0, 40, 0, 40)
+    button.Position = UDim2.new(0, 10, 0, 10)
+    button.BackgroundColor3 = Color3.fromRGB(0, 150, 100)
+    button.TextColor3 = Color3.new(1, 1, 1)
+    button.Font = Enum.Font.GothamBold
+    button.TextSize = 18
+    button.Parent = gui
     
-    -- Header
-    local header = Instance.new("Frame")
-    header.Size = UDim2.new(1, 0, 0, 35)
-    header.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
-    header.Parent = main
-    
-    local title = Instance.new("TextLabel")
-    title.Text = "🚗 Car Manager"
-    title.Size = UDim2.new(1, -10, 1, 0)
-    title.Position = UDim2.new(0, 5, 0, 0)
-    title.BackgroundTransparency = 1
-    title.TextColor3 = Color3.new(1, 1, 1)
-    title.Font = Enum.Font.GothamMedium
-    title.TextSize = 14
-    title.TextXAlignment = Enum.TextXAlignment.Left
-    title.Parent = header
-    
-    local closeBtn = Instance.new("TextButton")
-    closeBtn.Text = "×"
-    closeBtn.Size = UDim2.new(0, 25, 0, 25)
-    closeBtn.Position = UDim2.new(1, -30, 0, 5)
-    closeBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
-    closeBtn.TextColor3 = Color3.new(1, 1, 1)
-    closeBtn.Font = Enum.Font.Gotham
-    closeBtn.TextSize = 16
-    closeBtn.Parent = header
-    
-    -- Content
-    local content = Instance.new("Frame")
-    content.Size = UDim2.new(1, 0, 1, -35)
-    content.Position = UDim2.new(0, 0, 0, 35)
-    content.BackgroundTransparency = 1
-    content.Parent = main
-    
-    -- Status
     local status = Instance.new("TextLabel")
-    status.Text = "4 working remotes detected\nReady to inject cars"
-    status.Size = UDim2.new(1, -10, 0, 50)
-    status.Position = UDim2.new(0, 5, 0, 5)
+    status.Text = "READY"
+    status.Size = UDim2.new(0, 80, 0, 20)
+    status.Position = UDim2.new(0, 55, 0, 10)
     status.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-    status.TextColor3 = Color3.fromRGB(0, 255, 150)
+    status.TextColor3 = Color3.new(1, 1, 1)
     status.Font = Enum.Font.Gotham
-    status.TextSize = 11
-    status.TextWrapped = true
-    status.Parent = content
-    
-    -- Remote list
-    local remoteList = Instance.new("TextLabel")
-    remoteList.Text = "OnCarsAdded\nOnSubscriptionCarAdded\nClaimGiveawayCar\nOnWrapsAdded"
-    remoteList.Size = UDim2.new(1, -10, 0, 60)
-    remoteList.Position = UDim2.new(0, 5, 0, 60)
-    remoteList.BackgroundColor3 = Color3.fromRGB(30, 40, 30)
-    remoteList.TextColor3 = Color3.new(1, 1, 1)
-    remoteList.Font = Enum.Font.Code
-    remoteList.TextSize = 10
-    remoteList.TextWrapped = true
-    remoteList.Parent = content
-    
-    -- Buttons
-    local injectBtn = Instance.new("TextButton")
-    injectBtn.Text = "🎯 INJECT CARS"
-    injectBtn.Size = UDim2.new(1, -10, 0, 30)
-    injectBtn.Position = UDim2.new(0, 5, 0, 125)
-    injectBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 100)
-    injectBtn.TextColor3 = Color3.new(1, 1, 1)
-    injectBtn.Font = Enum.Font.GothamMedium
-    injectBtn.TextSize = 12
-    injectBtn.Parent = content
-    
-    local rapidBtn = Instance.new("TextButton")
-    rapidBtn.Text = "⚡ RAPID FIRE"
-    rapidBtn.Size = UDim2.new(1, -10, 0, 30)
-    rapidBtn.Position = UDim2.new(0, 5, 0, 160)
-    rapidBtn.BackgroundColor3 = Color3.fromRGB(200, 100, 0)
-    rapidBtn.TextColor3 = Color3.new(1, 1, 1)
-    rapidBtn.Font = Enum.Font.GothamMedium
-    rapidBtn.TextSize = 12
-    rapidBtn.Parent = content
-    
-    local results = Instance.new("TextLabel")
-    results.Text = ""
-    results.Size = UDim2.new(1, -10, 0, 40)
-    results.Position = UDim2.new(0, 5, 0, 195)
-    results.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-    results.TextColor3 = Color3.new(1, 1, 1)
-    results.Font = Enum.Font.Code
-    results.TextSize = 9
-    results.TextWrapped = true
-    results.Parent = content
+    status.TextSize = 10
+    status.Parent = gui
     
     -- Add corners
-    local function addCorner(obj)
-        local corner = Instance.new("UICorner")
-        corner.CornerRadius = UDim.new(0, 4)
-        corner.Parent = obj
-    end
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = button
     
-    for _, obj in pairs({main, header, status, remoteList, injectBtn, rapidBtn, results, closeBtn}) do
-        addCorner(obj)
-    end
+    local statusCorner = Instance.new("UICorner")
+    statusCorner.CornerRadius = UDim.new(0, 4)
+    statusCorner.Parent = status
     
-    -- Draggable
+    -- Button action
+    local isRunning = false
+    
+    button.MouseButton1Click:Connect(function()
+        if isRunning then return end
+        
+        isRunning = true
+        button.Text = "..."
+        button.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
+        status.Text = "INJECTING"
+        
+        task.spawn(function()
+            injectNow()
+            
+            button.Text = "✅"
+            button.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+            status.Text = "DONE"
+            
+            task.wait(2)
+            
+            button.Text = "🚗"
+            button.BackgroundColor3 = Color3.fromRGB(0, 150, 100)
+            status.Text = "READY"
+            isRunning = false
+        end)
+    end)
+    
+    -- Make draggable
     local dragging = false
     local dragStart
     
-    header.InputBegan:Connect(function(input)
+    button.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
             dragging = true
-            dragStart = input.Position - main.AbsolutePosition
+            dragStart = input.Position - button.AbsolutePosition
         end
     end)
     
-    header.InputEnded:Connect(function()
+    button.InputEnded:Connect(function()
         dragging = false
     end)
     
     game:GetService("UserInputService").InputChanged:Connect(function(input)
         if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-            main.Position = UDim2.new(
-                0, input.Position.X - dragStart.X,
-                0, input.Position.Y - dragStart.Y
-            )
+            local newPos = input.Position - dragStart
+            button.Position = UDim2.new(0, newPos.X, 0, newPos.Y)
+            status.Position = UDim2.new(0, newPos.X + 45, 0, newPos.Y)
         end
-    end)
-    
-    -- Variables
-    local remoteObjects = findRemoteObjects()
-    
-    -- Button actions
-    injectBtn.MouseButton1Click:Connect(function()
-        if #remoteObjects == 0 then
-            status.Text = "No remotes found"
-            return
-        end
-        
-        injectBtn.Text = "WORKING..."
-        injectBtn.BackgroundColor3 = Color3.fromRGB(255, 150, 50)
-        status.Text = "Injecting cars via 4 remotes..."
-        results.Text = "Sending cars..."
-        
-        task.spawn(function()
-            local injections = injectCars(remoteObjects)
-            
-            local totalCars = 0
-            for _, data in pairs(injections) do
-                totalCars = totalCars + data.Count
-            end
-            
-            if totalCars > 0 then
-                status.Text = "✅ Injection complete!"
-                results.Text = totalCars .. " cars sent\nCheck inventory now!"
-            else
-                status.Text = "❌ No injections succeeded"
-                results.Text = "Try different approach"
-            end
-            
-            injectBtn.Text = "🎯 INJECT CARS"
-            injectBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 100)
-        end)
-    end)
-    
-    rapidBtn.MouseButton1Click:Connect(function()
-        if #remoteObjects == 0 then
-            status.Text = "No remotes found"
-            return
-        end
-        
-        rapidBtn.Text = "FIRING..."
-        rapidBtn.BackgroundColor3 = Color3.fromRGB(255, 120, 30)
-        status.Text = "Rapid fire: 50 requests..."
-        results.Text = "Sending rapid requests..."
-        
-        task.spawn(function()
-            local success = rapidFire(remoteObjects)
-            
-            if success then
-                status.Text = "✅ Rapid fire complete!"
-                results.Text = "50 requests sent\nCheck inventory!"
-            else
-                status.Text = "❌ Rapid fire failed"
-                results.Text = "No suitable remote"
-            end
-            
-            rapidBtn.Text = "⚡ RAPID FIRE"
-            rapidBtn.BackgroundColor3 = Color3.fromRGB(200, 100, 0)
-        end)
-    end)
-    
-    closeBtn.MouseButton1Click:Connect(function()
-        gui:Destroy()
     end)
     
     return gui
 end
 
--- ===== QUICK TEST =====
-local function quickTest()
-    print("\n🎯 QUICK TEST - Sending immediate requests...")
-    
-    local remotes = findRemoteObjects()
-    
-    if #remotes > 0 then
-        print("🚀 Sending immediate car requests...")
-        
-        -- Immediate injection
-        for _, remote in pairs(remotes) do
-            if remote.Name == "OnCarsAdded" or remote.Name == "ClaimGiveawayCar" then
-                for i = 1, 5 do
-                    pcall(function()
-                        remote.Object:FireServer("Bontlay Bontaga")
-                        remote.Object:FireServer({"Bontlay Bontaga"})
-                        remote.Object:FireServer({player, "Bontlay Bontaga"})
-                    end)
-                    task.wait(0.1)
-                end
-                print("✅ Sent to: " .. remote.Name)
-            end
-        end
-        
-        print("\n🎉 Check your inventory NOW!")
-        print("💡 If cars appear, run the UI for more!")
-    end
+-- ===== AUTOMATIC START =====
+print("\n🚀 Starting automatic injection in 3 seconds...")
+for i = 3, 1, -1 do
+    print(i .. "...")
+    task.wait(1)
 end
 
--- ===== MAIN =====
-print("=" .. string.rep("=", 60))
-print("🎯 CAR ACQUISITION SYSTEM - WORKING REMOTES DETECTED")
-print("=" .. string.rep("=", 60))
-
-print("\n✅ WORKING REMOTES FOUND:")
-print("1. OnCarsAdded - Adds cars to inventory")
-print("2. OnSubscriptionCarAdded - Subscription cars")
-print("3. ClaimGiveawayCar - Giveaway claims")
-print("4. OnWrapsAdded - Car wraps/upgrades")
-
-print("\n🚀 These remotes ACCEPTED car data!")
-print("This means the game has WEAK validation!")
-
-task.wait(1)
-
--- Run immediate test
-quickTest()
-
-task.wait(2)
+-- Run injection immediately
+injectNow()
 
 -- Create UI
-local ui = createEnhancedUI()
+task.wait(1)
+createSimpleUI()
 
-print("\n📱 UI created (top-left)")
-print("\n💡 HOW TO USE:")
-print("1. Click INJECT CARS - Sends 28 cars via 4 remotes")
-print("2. Click RAPID FIRE - Sends 50 rapid requests")
-print("3. CHECK INVENTORY after each click")
-print("\n⚠️  TIP: If cars appear, wait 30 seconds and try again!")
+print("\n✅ Injection complete!")
+print("\n📱 Green button in top-left corner")
+print("💡 Click it to inject more cars")
+print("📦 Check your inventory now!")
