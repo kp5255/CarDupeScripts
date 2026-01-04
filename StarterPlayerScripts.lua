@@ -1,7 +1,7 @@
--- 🔍 PROPER CAR STORAGE ANALYSIS (Fixed)
+-- 🎯 SERVER-SIDE CAR DUPLICATION ATTEMPT
 -- Place ID: 1554960397
 
-print("🔍 PROPER CAR STORAGE ANALYSIS")
+print("🎯 SERVER-SIDE CAR DUPLICATION")
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -10,195 +10,253 @@ local player = Players.LocalPlayer
 repeat task.wait() until game:IsLoaded()
 task.wait(2)
 
--- ===== SAFE DATA SCAN =====
-local function safePlayerScan()
-    print("\n🔬 SAFE PLAYER DATA SCAN")
+-- ===== STEP 1: CHECK FOR MODULE-BASED STORAGE =====
+local function checkModuleStorage()
+    print("\n📦 CHECKING MODULE-BASED STORAGE")
     
-    print("Scanning player: " .. player.Name)
-    print("Player has " .. #player:GetChildren() .. " direct children")
+    -- Look for car-related modules
+    local carModules = {}
     
-    -- List all player folders
-    local folders = {}
-    local values = {}
+    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+        if obj:IsA("ModuleScript") then
+            local name = obj.Name:lower()
+            if name:find("car") or name:find("vehicle") or 
+               name:find("garage") or name:find("inventory") or
+               name:find("data") or name:find("save") then
+                table.insert(carModules, obj)
+            end
+        end
+    end
     
-    for _, child in pairs(player:GetChildren()) do
-        print("\n📁 " .. child.Name .. " (" .. child.ClassName .. ")")
+    print("Found " .. #carModules .. " car-related modules")
+    
+    -- Try to require and check them
+    for _, module in pairs(carModules) do
+        local success, moduleTable = pcall(function()
+            return require(module)
+        end)
         
-        if child:IsA("Folder") then
-            table.insert(folders, child.Name)
-            print("  Contains " .. #child:GetChildren() .. " items:")
+        if success and type(moduleTable) == "table" then
+            print("\nModule: " .. module.Name)
             
-            for _, item in pairs(child:GetChildren()) do
-                local safeValue = "N/A"
-                pcall(function()
-                    if item:IsA("ValueBase") then
-                        safeValue = tostring(item.Value)
+            -- Look for car data functions
+            for key, value in pairs(moduleTable) do
+                if type(value) == "function" then
+                    -- Try to call with player
+                    pcall(function()
+                        local result = value(player)
+                        if result and (type(result) == "table" or type(result) == "string") then
+                            print("  Function " .. key .. " returned data")
+                        end
+                    end)
+                elseif type(value) == "table" then
+                    -- Check if it contains car data
+                    for k, v in pairs(value) do
+                        if type(v) == "string" and (v:find("Bontlay") or v:find("Corsaro")) then
+                            print("  Found car in table: " .. v)
+                        end
                     end
-                end)
-                
-                print("    - " .. item.Name .. " (" .. item.ClassName .. ") = " .. safeValue)
-                
-                -- Check for car names
-                if safeValue:find("Bontlay") or safeValue:find("Jegar") or 
-                   safeValue:find("Sportler") or safeValue:find("Lavish") or 
-                   safeValue:find("Corsaro") then
-                    print("      ⚡ CAR FOUND: " .. safeValue)
                 end
             end
-        elseif child:IsA("ValueBase") then
-            table.insert(values, child.Name)
-            local safeValue = "N/A"
-            pcall(function()
-                safeValue = tostring(child.Value)
-            end)
-            print("  Value: " .. safeValue)
         end
     end
+end
+
+-- ===== STEP 2: ATTEMPT SERVER-SIDE DUPLICATION =====
+local function attemptServerSideDuplication()
+    print("\n⚡ ATTEMPTING SERVER-SIDE DUPLICATION")
     
-    -- Deep scan for StringValues with car names
-    print("\n🔍 DEEP SCAN FOR CAR DATA:")
+    -- Since cars aren't client-side, we need to trigger server actions
     
-    local carDataFound = false
-    for _, descendant in pairs(player:GetDescendants()) do
-        if descendant:IsA("StringValue") then
-            local value = ""
-            pcall(function()
-                value = descendant.Value
-            end)
-            
-            if value and (value:find("Bontlay") or value:find("Jegar") or 
-                          value:find("Sportler") or value:find("Lavish") or 
-                          value:find("Corsaro") or value:find("T8") or 
-                          value:find("Model")) then
-                
-                print("✅ CAR DATA FOUND:")
-                print("   Path: " .. descendant:GetFullName())
-                print("   Value: " .. value)
-                carDataFound = true
+    -- Method 1: Achievement/Challenge completion
+    print("\n[Method 1] Achievement triggers...")
+    local achievementEvents = {
+        "CompleteChallenge",
+        "UnlockAchievement",
+        "EarnReward",
+        "GetPrize"
+    }
+    
+    for _, eventName in pairs(achievementEvents) do
+        local event = ReplicatedStorage:FindFirstChild(eventName)
+        if event then
+            for i = 1, 3 do
+                pcall(function()
+                    event:FireServer("CarDuplication", "Bontlay Bontaga")
+                    print("✅ Triggered " .. eventName .. " attempt " .. i)
+                end)
+                task.wait(0.1)
             end
         end
     end
     
-    if not carDataFound then
-        print("❌ No car data found in StringValues")
+    -- Method 2: Data save/load manipulation
+    print("\n[Method 2] Data manipulation...")
+    local dataEvents = {
+        "SaveGame",
+        "LoadGame", 
+        "UpdateData",
+        "SetPlayerData"
+    }
+    
+    for _, eventName in pairs(dataEvents) do
+        local event = ReplicatedStorage:FindFirstChild(eventName)
+        if event then
+            -- Try to send fake save data with extra cars
+            local fakeData = {
+                Cars = {"Bontlay Bontaga", "Jegar Model F", "Corsaro T8"},
+                ExtraCars = {"Bontlay Bontaga", "Bontlay Bontaga", "Bontlay Bontaga"}
+            }
+            
+            pcall(function()
+                event:FireServer(fakeData)
+                print("✅ Sent fake data to " .. eventName)
+            end)
+        end
     end
     
-    return {Folders = folders, Values = values, FoundCarData = carDataFound}
-end
-
--- ===== SIMPLE REMOTE TEST =====
-local function simpleRemoteTest()
-    print("\n💰 SIMPLE REMOTE TEST")
+    -- Method 3: Direct purchase events (most likely to work)
+    print("\n[Method 3] Direct purchase events...")
     
-    -- Just test a few key remotes
-    local testRemotes = {
-        "BuyCar",
-        "PurchaseCar", 
-        "AddCar",
-        "GiveCar",
-        "SaveCar",
-        "LoadCar",
-        "DuplicateCar",
-        "CopyCar"
-    }
+    -- Get ALL remote events
+    local allRemotes = {}
+    for _, obj in pairs(ReplicatedStorage:GetChildren()) do
+        if obj:IsA("RemoteEvent") then
+            table.insert(allRemotes, obj)
+        end
+    end
+    
+    -- Also check for RemoteFunctions
+    for _, obj in pairs(ReplicatedStorage:GetChildren()) do
+        if obj:IsA("RemoteFunction") then
+            table.insert(allRemotes, obj)
+        end
+    end
+    
+    print("Testing " .. #allRemotes .. " remote objects")
     
     local testCars = {
         "Bontlay Bontaga",
         "Jegar Model F",
-        "Corsaro T8"
+        "Corsaro T8",
+        "Lavish Ventoge",
+        "Sportler Tecan"
     }
     
-    for _, remoteName in pairs(testRemotes) do
-        local remote = ReplicatedStorage:FindFirstChild(remoteName)
-        if remote then
-            print("\nTesting: " .. remoteName .. " (" .. remote.ClassName .. ")")
+    local attempts = 0
+    local successfulEvents = {}
+    
+    for _, remote in pairs(allRemotes) do
+        for _, carName in pairs(testCars) do
+            -- Try different argument patterns
+            local patterns = {
+                {carName},
+                {carName, 0},
+                {player, carName},
+                {"buy", carName},
+                {Vehicle = carName, Price = 0}
+            }
             
-            for _, carName in pairs(testCars) do
-                -- Try simple calls
-                local attempts = {
-                    {carName},
-                    {carName, 0},
-                    {player, carName}
-                }
+            for _, args in pairs(patterns) do
+                attempts = attempts + 1
                 
-                for i, args in pairs(attempts) do
-                    local success, errorMsg = pcall(function()
-                        if remote:IsA("RemoteEvent") then
-                            remote:FireServer(unpack(args))
-                        else
-                            remote:InvokeServer(unpack(args))
-                        end
-                    end)
-                    
-                    if success then
-                        print("  ✅ " .. carName .. " - Attempt " .. i)
+                local success, errorMsg = pcall(function()
+                    if remote:IsA("RemoteEvent") then
+                        remote:FireServer(unpack(args))
                     else
-                        if errorMsg and not errorMsg:find("Not connected") then
-                            print("  ❌ Error: " .. errorMsg:sub(1, 50))
+                        remote:InvokeServer(unpack(args))
+                    end
+                end)
+                
+                if success then
+                    if not successfulEvents[remote.Name] then
+                        successfulEvents[remote.Name] = 0
+                    end
+                    successfulEvents[remote.Name] = successfulEvents[remote.Name] + 1
+                    
+                    if attempts % 20 == 0 then
+                        print("Attempt " .. attempts .. " - " .. remote.Name .. " accepted")
+                    end
+                end
+                
+                task.wait(0.02)
+            end
+        end
+    end
+    
+    print("\n📊 RESULTS:")
+    print("Total attempts: " .. attempts)
+    print("Successful events: " .. #(successfulEvents))
+    
+    if next(successfulEvents) then
+        print("\nEvents that accepted calls:")
+        for eventName, count in pairs(successfulEvents) do
+            print("  " .. eventName .. " (" .. count .. " calls)")
+        end
+    end
+    
+    return attempts
+end
+
+-- ===== STEP 3: CHECK FOR VISIBLE CHANGES =====
+local function checkForChanges()
+    print("\n🔍 CHECKING FOR VISIBLE CHANGES")
+    
+    -- Check money (might change if purchases happen)
+    if player:FindFirstChild("leaderstats") then
+        local moneyStat = player.leaderstats:FindFirstChild("Money")
+        if moneyStat then
+            print("Current money: $" .. moneyStat.Value)
+        end
+    end
+    
+    -- Check if any new UI appears
+    if player:FindFirstChild("PlayerGui") then
+        local screenGuis = 0
+        for _, gui in pairs(player.PlayerGui:GetChildren()) do
+            if gui:IsA("ScreenGui") then
+                screenGuis = screenGuis + 1
+            end
+        end
+        print("ScreenGuis in PlayerGui: " .. screenGuis)
+    end
+    
+    -- Listen for any server messages
+    for _, remote in pairs(ReplicatedStorage:GetChildren()) do
+        if remote:IsA("RemoteEvent") then
+            pcall(function()
+                remote.OnClientEvent:Connect(function(...)
+                    local args = {...}
+                    local argsStr = ""
+                    for i, arg in ipairs(args) do
+                        if type(arg) == "string" and (arg:find("Car") or arg:find("Success") or arg:find("Bought")) then
+                            argsStr = argsStr .. tostring(arg) .. " "
                         end
                     end
-                    
-                    task.wait(0.1)
-                end
-            end
+                    if #argsStr > 0 then
+                        print("\n📨 Server message from " .. remote.Name .. ": " .. argsStr)
+                    end
+                end)
+                print("Listening to " .. remote.Name)
+            end)
         end
     end
 end
 
--- ===== CHECK INVENTORY LOCATIONS =====
-local function checkInventoryLocations()
-    print("\n📦 CHECKING COMMON INVENTORY LOCATIONS")
-    
-    local commonLocations = {
-        "Inventory",
-        "Garage", 
-        "Cars",
-        "Vehicles",
-        "OwnedCars",
-        "PlayerData",
-        "Data",
-        "SaveData",
-        "CarStorage"
-    }
-    
-    for _, locationName in pairs(commonLocations) do
-        local location = player:FindFirstChild(locationName)
-        if location then
-            print("\n✅ FOUND: " .. locationName)
-            print("   Type: " .. location.ClassName)
-            print("   Items: " .. #location:GetChildren())
-            
-            -- Show first few items
-            for i = 1, math.min(5, #location:GetChildren()) do
-                local item = location:GetChildren()[i]
-                local valueInfo = ""
-                
-                if item:IsA("ValueBase") then
-                    pcall(function()
-                        valueInfo = " = " .. tostring(item.Value)
-                    end)
-                end
-                
-                print("   " .. i .. ". " .. item.Name .. " (" .. item.ClassName .. ")" .. valueInfo)
-            end
-        end
-    end
-end
-
--- ===== CREATE SIMPLE UI FOR CONTROL =====
-local function createControlUI()
+-- ===== STEP 4: CREATE SIMPLE TEST UI =====
+local function createTestUI()
     local gui = Instance.new("ScreenGui")
     gui.Parent = player:WaitForChild("PlayerGui")
     
     local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(0, 300, 0, 250)
-    frame.Position = UDim2.new(0.5, -150, 0.1, 0)
+    frame.Size = UDim2.new(0, 320, 0, 280)
+    frame.Position = UDim2.new(0.5, -160, 0.5, -140)
     frame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
     frame.BorderSizePixel = 0
     frame.Parent = gui
     
     local title = Instance.new("TextLabel")
-    title.Text = "🔍 CAR STORAGE ANALYZER"
+    title.Text = "🎯 SERVER-SIDE DUPLICATION"
     title.Size = UDim2.new(1, 0, 0, 40)
     title.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
     title.TextColor3 = Color3.new(1, 1, 1)
@@ -207,8 +265,8 @@ local function createControlUI()
     title.Parent = frame
     
     local status = Instance.new("TextLabel")
-    status.Text = "Click buttons to analyze\nwhere your cars are stored."
-    status.Size = UDim2.new(1, -20, 0, 80)
+    status.Text = "Cars are stored SERVER-SIDE.\nWe need to trigger server actions.\n\nClick buttons below to try."
+    status.Size = UDim2.new(1, -20, 0, 100)
     status.Position = UDim2.new(0, 10, 0, 50)
     status.BackgroundTransparency = 1
     status.TextColor3 = Color3.new(1, 1, 1)
@@ -217,11 +275,11 @@ local function createControlUI()
     status.TextWrapped = true
     status.Parent = frame
     
-    -- Button 1: Scan Player
+    -- Button 1: Check Modules
     local btn1 = Instance.new("TextButton")
-    btn1.Text = "🔍 SCAN PLAYER DATA"
+    btn1.Text = "📦 CHECK MODULES"
     btn1.Size = UDim2.new(1, -40, 0, 35)
-    btn1.Position = UDim2.new(0, 20, 0, 140)
+    btn1.Position = UDim2.new(0, 20, 0, 160)
     btn1.BackgroundColor3 = Color3.fromRGB(50, 120, 220)
     btn1.TextColor3 = Color3.new(1, 1, 1)
     btn1.Font = Enum.Font.GothamBold
@@ -229,48 +287,56 @@ local function createControlUI()
     btn1.Parent = frame
     
     btn1.MouseButton1Click:Connect(function()
-        status.Text = "Scanning player data...\nCheck console (F9) for results."
+        status.Text = "Checking module storage...\nCheck F9 console."
         task.spawn(function()
-            safePlayerScan()
-            status.Text = "Scan complete!\nCheck F9 console for details."
+            checkModuleStorage()
+            status.Text = "Module check complete.\nCheck F9 for results."
         end)
     end)
     
-    -- Button 2: Check Inventory
+    -- Button 2: Attempt Duplication
     local btn2 = Instance.new("TextButton")
-    btn2.Text = "📦 CHECK INVENTORY"
+    btn2.Text = "⚡ TRY DUPLICATION"
     btn2.Size = UDim2.new(1, -40, 0, 35)
-    btn2.Position = UDim2.new(0, 20, 0, 185)
-    btn2.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
+    btn2.Position = UDim2.new(0, 20, 0, 205)
+    btn2.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
     btn2.TextColor3 = Color3.new(1, 1, 1)
     btn2.Font = Enum.Font.GothamBold
     btn2.TextSize = 14
     btn2.Parent = frame
     
     btn2.MouseButton1Click:Connect(function()
-        status.Text = "Checking inventory locations..."
+        status.Text = "Attempting duplication...\nThis may take 10-15 seconds.\nCheck F9 console!"
+        btn2.Text = "WORKING..."
+        btn2.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
+        
         task.spawn(function()
-            checkInventoryLocations()
-            status.Text = "Inventory check complete!\nCheck F9 console."
+            local attempts = attemptServerSideDuplication()
+            task.wait(2)
+            checkForChanges()
+            
+            status.Text = "Complete!\n\nAttempts: " .. attempts .. "\nCheck if cars duplicated."
+            btn2.Text = "TRY AGAIN"
+            btn2.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
         end)
     end)
     
-    -- Button 3: Test Remotes
+    -- Button 3: Monitor
     local btn3 = Instance.new("TextButton")
-    btn3.Text = "💰 TEST REMOTES"
+    btn3.Text = "👂 MONITOR CHANGES"
     btn3.Size = UDim2.new(1, -40, 0, 35)
-    btn3.Position = UDim2.new(0, 20, 0, 230)
-    btn3.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    btn3.Position = UDim2.new(0, 20, 0, 250)
+    btn3.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
     btn3.TextColor3 = Color3.new(1, 1, 1)
     btn3.Font = Enum.Font.GothamBold
     btn3.TextSize = 14
     btn3.Parent = frame
     
     btn3.MouseButton1Click:Connect(function()
-        status.Text = "Testing remote events...\nThis may take a moment."
+        status.Text = "Monitoring for changes...\nWill alert in F9 console."
         task.spawn(function()
-            simpleRemoteTest()
-            status.Text = "Remote test complete!\nCheck F9 console for results."
+            checkForChanges()
+            status.Text = "Monitoring active!\nCheck F9 for any server messages."
         end)
     end)
     
@@ -282,77 +348,40 @@ local function createControlUI()
 end
 
 -- ===== MAIN EXECUTION =====
-print("\n" .. string.rep("=", 60))
-print("🔍 PROPER CAR STORAGE ANALYSIS")
-print(string.rep("=", 60))
-print("\nThis script will help us find:")
-print("1. WHERE your cars are stored")
-print("2. WHICH remote events work")
-print("3. WHAT format the game uses")
+print("\n" .. string.rep("=", 70))
+print("🎯 SERVER-SIDE CAR DUPLICATION ATTEMPT")
+print(string.rep("=", 70))
+print("\nKEY FINDING: Cars are NOT stored client-side!")
+print("They are stored SERVER-SIDE.")
+print("\nThis means we need to:")
+print("1. Trigger server actions")
+print("2. Manipulate server data")
+print("3. Exploit server validation")
 
 -- Create UI
 task.wait(1)
-local gui, status = createControlUI()
+local gui, status = createTestUI()
 
--- Auto-run initial scan
+-- Auto-run
 task.wait(3)
-status.Text = "Auto-running initial scan...\nCheck F9 console!"
+status.Text = "Auto-starting duplication attempt...\nCheck F9 console!"
 
-print("\n🚀 AUTO-RUNNING INITIAL SCAN...")
-local scanResults = safePlayerScan()
-
-task.wait(2)
-checkInventoryLocations()
+print("\n🚀 AUTO-STARTING DUPLICATION ATTEMPT...")
+local attempts = attemptServerSideDuplication()
 
 task.wait(2)
-simpleRemoteTest()
+checkForChanges()
 
--- Final summary
-task.wait(2)
-print("\n" .. string.rep("=", 60))
-print("📋 ANALYSIS COMPLETE")
-print(string.rep("=", 60))
-
-if scanResults.FoundCarData then
-    print("\n✅ CAR DATA WAS FOUND!")
-    print("Now we know WHERE cars are stored.")
-    status.Text = "✅ Car data found!\nCheck F9 console for location."
-else
-    print("\n❌ NO CAR DATA FOUND IN STRINGVALUES")
-    print("\nCars might be stored in:")
-    print("1. Folder structure (not values)")
-    print("2. Remote server (not client)")
-    print("3. Custom data format")
-    status.Text = "⚠️ No car data found.\nCars might be server-side only."
-end
-
-print("\n💡 NEXT STEPS:")
-print("1. Use the UI buttons to investigate more")
-print("2. Check F9 console for detailed output")
-print("3. Look for where NEW cars appear when bought")
-
--- Monitor for new data
-task.spawn(function()
-    local lastItemCount = #player:GetChildren()
-    
-    while true do
-        task.wait(5)
-        local currentCount = #player:GetChildren()
-        
-        if currentCount > lastItemCount then
-            print("\n🔔 NEW ITEMS ADDED TO PLAYER!")
-            print("Count: " .. lastItemCount .. " → " .. currentCount)
-            print("New items might be car data!")
-            lastItemCount = currentCount
-            
-            -- Quick scan for new StringValues
-            for _, child in pairs(player:GetDescendants()) do
-                if child:IsA("StringValue") and child:GetFullName():find("Car") then
-                    pcall(function()
-                        print("New car value: " .. child.Name .. " = " .. child.Value)
-                    end)
-                end
-            end
-        end
-    end
-end)
+-- Final analysis
+print("\n" .. string.rep("=", 70))
+print("📊 FINAL ANALYSIS")
+print(string.rep("=", 70))
+print("\nAttempts made: " .. attempts)
+print("\nIf no cars duplicated:")
+print("1. Server has strong validation")
+print("2. All requests are being rejected")
+print("3. Game is properly secured")
+print("\n💡 Last resorts:")
+print("• Try buying a NEW car, then immediately run script")
+print("• Try different game servers")
+print("• Look for game updates/patches")
