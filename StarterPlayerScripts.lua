@@ -1,6 +1,4 @@
--- 🚗 SIMPLE CAR BROWSER & DUPLICATOR
--- No external dependencies
-
+-- 🚗 SIMPLE CAR BROWSER & DUPLICATOR (FIXED)
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local player = Players.LocalPlayer
@@ -14,59 +12,63 @@ local function findCarsSimple()
     
     local cars = {}
     
-    -- 1. Check common locations
-    local locations = {
-        {Name = "Cars Folder", Object = ReplicatedStorage:FindFirstChild("Cars")},
-        {Name = "Vehicles Folder", Object = ReplicatedStorage:FindFirstChild("Vehicles")},
-        {Name = "CarShop", Object = ReplicatedStorage:FindFirstChild("CarShop")},
-        {Name = "VehicleShop", Object = ReplicatedStorage:FindFirstChild("VehicleShop")},
-        {Name = "Workspace Cars", Object = Workspace:FindFirstChild("Cars")}
+    -- Add your known cars first
+    local knownCars = {
+        "Bontlay Bontaga",
+        "Jegar Model F",
+        "Corsaro T8",
+        "Lavish Ventoge",
+        "Sportler Tecan",
+        "Bontlay Cental RT",
+        "Corsaro Roni",
+        "Corsaro Pursane",
+        "Corsaro G08",
+        "Corsaro P 213"
     }
     
-    for _, location in pairs(locations) do
-        if location.Object then
-            for _, item in pairs(location.Object:GetChildren()) do
-                if item:IsA("Model") or item:IsA("Folder") then
-                    table.insert(cars, {
-                        Name = item.Name,
-                        Source = location.Name
-                    })
-                end
-            end
-        end
+    for _, carName in pairs(knownCars) do
+        table.insert(cars, {
+            Name = carName,
+            Source = "Known Cars"
+        })
     end
     
-    -- 2. Look for Configuration objects with car data
-    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
-        if obj:IsA("Configuration") then
-            local name = obj.Name
-            if name:find("Car") or name:find("Vehicle") then
+    -- Check folders
+    local checkFolders = {
+        ReplicatedStorage:FindFirstChild("Cars"),
+        ReplicatedStorage:FindFirstChild("Vehicles"),
+        ReplicatedStorage:FindFirstChild("CarShop"),
+        Workspace:FindFirstChild("Cars")
+    }
+    
+    for _, folder in pairs(checkFolders) do
+        if folder then
+            for _, item in pairs(folder:GetChildren()) do
                 table.insert(cars, {
-                    Name = name,
-                    Source = "Configuration"
+                    Name = item.Name,
+                    Source = folder.Name
                 })
             end
         end
     end
     
-    -- 3. Remove duplicates
-    local uniqueCars = {}
+    -- Remove duplicates
+    local unique = {}
     local seen = {}
-    
     for _, car in pairs(cars) do
         if not seen[car.Name] then
             seen[car.Name] = true
-            table.insert(uniqueCars, car)
+            table.insert(unique, car)
         end
     end
     
-    -- Sort alphabetically
-    table.sort(uniqueCars, function(a, b)
+    -- Sort
+    table.sort(unique, function(a, b)
         return a.Name < b.Name
     end)
     
-    print("✅ Found " .. #uniqueCars .. " cars")
-    return uniqueCars
+    print("✅ Found " .. #unique .. " cars")
+    return unique
 end
 
 -- ===== DUPLICATE CAR =====
@@ -74,18 +76,39 @@ local function duplicateCar(carName)
     print("🔄 Duplicating: " .. carName)
     
     local cmdr = ReplicatedStorage:FindFirstChild("CmdrClient")
-    if not cmdr then return false end
+    if not cmdr then 
+        print("❌ CmdrClient not found")
+        return false 
+    end
     
     local cmdrEvent = cmdr:FindFirstChild("CmdrEvent")
-    if not cmdrEvent then return false end
+    if not cmdrEvent then 
+        print("❌ CmdrEvent not found")
+        return false 
+    end
     
-    -- Try command
-    local success = pcall(function()
-        cmdrEvent:FireServer("givecar " .. carName)
-        return true
-    end)
+    -- Try different formats
+    local formats = {
+        "givecar " .. carName,
+        "givecar " .. carName:gsub(" ", "_"),
+        "givecar " .. carName:gsub(" ", "")
+    }
     
-    return success
+    for _, cmd in pairs(formats) do
+        local success, result = pcall(function()
+            cmdrEvent:FireServer(cmd)
+            return true
+        end)
+        
+        if success then
+            print("✅ Sent: " .. cmd)
+            return true
+        else
+            print("❌ Failed: " .. tostring(result))
+        end
+    end
+    
+    return false
 end
 
 -- ===== CREATE SIMPLE UI =====
@@ -103,7 +126,7 @@ local function createSimpleUI()
     
     -- Title
     local title = Instance.new("TextLabel")
-    title.Text = "🚗 CAR BROWSER"
+    title.Text = "🚗 CAR DUPLICATOR"
     title.Size = UDim2.new(1, 0, 0, 50)
     title.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
     title.TextColor3 = Color3.new(1, 1, 1)
@@ -114,7 +137,7 @@ local function createSimpleUI()
     -- Status
     local status = Instance.new("TextLabel")
     status.Text = "Loading cars..."
-    status.Size = UDim2.new(1, -20, 0, 40)
+    status.Size = UDim2.new(1, -20, 0, 60)
     status.Position = UDim2.new(0, 10, 0, 60)
     status.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
     status.TextColor3 = Color3.new(1, 1, 1)
@@ -126,40 +149,32 @@ local function createSimpleUI()
     -- Car list
     local listFrame = Instance.new("ScrollingFrame")
     listFrame.Size = UDim2.new(1, -20, 0, 300)
-    listFrame.Position = UDim2.new(0, 10, 0, 110)
+    listFrame.Position = UDim2.new(0, 10, 0, 130)
     listFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
     listFrame.BorderSizePixel = 0
     listFrame.ScrollBarThickness = 8
     listFrame.Parent = frame
     
-    -- Buttons frame
-    local buttons = Instance.new("Frame")
-    buttons.Size = UDim2.new(1, -20, 0, 80)
-    buttons.Position = UDim2.new(0, 10, 0, 420)
-    buttons.BackgroundTransparency = 1
-    buttons.Parent = frame
-    
-    -- Refresh button
+    -- Buttons
     local refreshBtn = Instance.new("TextButton")
-    refreshBtn.Text = "🔄 REFRESH"
-    refreshBtn.Size = UDim2.new(1, 0, 0, 35)
-    refreshBtn.Position = UDim2.new(0, 0, 0, 0)
+    refreshBtn.Text = "🔄 REFRESH LIST"
+    refreshBtn.Size = UDim2.new(1, -20, 0, 40)
+    refreshBtn.Position = UDim2.new(0, 10, 0, 440)
     refreshBtn.BackgroundColor3 = Color3.fromRGB(50, 120, 220)
     refreshBtn.TextColor3 = Color3.new(1, 1, 1)
     refreshBtn.Font = Enum.Font.GothamBold
     refreshBtn.TextSize = 14
-    refreshBtn.Parent = buttons
+    refreshBtn.Parent = frame
     
-    -- Duplicate button
     local dupeBtn = Instance.new("TextButton")
     dupeBtn.Text = "🎯 DUPLICATE SELECTED"
-    dupeBtn.Size = UDim2.new(1, 0, 0, 35)
-    dupeBtn.Position = UDim2.new(0, 0, 0, 45)
+    dupeBtn.Size = UDim2.new(1, -20, 0, 40)
+    dupeBtn.Position = UDim2.new(0, 10, 0, 490)
     dupeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
     dupeBtn.TextColor3 = Color3.new(1, 1, 1)
     dupeBtn.Font = Enum.Font.GothamBold
     dupeBtn.TextSize = 16
-    dupeBtn.Parent = buttons
+    dupeBtn.Parent = frame
     
     -- Selected car
     local selectedCar = nil
@@ -170,18 +185,19 @@ local function createSimpleUI()
         
         local y = 5
         for i, car in pairs(carList) do
-            -- Entry
+            -- Entry frame
             local entry = Instance.new("Frame")
+            entry.Name = "Entry_" .. i
             entry.Size = UDim2.new(1, -10, 0, 40)
             entry.Position = UDim2.new(0, 5, 0, y)
             entry.BackgroundColor3 = selectedCar == car.Name and Color3.fromRGB(60, 80, 60) or Color3.fromRGB(40, 40, 50)
             entry.BorderSizePixel = 0
             entry.Parent = listFrame
             
-            -- Name
+            -- Car name
             local nameLabel = Instance.new("TextLabel")
             nameLabel.Text = car.Name
-            nameLabel.Size = UDim2.new(0.7, -5, 1, 0)
+            nameLabel.Size = UDim2.new(0.8, -5, 1, 0)
             nameLabel.Position = UDim2.new(0, 5, 0, 0)
             nameLabel.BackgroundTransparency = 1
             nameLabel.TextColor3 = Color3.new(1, 1, 1)
@@ -193,8 +209,8 @@ local function createSimpleUI()
             -- Source
             local sourceLabel = Instance.new("TextLabel")
             sourceLabel.Text = car.Source
-            sourceLabel.Size = UDim2.new(0.3, -5, 1, 0)
-            sourceLabel.Position = UDim2.new(0.7, 0, 0, 0)
+            sourceLabel.Size = UDim2.new(0.2, -5, 1, 0)
+            sourceLabel.Position = UDim2.new(0.8, 0, 0, 0)
             sourceLabel.BackgroundTransparency = 1
             sourceLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
             sourceLabel.Font = Enum.Font.Gotham
@@ -202,11 +218,19 @@ local function createSimpleUI()
             sourceLabel.TextXAlignment = Enum.TextXAlignment.Right
             sourceLabel.Parent = entry
             
-            -- Click to select
-            entry.MouseButton1Click:Connect(function()
+            -- Click detection using TextButton overlay
+            local clickBtn = Instance.new("TextButton")
+            clickBtn.Text = ""
+            clickBtn.Size = UDim2.new(1, 0, 1, 0)
+            clickBtn.Position = UDim2.new(0, 0, 0, 0)
+            clickBtn.BackgroundTransparency = 1
+            clickBtn.Parent = entry
+            
+            -- Click event
+            clickBtn.MouseButton1Click:Connect(function()
                 selectedCar = car.Name
                 status.Text = "Selected: " .. car.Name
-                showCars(carList) -- Refresh
+                showCars(carList) -- Refresh to update colors
             end)
             
             y = y + 45
@@ -215,37 +239,49 @@ local function createSimpleUI()
         listFrame.CanvasSize = UDim2.new(0, 0, 0, y)
     end
     
-    -- Load cars
+    -- Initial load
     local cars = findCarsSimple()
     showCars(cars)
-    status.Text = "Found " .. #cars .. " cars. Click to select."
+    status.Text = "Found " .. #cars .. " cars\nClick to select, then click DUPLICATE"
     
     -- Refresh button
     refreshBtn.MouseButton1Click:Connect(function()
         status.Text = "Refreshing..."
         cars = findCarsSimple()
-        showCars(cars)
         selectedCar = nil
-        status.Text = "Found " .. #cars .. " cars. Click to select."
+        showCars(cars)
+        status.Text = "Found " .. #cars .. " cars\nClick to select, then click DUPLICATE"
     end)
     
     -- Duplicate button
     dupeBtn.MouseButton1Click:Connect(function()
         if not selectedCar then
-            status.Text = "❌ Select a car first!"
+            status.Text = "❌ Please select a car first!\nClick on a car from the list."
             return
         end
         
-        status.Text = "Duplicating " .. selectedCar .. "..."
+        status.Text = "Duplicating: " .. selectedCar .. "\nSending command..."
         dupeBtn.Text = "WORKING..."
         dupeBtn.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
         
         task.spawn(function()
             local success = duplicateCar(selectedCar)
+            
             if success then
-                status.Text = "✅ Sent: givecar " .. selectedCar .. "\nCheck garage!"
+                status.Text = "✅ Command sent: givecar " .. selectedCar .. "\nCheck your garage in 5 seconds!"
+                
+                -- Try rapid duplicates
+                task.wait(1)
+                for i = 1, 5 do
+                    pcall(function()
+                        duplicateCar(selectedCar)
+                    end)
+                    task.wait(0.1)
+                end
+                
+                status.Text = status.Text .. "\n🎉 Sent multiple duplication attempts!"
             else
-                status.Text = "❌ Failed to duplicate"
+                status.Text = "❌ Failed to send command\nTry a different car or server"
             end
             
             task.wait(2)
@@ -254,7 +290,7 @@ local function createSimpleUI()
         end)
     end)
     
-    -- Add corners
+    -- Add rounded corners
     local corners = {frame, status, listFrame, refreshBtn, dupeBtn}
     for _, obj in pairs(corners) do
         local corner = Instance.new("UICorner")
@@ -262,16 +298,16 @@ local function createSimpleUI()
         corner.Parent = obj
     end
     
-    return gui, status
+    return gui
 end
 
 -- ===== MAIN =====
-print("🚗 SIMPLE CAR BROWSER")
+print("🚗 SIMPLE CAR DUPLICATOR")
 task.wait(2)
 createSimpleUI()
 print("✅ UI Created!")
-print("\nInstructions:")
-print("1. Browse cars in the UI")
-print("2. Click a car to select it")
-print("3. Click 'DUPLICATE SELECTED'")
-print("4. Check your garage!")
+print("\nHow to use:")
+print("1. Click any car in the list to select it")
+print("2. Click 'DUPLICATE SELECTED' button")
+print("3. Check your garage for the car")
+print("4. If it doesn't work, try a different server")
