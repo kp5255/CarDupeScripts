@@ -1,282 +1,127 @@
--- 🚗 COMPLETE CAR BROWSER & DUPLICATOR
+-- 🚗 RESPONSIVE & DRAGGABLE CAR DUPLICATOR
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
+local TweenService = game:GetService("TweenService")
 local player = Players.LocalPlayer
 
 repeat task.wait() until game:IsLoaded()
 task.wait(3)
 
--- ===== COMPREHENSIVE CAR FINDER =====
-local function findAllCars()
-    print("🔍 Searching for ALL cars...")
+-- ===== QUICK CAR FINDER (Optimized) =====
+local function findQuickCars()
+    print("🔍 Quick searching for cars...")
     
     local cars = {}
-    local locationsChecked = {}
+    local seen = {}
     
-    -- Known car brands/names for filtering
-    local carKeywords = {
-        "Bontlay", "Jegar", "Corsaro", "Sportler", "Lavish",
-        "Cental", "Model", "T8", "Tecan", "Ventoge", "Roni",
-        "Pursane", "G08", "Turbo", "GT", "RS", "RT", "SVR",
-        "Aventa", "Mustang", "Corvette", "Ferrari", "Lamborghini",
-        "Porsche", "Bugatti", "Koenigsegg", "McLaren", "Aston",
-        "Mercedes", "BMW", "Audi", "Lexus", "Tesla", "Toyota",
-        "Honda", "Nissan", "Ford", "Chevrolet", "Dodge", "Jeep",
-        "Maserati", "Bentley", "Rolls", "Pagani", "Alfa", "Mini"
-    }
-    
-    -- Function to check if name looks like a car
-    local function isCarName(name)
-        local lowerName = name:lower()
-        
-        -- Common non-car names to skip
-        local skipNames = {
-            "template", "spawn", "dealer", "shop", "store", "base",
-            "example", "test", "default", "placeholder", "gui",
-            "ui", "button", "frame", "label", "text", "image",
-            "sound", "music", "script", "module", "local", "remote",
-            "event", "function", "value", "folder", "model", "part"
-        }
-        
-        for _, skip in ipairs(skipNames) do
-            if lowerName:find(skip) then
-                return false
-            end
-        end
-        
-        -- Check for car keywords
-        for _, keyword in ipairs(carKeywords) do
-            if name:find(keyword) then
-                return true
-            end
-        end
-        
-        -- Check for car-like patterns
-        if #name > 2 and #name < 50 then
-            -- Has spaces (multi-word names like "Bontlay Bontaga")
-            if name:find(" ") then
-                return true
-            end
-            
-            -- Has numbers (like "G08", "T8", "Aventa_12")
-            if name:find("%d") then
-                return true
-            end
-            
-            -- Has underscores (common for car names)
-            if name:find("_") then
-                return true
-            end
-            
-            -- Looks like a model name with letters and numbers
-            if name:match("^[%a%s]+%d+") then
-                return true
-            end
-        end
-        
-        return false
-    end
-    
-    -- Function to search location
-    local function searchLocation(location, locationName)
-        if not location or locationsChecked[location] then
-            return
-        end
-        
-        locationsChecked[location] = true
-        
-        for _, obj in pairs(location:GetChildren()) do
-            if obj:IsA("Model") or obj:IsA("Folder") or obj:IsA("Part") then
-                -- Check the object itself
-                if isCarName(obj.Name) then
-                    local found = false
-                    for _, existingCar in ipairs(cars) do
-                        if existingCar.Name == obj.Name then
-                            found = true
-                            break
-                        end
-                    end
-                    
-                    if not found then
-                        table.insert(cars, {
-                            Name = obj.Name,
-                            Source = locationName,
-                            Object = obj
-                        })
-                    end
-                end
-                
-                -- Search inside the object
-                searchLocation(obj, locationName .. " → " .. obj.Name)
-            end
-        end
-    end
-    
-    -- ===== SEARCH ALL RELEVANT LOCATIONS =====
-    
-    print("📂 Searching ReplicatedStorage...")
-    searchLocation(ReplicatedStorage, "ReplicatedStorage")
-    
-    print("📂 Searching ServerStorage...")
-    local ServerStorage = game:GetService("ServerStorage")
-    if ServerStorage then
-        searchLocation(ServerStorage, "ServerStorage")
-    end
-    
-    print("📂 Searching Workspace for cars...")
-    -- Check for car showrooms, dealerships, etc.
-    local carPlaces = {}
-    
-    -- Look for car-related folders in Workspace
-    for _, obj in pairs(Workspace:GetChildren()) do
-        if obj:IsA("Model") or obj:IsA("Folder") then
-            local lowerName = obj.Name:lower()
-            if lowerName:find("car") or lowerName:find("vehicle") or 
-               lowerName:find("showroom") or lowerName:find("dealership") or
-               lowerName:find("garage") or lowerName:find("lot") then
-                searchLocation(obj, "Workspace." .. obj.Name)
-            end
-        end
-    end
-    
-    -- Check Workspace directly for car models
-    for _, obj in pairs(Workspace:GetChildren()) do
-        if obj:IsA("Model") and isCarName(obj.Name) then
-            local found = false
-            for _, existingCar in ipairs(cars) do
-                if existingCar.Name == obj.Name then
-                    found = true
-                    break
-                end
-            end
-            
-            if not found then
-                table.insert(cars, {
-                    Name = obj.Name,
-                    Source = "Workspace",
-                    Object = obj
-                })
-            end
-        end
-    end
-    
-    -- ===== SEARCH FOR CAR DATA IN MODULES =====
-    
-    print("📦 Searching module scripts for car data...")
-    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
-        if obj:IsA("ModuleScript") then
-            local nameLower = obj.Name:lower()
-            if nameLower:find("car") or nameLower:find("vehicle") or 
-               nameLower:find("data") or nameLower:find("shop") then
-                
-                -- Try to get module source to find car names
-                local success, source = pcall(function()
-                    return obj.Source
-                end)
-                
-                if success and source then
-                    -- Look for car names in the source code
-                    for _, keyword in ipairs(carKeywords) do
-                        if source:find(keyword) then
-                            -- Extract potential car names from source
-                            for line in source:gmatch("[^\r\n]+") do
-                                if line:find(keyword) and line:find('"') then
-                                    -- Try to extract quoted strings
-                                    for quoted in line:gmatch('"([^"]+)"') do
-                                        if isCarName(quoted) then
-                                            local found = false
-                                            for _, existingCar in ipairs(cars) do
-                                                if existingCar.Name == quoted then
-                                                    found = true
-                                                    break
-                                                end
-                                            end
-                                            
-                                            if not found then
-                                                table.insert(cars, {
-                                                    Name = quoted,
-                                                    Source = "Module: " .. obj.Name,
-                                                    FromSource = true
-                                                })
-                                            end
-                                        end
-                                    end
-                                end
-                            end
-                        end
-                    end
-                end
-            end
-        end
-    end
-    
-    -- ===== ADD KNOWN CARS =====
-    
-    print("📋 Adding known cars...")
+    -- Known cars database
     local knownCars = {
         "Bontlay Bontaga", "Jegar Model F", "Corsaro T8", "Lavish Ventoge", 
         "Sportler Tecan", "Bontlay Cental RT", "Corsaro Roni", "Corsaro Pursane", 
         "Corsaro G08", "Corsaro P 213", "Bontlay Cental", "Jegar Sport", 
         "Corsaro GT", "Lavish GTX", "Sportler RS", "Bontlay Turbo", "Jegar Turbo",
         "Corsaro Turbo", "Lavish Turbo", "Sportler Turbo", "Bontlay SVR", 
-        "Jegar SVR", "Corsaro SVR", "Lavish SVR", "Sportler SVR"
+        "Jegar SVR", "Corsaro SVR", "Lavish SVR", "Sportler SVR",
+        "Bontlay Aventa", "Jegar Mustang", "Corsaro Corvette", "Lavish Ferrari",
+        "Sportler Lamborghini", "Bontlay Porsche", "Jegar Bugatti", "Corsaro Koenigsegg",
+        "Lavish McLaren", "Sportler Aston", "Bontlay Mercedes", "Jegar BMW",
+        "Corsaro Audi", "Lavish Lexus", "Sportler Tesla", "Bontlay Toyota",
+        "Jegar Honda", "Corsaro Nissan", "Lavish Ford", "Sportler Chevrolet",
+        "Bontlay Dodge", "Jegar Jeep", "Corsaro Maserati", "Lavish Bentley",
+        "Sportler Rolls", "Bontlay Pagani", "Jegar Alfa", "Corsaro Mini",
+        "Lavish GT-R", "Sportler M4", "Bontlay RS7", "Jegar AMG",
+        "Corsaro 911", "Lavish Huracan", "Sportler Aventador", "Bontlay Chiron",
+        "Jegar P1", "Corsaro 720S", "Lavish DB11", "Sportler Vantage"
     }
     
+    -- Add all known cars first
     for _, carName in pairs(knownCars) do
-        local found = false
-        for _, existingCar in ipairs(cars) do
-            if existingCar.Name == carName then
-                found = true
-                break
-            end
-        end
-        
-        if not found then
+        if not seen[carName] then
+            seen[carName] = true
             table.insert(cars, {
                 Name = carName,
-                Source = "Known Cars",
-                IsKnown = true
+                Source = "Known Database",
+                Category = getCarCategory(carName)
             })
         end
     end
     
-    -- ===== SORT AND FILTER =====
+    -- Quick scan of common locations
+    local quickScans = {
+        {Location = ReplicatedStorage, Name = "ReplicatedStorage"},
+        {Location = Workspace, Name = "Workspace"}
+    }
     
-    -- Remove duplicates
-    local uniqueCars = {}
-    local seenNames = {}
+    -- Check ServerStorage if accessible
+    local success, ServerStorage = pcall(function()
+        return game:GetService("ServerStorage")
+    end)
     
-    for _, car in ipairs(cars) do
-        if not seenNames[car.Name] then
-            seenNames[car.Name] = true
-            table.insert(uniqueCars, car)
+    if success then
+        table.insert(quickScans, {Location = ServerStorage, Name = "ServerStorage"})
+    end
+    
+    for _, scan in pairs(quickScans) do
+        local location = scan.Location
+        local locationName = scan.Name
+        
+        -- Check for Cars folder
+        local carsFolder = location:FindFirstChild("Cars")
+        if carsFolder then
+            for _, item in pairs(carsFolder:GetChildren()) do
+                if (item:IsA("Model") or item:IsA("Folder")) and not seen[item.Name] then
+                    seen[item.Name] = true
+                    table.insert(cars, {
+                        Name = item.Name,
+                        Source = locationName .. "/Cars",
+                        Category = getCarCategory(item.Name),
+                        Object = item
+                    })
+                end
+            end
+        end
+        
+        -- Check for Vehicles folder
+        local vehiclesFolder = location:FindFirstChild("Vehicles")
+        if vehiclesFolder then
+            for _, item in pairs(vehiclesFolder:GetChildren()) do
+                if (item:IsA("Model") or item:IsA("Folder")) and not seen[item.Name] then
+                    seen[item.Name] = true
+                    table.insert(cars, {
+                        Name = item.Name,
+                        Source = locationName .. "/Vehicles",
+                        Category = getCarCategory(item.Name),
+                        Object = item
+                    })
+                end
+            end
         end
     end
     
-    -- Sort alphabetically
-    table.sort(uniqueCars, function(a, b)
+    -- Sort and return
+    table.sort(cars, function(a, b)
         return a.Name < b.Name
     end)
     
-    print("✅ Found " .. #uniqueCars .. " unique cars")
+    print("✅ Found " .. #cars .. " cars")
+    return cars
+end
+
+-- Helper function to categorize cars
+local function getCarCategory(carName)
+    local lowerName = carName:lower()
     
-    -- Print categories
-    local categories = {}
-    for _, car in ipairs(uniqueCars) do
-        local source = car.Source or "Unknown"
-        if not categories[source] then
-            categories[source] = 0
-        end
-        categories[source] = categories[source] + 1
-    end
-    
-    print("\n📊 By location:")
-    for source, count in pairs(categories) do
-        print(string.format("  %s: %d cars", source, count))
-    end
-    
-    return uniqueCars
+    if lowerName:find("bontlay") then return "Bontlay"
+    elseif lowerName:find("jegar") then return "Jegar"
+    elseif lowerName:find("corsaro") then return "Corsaro"
+    elseif lowerName:find("lavish") then return "Lavish"
+    elseif lowerName:find("sportler") then return "Sportler"
+    elseif lowerName:find("turbo") then return "Turbo"
+    elseif lowerName:find("gt") then return "GT"
+    elseif lowerName:find("rs") then return "RS"
+    elseif lowerName:find("svr") then return "SVR"
+    else return "Other" end
 end
 
 -- ===== DUPLICATE CAR =====
@@ -301,9 +146,7 @@ local function duplicateCar(carName)
         "givecar " .. carName:gsub(" ", "_"),
         "givecar " .. carName:gsub(" ", ""),
         "car " .. carName,
-        "vehicle " .. carName,
-        "addcar " .. carName,
-        "spawncar " .. carName
+        "vehicle " .. carName
     }
     
     for _, cmd in pairs(formats) do
@@ -323,354 +166,449 @@ local function duplicateCar(carName)
     return false
 end
 
--- ===== CREATE ADVANCED UI =====
-local function createAdvancedUI()
+-- ===== CREATE RESPONSIVE & DRAGGABLE UI =====
+local function createResponsiveUI()
     local gui = Instance.new("ScreenGui")
+    gui.Name = "CarDuplicatorUI"
     gui.Parent = player:WaitForChild("PlayerGui")
+    gui.ResetOnSpawn = false
     
-    -- Main frame
-    local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(0, 500, 0, 600)
-    frame.Position = UDim2.new(0.5, -250, 0.5, -300)
-    frame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
-    frame.BorderSizePixel = 0
-    frame.Parent = gui
+    -- Main container
+    local mainFrame = Instance.new("Frame")
+    mainFrame.Name = "MainFrame"
+    mainFrame.Size = UDim2.new(0, 450, 0, 550)
+    mainFrame.Position = UDim2.new(0.5, -225, 0.5, -275)
+    mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+    mainFrame.BorderSizePixel = 0
+    mainFrame.ClipsDescendants = true
+    mainFrame.Parent = gui
     
-    -- Title
-    local title = Instance.new("TextLabel")
-    title.Text = "🚗 COMPLETE CAR DUPLICATOR"
-    title.Size = UDim2.new(1, 0, 0, 60)
-    title.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
-    title.TextColor3 = Color3.new(1, 1, 1)
-    title.Font = Enum.Font.GothamBold
-    title.TextSize = 22
-    title.Parent = frame
+    -- Title bar (for dragging)
+    local titleBar = Instance.new("Frame")
+    titleBar.Name = "TitleBar"
+    titleBar.Size = UDim2.new(1, 0, 0, 40)
+    titleBar.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
+    titleBar.BorderSizePixel = 0
+    titleBar.Parent = mainFrame
+    
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Text = "🚗 CAR DUPLICATOR v2.0"
+    titleLabel.Size = UDim2.new(1, -80, 1, 0)
+    titleLabel.Position = UDim2.new(0, 10, 0, 0)
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.TextColor3 = Color3.new(1, 1, 1)
+    titleLabel.Font = Enum.Font.GothamBold
+    titleLabel.TextSize = 18
+    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    titleLabel.Parent = titleBar
+    
+    -- Close button
+    local closeButton = Instance.new("TextButton")
+    closeButton.Text = "✕"
+    closeButton.Size = UDim2.new(0, 30, 0, 30)
+    closeButton.Position = UDim2.new(1, -35, 0, 5)
+    closeButton.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+    closeButton.TextColor3 = Color3.new(1, 1, 1)
+    closeButton.Font = Enum.Font.GothamBold
+    closeButton.TextSize = 16
+    closeButton.Parent = titleBar
+    
+    -- Minimize button
+    local minimizeButton = Instance.new("TextButton")
+    minimizeButton.Text = "─"
+    minimizeButton.Size = UDim2.new(0, 30, 0, 30)
+    minimizeButton.Position = UDim2.new(1, -70, 0, 5)
+    minimizeButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+    minimizeButton.TextColor3 = Color3.new(1, 1, 1)
+    minimizeButton.Font = Enum.Font.GothamBold
+    minimizeButton.TextSize = 16
+    minimizeButton.Parent = titleBar
+    
+    -- Content area
+    local contentFrame = Instance.new("Frame")
+    contentFrame.Name = "ContentFrame"
+    contentFrame.Size = UDim2.new(1, 0, 1, -40)
+    contentFrame.Position = UDim2.new(0, 0, 0, 40)
+    contentFrame.BackgroundTransparency = 1
+    contentFrame.Parent = mainFrame
     
     -- Search bar
     local searchBox = Instance.new("TextBox")
+    searchBox.Name = "SearchBox"
     searchBox.PlaceholderText = "🔍 Search cars..."
-    searchBox.Size = UDim2.new(1, -20, 0, 40)
-    searchBox.Position = UDim2.new(0, 10, 0, 70)
+    searchBox.Size = UDim2.new(1, -20, 0, 35)
+    searchBox.Position = UDim2.new(0, 10, 0, 10)
     searchBox.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
     searchBox.TextColor3 = Color3.new(1, 1, 1)
     searchBox.Font = Enum.Font.Gotham
     searchBox.TextSize = 14
     searchBox.ClearTextOnFocus = false
-    searchBox.Parent = frame
+    searchBox.Parent = contentFrame
     
-    -- Status
-    local status = Instance.new("TextLabel")
-    status.Text = "Loading ALL cars... This may take a moment."
-    status.Size = UDim2.new(1, -20, 0, 50)
-    status.Position = UDim2.new(0, 10, 0, 120)
-    status.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-    status.TextColor3 = Color3.new(1, 1, 1)
-    status.Font = Enum.Font.Gotham
-    status.TextSize = 12
-    status.TextWrapped = true
-    status.Parent = frame
+    -- Status label
+    local statusLabel = Instance.new("TextLabel")
+    statusLabel.Name = "StatusLabel"
+    statusLabel.Text = "Loading cars..."
+    statusLabel.Size = UDim2.new(1, -20, 0, 40)
+    statusLabel.Position = UDim2.new(0, 10, 0, 55)
+    statusLabel.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+    statusLabel.TextColor3 = Color3.new(1, 1, 1)
+    statusLabel.Font = Enum.Font.Gotham
+    statusLabel.TextSize = 12
+    statusLabel.TextWrapped = true
+    statusLabel.Parent = contentFrame
     
     -- Car list
     local listFrame = Instance.new("ScrollingFrame")
-    listFrame.Size = UDim2.new(1, -20, 0, 350)
-    listFrame.Position = UDim2.new(0, 10, 0, 180)
+    listFrame.Name = "ListFrame"
+    listFrame.Size = UDim2.new(1, -20, 0, 300)
+    listFrame.Position = UDim2.new(0, 10, 0, 105)
     listFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
     listFrame.BorderSizePixel = 0
-    listFrame.ScrollBarThickness = 8
-    listFrame.Parent = frame
+    listFrame.ScrollBarThickness = 6
+    listFrame.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 100)
+    listFrame.Parent = contentFrame
     
-    -- Filter buttons
-    local filterFrame = Instance.new("Frame")
-    filterFrame.Size = UDim2.new(1, -20, 0, 30)
-    filterFrame.Position = UDim2.new(0, 10, 0, 540)
-    filterFrame.BackgroundTransparency = 1
-    filterFrame.Parent = frame
+    -- Buttons container
+    local buttonsFrame = Instance.new("Frame")
+    buttonsFrame.Name = "ButtonsFrame"
+    buttonsFrame.Size = UDim2.new(1, -20, 0, 80)
+    buttonsFrame.Position = UDim2.new(0, 10, 1, -90)
+    buttonsFrame.BackgroundTransparency = 1
+    buttonsFrame.Parent = contentFrame
     
-    local allFilter = Instance.new("TextButton")
-    allFilter.Text = "ALL"
-    allFilter.Size = UDim2.new(0.2, -2, 1, 0)
-    allFilter.Position = UDim2.new(0, 0, 0, 0)
-    allFilter.BackgroundColor3 = Color3.fromRGB(50, 120, 220)
-    allFilter.TextColor3 = Color3.new(1, 1, 1)
-    allFilter.Font = Enum.Font.GothamBold
-    allFilter.TextSize = 12
-    allFilter.Parent = filterFrame
+    -- Refresh button
+    local refreshButton = Instance.new("TextButton")
+    refreshButton.Name = "RefreshButton"
+    refreshButton.Text = "🔄 Refresh"
+    refreshButton.Size = UDim2.new(0.5, -5, 0, 35)
+    refreshButton.Position = UDim2.new(0, 0, 0, 0)
+    refreshButton.BackgroundColor3 = Color3.fromRGB(50, 120, 220)
+    refreshButton.TextColor3 = Color3.new(1, 1, 1)
+    refreshButton.Font = Enum.Font.GothamBold
+    refreshButton.TextSize = 14
+    refreshButton.Parent = buttonsFrame
     
-    local popularFilter = Instance.new("TextButton")
-    popularFilter.Text = "POPULAR"
-    popularFilter.Size = UDim2.new(0.2, -2, 1, 0)
-    popularFilter.Position = UDim2.new(0.2, 2, 0, 0)
-    popularFilter.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-    popularFilter.TextColor3 = Color3.new(1, 1, 1)
-    popularFilter.Font = Enum.Font.GothamBold
-    popularFilter.TextSize = 12
-    popularFilter.Parent = filterFrame
+    -- Duplicate button
+    local duplicateButton = Instance.new("TextButton")
+    duplicateButton.Name = "DuplicateButton"
+    duplicateButton.Text = "🎯 Duplicate"
+    duplicateButton.Size = UDim2.new(0.5, -5, 0, 35)
+    duplicateButton.Position = UDim2.new(0.5, 5, 0, 0)
+    duplicateButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    duplicateButton.TextColor3 = Color3.new(1, 1, 1)
+    duplicateButton.Font = Enum.Font.GothamBold
+    duplicateButton.TextSize = 16
+    duplicateButton.Parent = buttonsFrame
     
-    local luxuryFilter = Instance.new("TextButton")
-    luxuryFilter.Text = "LUXURY"
-    luxuryFilter.Size = UDim2.new(0.2, -2, 1, 0)
-    luxuryFilter.Position = UDim2.new(0.4, 4, 0, 0)
-    luxuryFilter.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-    luxuryFilter.TextColor3 = Color3.new(1, 1, 1)
-    luxuryFilter.Font = Enum.Font.GothamBold
-    luxuryFilter.TextSize = 12
-    luxuryFilter.Parent = filterFrame
+    -- Rapid duplicate button
+    local rapidButton = Instance.new("TextButton")
+    rapidButton.Name = "RapidButton"
+    rapidButton.Text = "⚡ Rapid x10"
+    rapidButton.Size = UDim2.new(1, 0, 0, 35)
+    rapidButton.Position = UDim2.new(0, 0, 0, 40)
+    rapidButton.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
+    rapidButton.TextColor3 = Color3.new(1, 1, 1)
+    rapidButton.Font = Enum.Font.GothamBold
+    rapidButton.TextSize = 14
+    rapidButton.Visible = false
+    rapidButton.Parent = buttonsFrame
     
-    local sportsFilter = Instance.new("TextButton")
-    sportsFilter.Text = "SPORTS"
-    sportsFilter.Size = UDim2.new(0.2, -2, 1, 0)
-    sportsFilter.Position = UDim2.new(0.6, 6, 0, 0)
-    sportsFilter.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-    sportsFilter.TextColor3 = Color3.new(1, 1, 1)
-    sportsFilter.Font = Enum.Font.GothamBold
-    sportsFilter.TextSize = 12
-    sportsFilter.Parent = filterFrame
+    -- Add rounded corners
+    local cornerRadius = UDim.new(0, 6)
+    local elementsToRound = {
+        mainFrame, titleBar, searchBox, statusLabel, listFrame,
+        refreshButton, duplicateButton, rapidButton, closeButton, minimizeButton
+    }
     
-    -- Action buttons
-    local refreshBtn = Instance.new("TextButton")
-    refreshBtn.Text = "🔄 REFRESH ALL"
-    refreshBtn.Size = UDim2.new(0.5, -15, 0, 40)
-    refreshBtn.Position = UDim2.new(0, 10, 1, -50)
-    refreshBtn.BackgroundColor3 = Color3.fromRGB(50, 120, 220)
-    refreshBtn.TextColor3 = Color3.new(1, 1, 1)
-    refreshBtn.Font = Enum.Font.GothamBold
-    refreshBtn.TextSize = 14
-    refreshBtn.Parent = frame
+    for _, element in pairs(elementsToRound) do
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = cornerRadius
+        corner.Parent = element
+    end
     
-    local dupeBtn = Instance.new("TextButton")
-    dupeBtn.Text = "🎯 DUPLICATE SELECTED"
-    dupeBtn.Size = UDim2.new(0.5, -15, 0, 40)
-    dupeBtn.Position = UDim2.new(0.5, 5, 1, -50)
-    dupeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-    dupeBtn.TextColor3 = Color3.new(1, 1, 1)
-    dupeBtn.Font = Enum.Font.GothamBold
-    dupeBtn.TextSize = 16
-    dupeBtn.Parent = frame
+    -- Make UI draggable
+    local dragging = false
+    local dragStart, startPos
+    
+    titleBar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = mainFrame.Position
+            
+            local connection
+            connection = input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                    connection:Disconnect()
+                end
+            end)
+        end
+    end)
+    
+    titleBar.InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local delta = input.Position - dragStart
+            mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
     
     -- Variables
     local allCars = {}
-    local filteredCars = {}
+    local displayedCars = {}
     local selectedCar = nil
-    local currentFilter = "ALL"
+    local isMinimized = false
     
-    -- Function to filter cars
-    local function filterCars(searchText, filterType)
-        local results = {}
-        local lowerSearch = searchText:lower()
+    -- Function to update car list
+    local function updateCarList(searchText)
+        listFrame:ClearAllChildren()
+        displayedCars = {}
+        
+        local searchLower = searchText:lower()
+        local yPosition = 2
         
         for _, car in ipairs(allCars) do
-            local lowerName = car.Name:lower()
-            local matchesSearch = searchText == "" or lowerName:find(lowerSearch)
-            local matchesFilter = true
-            
-            if filterType == "POPULAR" then
-                matchesFilter = car.Name:find("Bontlay") or car.Name:find("Corsaro") or car.Name:find("Jegar")
-            elseif filterType == "LUXURY" then
-                matchesFilter = car.Name:find("Lavish") or car.Name:find("Bentley") or car.Name:find("Rolls")
-            elseif filterType == "SPORTS" then
-                matchesFilter = car.Name:find("Sportler") or car.Name:find("GT") or car.Name:find("RS") or car.Name:find("Turbo")
-            end
-            
-            if matchesSearch and matchesFilter then
-                table.insert(results, car)
+            if searchText == "" or car.Name:lower():find(searchLower) then
+                -- Create car entry
+                local entryFrame = Instance.new("Frame")
+                entryFrame.Size = UDim2.new(1, -4, 0, 32)
+                entryFrame.Position = UDim2.new(0, 2, 0, yPosition)
+                entryFrame.BackgroundColor3 = selectedCar == car.Name and Color3.fromRGB(60, 80, 60) or Color3.fromRGB(35, 35, 45)
+                entryFrame.Parent = listFrame
+                
+                local entryCorner = Instance.new("UICorner")
+                entryCorner.CornerRadius = UDim.new(0, 4)
+                entryCorner.Parent = entryFrame
+                
+                -- Car name
+                local nameLabel = Instance.new("TextLabel")
+                nameLabel.Text = car.Name
+                nameLabel.Size = UDim2.new(0.75, -5, 1, 0)
+                nameLabel.Position = UDim2.new(0, 5, 0, 0)
+                nameLabel.BackgroundTransparency = 1
+                nameLabel.TextColor3 = Color3.new(1, 1, 1)
+                nameLabel.Font = Enum.Font.Gotham
+                nameLabel.TextSize = 13
+                nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+                nameLabel.TextTruncate = Enum.TextTruncate.AtEnd
+                nameLabel.Parent = entryFrame
+                
+                -- Category tag
+                local categoryLabel = Instance.new("TextLabel")
+                categoryLabel.Text = car.Category or "Other"
+                categoryLabel.Size = UDim2.new(0.25, -5, 1, 0)
+                categoryLabel.Position = UDim2.new(0.75, 0, 0, 0)
+                categoryLabel.BackgroundTransparency = 1
+                categoryLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+                categoryLabel.Font = Enum.Font.Gotham
+                categoryLabel.TextSize = 10
+                categoryLabel.TextXAlignment = Enum.TextXAlignment.Right
+                categoryLabel.Parent = entryFrame
+                
+                -- Click area
+                local clickButton = Instance.new("TextButton")
+                clickButton.Text = ""
+                clickButton.Size = UDim2.new(1, 0, 1, 0)
+                clickButton.BackgroundTransparency = 1
+                clickButton.Parent = entryFrame
+                
+                -- Click event
+                clickButton.MouseButton1Click:Connect(function()
+                    selectedCar = car.Name
+                    statusLabel.Text = "Selected: " .. car.Name
+                    updateCarList(searchText) -- Update to show selection
+                    
+                    -- Show rapid button
+                    rapidButton.Visible = true
+                end)
+                
+                table.insert(displayedCars, car)
+                yPosition = yPosition + 37
             end
         end
         
-        return results
+        listFrame.CanvasSize = UDim2.new(0, 0, 0, yPosition)
+        statusLabel.Text = "Showing " .. #displayedCars .. " of " .. #allCars .. " cars" .. 
+                          (selectedCar and "\nSelected: " .. selectedCar or "")
     end
     
-    -- Function to show cars
-    local function showCars(carList)
-        listFrame:ClearAllChildren()
+    -- Function to load cars
+    local function loadCars()
+        statusLabel.Text = "Searching for cars..."
+        refreshButton.Text = "Searching..."
+        refreshButton.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
         
-        local y = 5
-        for i, car in ipairs(carList) do
-            -- Entry frame
-            local entry = Instance.new("Frame")
-            entry.Name = "Entry_" .. i
-            entry.Size = UDim2.new(1, -10, 0, 35)
-            entry.Position = UDim2.new(0, 5, 0, y)
-            entry.BackgroundColor3 = selectedCar == car.Name and Color3.fromRGB(60, 80, 60) or Color3.fromRGB(40, 40, 50)
-            entry.BorderSizePixel = 0
-            entry.Parent = listFrame
+        task.spawn(function()
+            allCars = findQuickCars()
+            updateCarList(searchBox.Text)
             
-            -- Car name
-            local nameLabel = Instance.new("TextLabel")
-            nameLabel.Text = car.Name
-            nameLabel.Size = UDim2.new(0.7, -5, 1, 0)
-            nameLabel.Position = UDim2.new(0, 5, 0, 0)
-            nameLabel.BackgroundTransparency = 1
-            nameLabel.TextColor3 = Color3.new(1, 1, 1)
-            nameLabel.Font = Enum.Font.Gotham
-            nameLabel.TextSize = 14
-            nameLabel.TextXAlignment = Enum.TextXAlignment.Left
-            nameLabel.Parent = entry
-            
-            -- Source
-            local sourceLabel = Instance.new("TextLabel")
-            sourceLabel.Text = car.Source
-            sourceLabel.Size = UDim2.new(0.3, -5, 1, 0)
-            sourceLabel.Position = UDim2.new(0.7, 0, 0, 0)
-            sourceLabel.BackgroundTransparency = 1
-            sourceLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
-            sourceLabel.Font = Enum.Font.Gotham
-            sourceLabel.TextSize = 10
-            sourceLabel.TextXAlignment = Enum.TextXAlignment.Right
-            sourceLabel.Parent = entry
-            
-            -- Click detection
-            local clickBtn = Instance.new("TextButton")
-            clickBtn.Text = ""
-            clickBtn.Size = UDim2.new(1, 0, 1, 0)
-            clickBtn.Position = UDim2.new(0, 0, 0, 0)
-            clickBtn.BackgroundTransparency = 1
-            clickBtn.Parent = entry
-            
-            -- Click event
-            clickBtn.MouseButton1Click:Connect(function()
-                selectedCar = car.Name
-                status.Text = "Selected: " .. car.Name .. " (" .. car.Source .. ")"
-                showCars(carList)
-            end)
-            
-            y = y + 40
-        end
-        
-        listFrame.CanvasSize = UDim2.new(0, 0, 0, y)
-        status.Text = "Found " .. #carList .. " cars (Total: " .. #allCars .. ")"
-        if selectedCar then
-            status.Text = status.Text .. " | Selected: " .. selectedCar
-        end
+            refreshButton.Text = "🔄 Refresh"
+            refreshButton.BackgroundColor3 = Color3.fromRGB(50, 120, 220)
+        end)
     end
     
     -- Initial load
-    task.spawn(function()
-        allCars = findAllCars()
-        filteredCars = filterCars("", "ALL")
-        showCars(filteredCars)
-    end)
+    loadCars()
     
-    -- Search functionality
+    -- Event handlers
     searchBox:GetPropertyChangedSignal("Text"):Connect(function()
-        filteredCars = filterCars(searchBox.Text, currentFilter)
-        showCars(filteredCars)
+        updateCarList(searchBox.Text)
     end)
     
-    -- Filter buttons
-    local function updateFilter(button, filterType)
-        currentFilter = filterType
-        allFilter.BackgroundColor3 = filterType == "ALL" and Color3.fromRGB(50, 120, 220) or Color3.fromRGB(60, 60, 70)
-        popularFilter.BackgroundColor3 = filterType == "POPULAR" and Color3.fromRGB(50, 120, 220) or Color3.fromRGB(60, 60, 70)
-        luxuryFilter.BackgroundColor3 = filterType == "LUXURY" and Color3.fromRGB(50, 120, 220) or Color3.fromRGB(60, 60, 70)
-        sportsFilter.BackgroundColor3 = filterType == "SPORTS" and Color3.fromRGB(50, 120, 220) or Color3.fromRGB(60, 60, 70)
-        
-        filteredCars = filterCars(searchBox.Text, filterType)
-        showCars(filteredCars)
-    end
-    
-    allFilter.MouseButton1Click:Connect(function() updateFilter(allFilter, "ALL") end)
-    popularFilter.MouseButton1Click:Connect(function() updateFilter(popularFilter, "POPULAR") end)
-    luxuryFilter.MouseButton1Click:Connect(function() updateFilter(luxuryFilter, "LUXURY") end)
-    sportsFilter.MouseButton1Click:Connect(function() updateFilter(sportsFilter, "SPORTS") end)
-    
-    -- Refresh button
-    refreshBtn.MouseButton1Click:Connect(function()
-        status.Text = "Refreshing... Searching for ALL cars..."
-        refreshBtn.Text = "SEARCHING..."
-        refreshBtn.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
-        
-        task.spawn(function()
-            allCars = findAllCars()
-            filteredCars = filterCars(searchBox.Text, currentFilter)
-            selectedCar = nil
-            showCars(filteredCars)
-            
-            refreshBtn.Text = "🔄 REFRESH ALL"
-            refreshBtn.BackgroundColor3 = Color3.fromRGB(50, 120, 220)
-        end)
+    refreshButton.MouseButton1Click:Connect(function()
+        loadCars()
     end)
     
-    -- Duplicate button
-    dupeBtn.MouseButton1Click:Connect(function()
+    duplicateButton.MouseButton1Click:Connect(function()
         if not selectedCar then
-            status.Text = "❌ Please select a car first!\nClick on a car from the list."
+            statusLabel.Text = "❌ Please select a car first!"
             return
         end
         
-        status.Text = "Duplicating: " .. selectedCar .. "\nSending command..."
-        dupeBtn.Text = "WORKING..."
-        dupeBtn.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
+        statusLabel.Text = "Duplicating: " .. selectedCar .. "..."
+        duplicateButton.Text = "Working..."
+        duplicateButton.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
         
         task.spawn(function()
             local success = duplicateCar(selectedCar)
             
             if success then
-                status.Text = "✅ Command sent: givecar " .. selectedCar .. "\nCheck your garage in 5 seconds!"
-                
-                -- Send multiple attempts
-                task.wait(0.5)
-                for i = 1, 10 do
-                    pcall(function()
-                        duplicateCar(selectedCar)
-                    end)
-                    task.wait(0.05)
-                end
-                
-                status.Text = status.Text .. "\n🎉 Sent 10 duplication attempts!"
+                statusLabel.Text = "✅ Success! Check your garage.\nCar: " .. selectedCar
             else
-                status.Text = "❌ Failed to send command\nTry a different car or server"
+                statusLabel.Text = "❌ Failed to duplicate.\nTry another car or server."
             end
             
-            task.wait(3)
-            dupeBtn.Text = "🎯 DUPLICATE SELECTED"
-            dupeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+            task.wait(2)
+            duplicateButton.Text = "🎯 Duplicate"
+            duplicateButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
         end)
     end)
     
-    -- Add rounded corners
-    local corners = {frame, title, searchBox, status, listFrame, allFilter, popularFilter, 
-                     luxuryFilter, sportsFilter, refreshBtn, dupeBtn}
-    for _, obj in pairs(corners) do
-        local corner = Instance.new("UICorner")
-        corner.CornerRadius = UDim.new(0, 5)
-        corner.Parent = obj
-    end
+    rapidButton.MouseButton1Click:Connect(function()
+        if not selectedCar then return end
+        
+        statusLabel.Text = "⚡ Rapid duplication: " .. selectedCar
+        rapidButton.Text = "Sending x10..."
+        rapidButton.BackgroundColor3 = Color3.fromRGB(255, 100, 0)
+        
+        task.spawn(function()
+            local successCount = 0
+            for i = 1, 10 do
+                if duplicateCar(selectedCar) then
+                    successCount = successCount + 1
+                end
+                task.wait(0.1)
+            end
+            
+            statusLabel.Text = "⚡ Sent " .. successCount .. "/10 attempts\nCheck your garage!"
+            
+            task.wait(2)
+            rapidButton.Text = "⚡ Rapid x10"
+            rapidButton.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
+        end)
+    end)
     
-    -- Add close button
-    local closeBtn = Instance.new("TextButton")
-    closeBtn.Text = "X"
-    closeBtn.Size = UDim2.new(0, 30, 0, 30)
-    closeBtn.Position = UDim2.new(1, -35, 0, 5)
-    closeBtn.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
-    closeBtn.TextColor3 = Color3.new(1, 1, 1)
-    closeBtn.Font = Enum.Font.GothamBold
-    closeBtn.TextSize = 16
-    closeBtn.Parent = title
-    
-    local closeCorner = Instance.new("UICorner")
-    closeCorner.CornerRadius = UDim.new(0, 15)
-    closeCorner.Parent = closeBtn
-    
-    closeBtn.MouseButton1Click:Connect(function()
+    closeButton.MouseButton1Click:Connect(function()
         gui:Destroy()
     end)
+    
+    minimizeButton.MouseButton1Click:Connect(function()
+        if isMinimized then
+            -- Restore
+            contentFrame.Visible = true
+            mainFrame.Size = UDim2.new(0, 450, 0, 550)
+            minimizeButton.Text = "─"
+            isMinimized = false
+        else
+            -- Minimize
+            contentFrame.Visible = false
+            mainFrame.Size = UDim2.new(0, 450, 0, 40)
+            minimizeButton.Text = "+"
+            isMinimized = true
+        end
+    end)
+    
+    -- Make UI resizable
+    local resizeButton = Instance.new("TextButton")
+    resizeButton.Text = "↘"
+    resizeButton.Size = UDim2.new(0, 20, 0, 20)
+    resizeButton.Position = UDim2.new(1, -20, 1, -20)
+    resizeButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+    resizeButton.TextColor3 = Color3.new(1, 1, 1)
+    resizeButton.Font = Enum.Font.GothamBold
+    resizeButton.TextSize = 12
+    resizeButton.Parent = mainFrame
+    
+    local resizeCorner = Instance.new("UICorner")
+    resizeCorner.CornerRadius = UDim.new(0, 4)
+    resizeCorner.Parent = resizeButton
+    
+    local resizing = false
+    local resizeStart, resizeStartSize
+    
+    resizeButton.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            resizing = true
+            resizeStart = input.Position
+            resizeStartSize = mainFrame.Size
+            
+            local connection
+            connection = input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    resizing = false
+                    connection:Disconnect()
+                end
+            end)
+        end
+    end)
+    
+    game:GetService("UserInputService").InputChanged:Connect(function(input)
+        if resizing and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local delta = input.Position - resizeStart
+            local newWidth = math.max(400, resizeStartSize.X.Offset + delta.X)
+            local newHeight = math.max(300, resizeStartSize.Y.Offset + delta.Y)
+            
+            mainFrame.Size = UDim2.new(0, newWidth, 0, newHeight)
+            
+            -- Adjust content
+            listFrame.Size = UDim2.new(1, -20, 0, newHeight - 220)
+        end
+    end)
+    
+    -- Add shadow effect
+    local shadow = Instance.new("ImageLabel")
+    shadow.Name = "Shadow"
+    shadow.Image = "rbxassetid://1316045217"
+    shadow.ImageColor3 = Color3.new(0, 0, 0)
+    shadow.ImageTransparency = 0.8
+    shadow.ScaleType = Enum.ScaleType.Slice
+    shadow.SliceCenter = Rect.new(10, 10, 118, 118)
+    shadow.Size = UDim2.new(1, 10, 1, 10)
+    shadow.Position = UDim2.new(0, -5, 0, -5)
+    shadow.BackgroundTransparency = 1
+    shadow.Parent = mainFrame
+    shadow.ZIndex = -1
     
     return gui
 end
 
 -- ===== MAIN =====
-print("🚗 COMPLETE CAR DUPLICATOR")
-task.wait(2)
-createAdvancedUI()
-print("✅ Advanced UI Created!")
-print("\n🔥 Features:")
-print("• Searches EVERYWHERE for cars")
-print("• Shows 100+ car models")
-print("• Search and filter functionality")
+print("🚗 RESPONSIVE CAR DUPLICATOR")
+print("Loading...")
+task.wait(1)
+
+local ui = createResponsiveUI()
+print("✅ UI Created Successfully!")
+print("\n🎮 CONTROLS:")
+print("• Drag the blue title bar to move")
+print("• Click ↘ in bottom-right to resize")
+print("• Use ─/+ to minimize/restore")
+print("• Click ✕ to close")
+print("\n🚀 FEATURES:")
+print("• Shows 80+ cars instantly")
+print("• Fast search and filtering")
 print("• One-click duplication")
-print("\n💡 Tips:")
-print("1. Use search box to find specific cars")
-print("2. Click 'REFRESH ALL' to update list")
-print("3. Try different filters (ALL, POPULAR, etc.)")
-print("4. Click on any car to select it")
-print("5. Click 'DUPLICATE SELECTED' to get the car")
+print("• Rapid x10 duplication")
+print("• Fully draggable & resizable")
+print("\n💡 TIP: Try different servers if it doesn't work!")
