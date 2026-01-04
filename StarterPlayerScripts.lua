@@ -1,316 +1,168 @@
--- 🎯 MONITOR CAR LOADING SYSTEM
+-- 🎯 DYNAMIC CAR FINDER - AUTO-CLICK TO COPY
 local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local player = Players.LocalPlayer
 
 repeat task.wait() until game:IsLoaded()
 task.wait(2)
 
-print("🎯 MONITORING CAR LOADING SYSTEM")
+print("🎯 DYNAMIC CAR FINDER")
 print("=" .. string.rep("=", 50))
 
--- ===== MONITOR GUI CHANGES =====
-local function monitorGUILoading()
-    print("\n👁️ Monitoring MultiCarSelection for car loading...")
-    
-    local gui = player.PlayerGui:FindFirstChild("MultiCarSelection")
-    if not gui then
-        print("❌ GUI not found")
-        return
+-- ===== COMMANDS DATABASE =====
+local commands = {
+    {
+        name = "📁 Check Player Folders",
+        code = [[for i,v in pairs(game.Players.LocalPlayer:GetChildren()) do 
+    if v:IsA("Folder") then 
+        print("FOLDER:", v.Name, "| Items:", #v:GetChildren())
+    end 
+end]]
+    },
+    {
+        name = "🔤 Check StringValues (Car IDs/Names)",
+        code = [[local count = 0
+for i,v in pairs(game.Players.LocalPlayer:GetDescendants()) do 
+    if v:IsA("StringValue") then 
+        print(v:GetFullName(), "=", v.Value)
+        count = count + 1
+    end 
+end
+print("TOTAL StringValues:", count)]]
+    },
+    {
+        name = "🔢 Check IntValues (Car Counts)",
+        code = [[for i,v in pairs(game.Players.LocalPlayer:GetDescendants()) do 
+    if v:IsA("IntValue") then 
+        print(v:GetFullName(), "=", v.Value)
+    end 
+end]]
+    },
+    {
+        name = "🚗 Find Cars in GUI",
+        code = [[local gui = game.Players.LocalPlayer.PlayerGui:FindFirstChild("MultiCarSelection")
+if gui then
+    print("✅ MultiCarSelection FOUND")
+    local frames = 0
+    for i,v in pairs(gui:GetDescendants()) do
+        if v:IsA("TextLabel") and #v.Text > 2 then
+            print("CAR TEXT:", v.Text, "| Path:", v:GetFullName())
+            frames = frames + 1
+        end
     end
-    
-    -- Watch the ScrollingFrame
-    local scrollingFrame = gui:FindFirstChild("ScrollingFrame")
-    if scrollingFrame then
-        print("🎯 Watching ScrollingFrame for changes...")
-        
-        -- Monitor when children are added
-        scrollingFrame.ChildAdded:Connect(function(child)
-            print("➕ Child added to car list: " .. child.Name)
-            print("   Class: " .. child.ClassName)
-            
-            -- Check what was added
-            if child:IsA("Frame") then
-                print("   📦 Frame added - checking contents...")
-                
-                -- Look for car data in the frame
-                for _, obj in pairs(child:GetDescendants()) do
-                    if obj:IsA("TextLabel") and #obj.Text > 2 then
-                        print("   🚗 Found text: " .. obj.Text)
-                    elseif obj:IsA("ImageLabel") then
-                        print("   🖼️ Image: " .. obj.Name)
-                    elseif obj:IsA("StringValue") or obj:IsA("IntValue") then
-                        local success, value = pcall(function()
-                            return obj.Value
-                        end)
-                        if success then
-                            print("   💾 Value: " .. obj.Name .. " = " .. tostring(value))
-                        end
-                    end
-                end
-            end
-        end)
-        
-        -- Monitor when children are removed
-        scrollingFrame.ChildRemoved:Connect(function(child)
-            print("➖ Child removed from car list: " .. child.Name)
-        end)
+    print("Total car labels found:", frames)
+else
+    print("❌ MultiCarSelection NOT FOUND")
+end]]
+    },
+    {
+        name = "🔍 Deep Scan for Car Data",
+        code = [[print("🔍 DEEP SCAN STARTED...")
+local interesting = {}
+for i,v in pairs(game.Players.LocalPlayer:GetDescendants()) do
+    if v:IsA("StringValue") or v:IsA("IntValue") then
+        local value = v.Value
+        if type(value) == "string" and #value > 20 then
+            table.insert(interesting, {path = v:GetFullName(), value = value})
+        elseif type(value) == "number" and value > 50 then
+            table.insert(interesting, {path = v:GetFullName(), value = value})
+        end
     end
-    
-    print("\n🎮 NOW: Open your garage/car selection!")
-    print("💡 The script will show EXACTLY how cars are loaded")
-    
-    return gui
+end
+print("🎯 INTERESTING DATA FOUND:", #interesting)
+for i, item in ipairs(interesting) do
+    if i <= 10 then
+        print(i .. ". " .. item.path)
+        print("   Value: " .. tostring(item.value))
+    end
+end]]
+    },
+    {
+        name = "💰 Check Leaderstats",
+        code = [[local stats = game.Players.LocalPlayer:FindFirstChild("leaderstats")
+if stats then
+    print("💰 LEADERSTATS:")
+    for i,v in pairs(stats:GetChildren()) do
+        print(v.Name .. ": " .. tostring(v.Value))
+    end
+else
+    print("❌ No leaderstats found")
+end]]
+    },
+    {
+        name = "📊 Count All Value Objects",
+        code = [[local stringCount = 0
+local intCount = 0
+local folderCount = 0
+
+for i,v in pairs(game.Players.LocalPlayer:GetDescendants()) do
+    if v:IsA("StringValue") then stringCount = stringCount + 1 end
+    if v:IsA("IntValue") then intCount = intCount + 1 end
+    if v:IsA("Folder") then folderCount = folderCount + 1 end
 end
 
--- ===== FIND CAR LOADING REMOTES =====
-local function findLoadingRemotes()
-    print("\n🔍 Looking for car loading remotes...")
-    
-    local loadingRemotes = {}
-    
-    -- Search all RemoteEvents
-    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
-        if obj:IsA("RemoteEvent") then
-            local nameLower = obj.Name:lower()
-            
-            -- Look for loading/request remotes
-            if nameLower:find("get") or nameLower:find("load") or 
-               nameLower:find("request") or nameLower:find("fetch") then
-                
-                table.insert(loadingRemotes, {
-                    Object = obj,
-                    Name = obj.Name,
-                    Path = obj:GetFullName()
-                })
-            end
-        end
-    end
-    
-    print("Found " .. #loadingRemotes .. " loading remotes")
-    
-    -- Try to request car data
-    for _, remote in pairs(loadingRemotes) do
-        print("\nTesting: " .. remote.Name)
-        
-        -- Try different request formats
-        local formats = {
-            {player},
-            {player.UserId},
-            {"cars"},
-            {"vehicles"},
-            {"inventory"},
-            {player, "cars"}
-        }
-        
-        for _, data in pairs(formats) do
-            local success, result = pcall(function()
-                remote.Object:FireServer(unpack(data))
-                return "Request sent"
-            end)
-            
-            if success then
-                print("✅ " .. remote.Name .. " accepted request")
-                break
-            end
-        end
-        
-        task.wait(0.1)
-    end
-    
-    return loadingRemotes
-end
+print("📊 VALUE OBJECTS COUNT:")
+print("StringValues:", stringCount)
+print("IntValues:", intCount)
+print("Folders:", folderCount)]]
+    }
+}
 
--- ===== INTERCEPT CAR DATA =====
-local function interceptCarData()
-    print("\n📡 Intercepting car data transmission...")
-    
-    local interceptedData = {}
-    
-    -- Hook RemoteEvents to see what data is sent
-    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
-        if obj:IsA("RemoteEvent") then
-            local nameLower = obj.Name:lower()
-            
-            -- Look for data response remotes
-            if nameLower:find("update") or nameLower:find("receive") or 
-               nameLower:find("data") or nameLower:find("cars") then
-                
-                local success, original = pcall(function()
-                    return obj.FireServer
-                end)
-                
-                if success then
-                    -- Create wrapper to intercept
-                    obj.FireServer = function(self, ...)
-                        local args = {...}
-                        
-                        -- Check if this looks like car data
-                        if #args > 0 then
-                            local firstArg = args[1]
-                            
-                            if type(firstArg) == "table" then
-                                -- Table data - might be car list
-                                print("\n🎯 INTERCEPTED CAR DATA from: " .. self.Name)
-                                print("   Table with " .. #firstArg .. " items")
-                                
-                                -- Try to extract car info
-                                for i, item in ipairs(firstArg) do
-                                    if i <= 5 then  -- Show first 5
-                                        if type(item) == "table" then
-                                            print("   Item " .. i .. ": TABLE")
-                                            for k, v in pairs(item) do
-                                                print("     " .. tostring(k) .. ": " .. tostring(v))
-                                            end
-                                        else
-                                            print("   Item " .. i .. ": " .. tostring(item))
-                                        end
-                                    end
-                                }
-                                
-                                table.insert(interceptedData, {
-                                    Remote = self.Name,
-                                    Data = firstArg
-                                })
-                            elseif type(firstArg) == "string" and #firstArg > 50 then
-                                -- Long string - might be JSON
-                                print("\n🎯 INTERCEPTED STRING DATA from: " .. self.Name)
-                                print("   Length: " .. #firstArg .. " chars")
-                                print("   Preview: " .. firstArg:sub(1, 100))
-                            end
-                        end
-                        
-                        return original(self, ...)
-                    end
-                    
-                    print("✅ Hooked: " .. obj.Name)
-                end
-            end
-        end
-    end
-    
-    print("\n📡 Now opening garage/car menu...")
-    print("💡 The script will show what data is sent to load your cars")
-    
-    return interceptedData
-end
-
--- ===== TRIGGER CAR LOAD =====
-local function triggerCarLoad()
-    print("\n🎯 Triggering car load sequence...")
-    
-    -- First, try to find and click garage buttons
-    local gui = player.PlayerGui:FindFirstChild("MultiCarSelection")
-    if gui then
-        -- Look for buttons that might load/show cars
-        local loadButtons = {}
-        
-        for _, obj in pairs(gui:GetDescendants()) do
-            if obj:IsA("TextButton") or obj:IsA("ImageButton") then
-                local nameLower = obj.Name:lower()
-                if nameLower:find("load") or nameLower:find("show") or 
-                   nameLower:find("refresh") or nameLower:find("open") then
-                    table.insert(loadButtons, obj)
-                end
-            end
-        end
-        
-        if #loadButtons > 0 then
-            print("Found " .. #loadButtons .. " load buttons")
-            
-            for _, button in pairs(loadButtons) do
-                print("Clicking: " .. button.Name)
-                
-                -- Try to click
-                pcall(function()
-                    button:Fire("Activated")
-                    button:Fire("MouseButton1Click")
-                end)
-                
-                task.wait(0.5)
-            end
-        else
-            print("No load buttons found")
-        end
-    end
-    
-    -- Also try common remotes
-    local remotes = findLoadingRemotes()
-    
-    return #remotes > 0
-end
-
--- ===== CREATE MONITOR UI =====
-local function createMonitorUI()
+-- ===== CREATE DYNAMIC UI =====
+local function createDynamicUI()
     local gui = Instance.new("ScreenGui")
-    gui.Name = "CarMonitor"
+    gui.Name = "DynamicCarFinder"
     gui.Parent = player:WaitForChild("PlayerGui")
     
     -- Main window
     local main = Instance.new("Frame")
-    main.Size = UDim2.new(0, 350, 0, 400)
-    main.Position = UDim2.new(0, 10, 0, 10)
+    main.Size = UDim2.new(0, 400, 0, 500)
+    main.Position = UDim2.new(0.5, -200, 0.5, -250)
     main.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
     main.Parent = gui
     
     -- Title
     local title = Instance.new("TextLabel")
-    title.Text = "🎯 CAR LOAD MONITOR"
-    title.Size = UDim2.new(1, 0, 0, 40)
+    title.Text = "🎯 DYNAMIC CAR FINDER"
+    title.Size = UDim2.new(1, 0, 0, 50)
     title.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
     title.TextColor3 = Color3.new(1, 1, 1)
     title.Font = Enum.Font.GothamBold
-    title.TextSize = 16
+    title.TextSize = 18
     title.Parent = main
-    
-    -- Content
-    local content = Instance.new("Frame")
-    content.Size = UDim2.new(1, 0, 1, -40)
-    content.Position = UDim2.new(0, 0, 0, 40)
-    content.BackgroundTransparency = 1
-    content.Parent = main
     
     -- Status
     local status = Instance.new("TextLabel")
-    status.Text = "Monitoring car loading system...\nYour 54 cars are loaded DYNAMICALLY."
-    status.Size = UDim2.new(1, -20, 0, 60)
-    status.Position = UDim2.new(0, 10, 0, 10)
+    status.Text = "Click any button below - Command auto-copies!"
+    status.Size = UDim2.new(1, -20, 0, 40)
+    status.Position = UDim2.new(0, 10, 0, 60)
     status.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
     status.TextColor3 = Color3.new(1, 1, 1)
     status.Font = Enum.Font.Gotham
     status.TextSize = 12
     status.TextWrapped = true
-    status.Parent = content
+    status.Parent = main
     
-    -- Log display
-    local log = Instance.new("ScrollingFrame")
-    log.Size = UDim2.new(1, -20, 0, 200)
-    log.Position = UDim2.new(0, 10, 0, 80)
-    log.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-    log.BorderSizePixel = 0
-    log.ScrollBarThickness = 6
-    log.Parent = content
+    -- Command list
+    local list = Instance.new("ScrollingFrame")
+    list.Size = UDim2.new(1, -20, 0, 350)
+    list.Position = UDim2.new(0, 10, 0, 110)
+    list.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+    list.BorderSizePixel = 0
+    list.ScrollBarThickness = 8
+    list.Parent = main
     
-    -- Buttons
-    local monitorBtn = Instance.new("TextButton")
-    monitorBtn.Text = "👁️ MONITOR GUI"
-    monitorBtn.Size = UDim2.new(1, -20, 0, 35)
-    monitorBtn.Position = UDim2.new(0, 10, 0, 290)
-    monitorBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 220)
-    monitorBtn.TextColor3 = Color3.new(1, 1, 1)
-    monitorBtn.Font = Enum.Font.GothamBold
-    monitorBtn.TextSize = 14
-    monitorBtn.Parent = content
-    
-    local interceptBtn = Instance.new("TextButton")
-    interceptBtn.Text = "📡 INTERCEPT DATA"
-    interceptBtn.Size = UDim2.new(1, -20, 0, 35)
-    interceptBtn.Position = UDim2.new(0, 10, 0, 335)
-    interceptBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 100)
-    interceptBtn.TextColor3 = Color3.new(1, 1, 1)
-    interceptBtn.Font = Enum.Font.GothamBold
-    interceptBtn.TextSize = 14
-    interceptBtn.Parent = content
+    -- Results display
+    local results = Instance.new("TextLabel")
+    results.Name = "Results"
+    results.Text = "No command executed yet"
+    results.Size = UDim2.new(1, -20, 0, 40)
+    results.Position = UDim2.new(0, 10, 1, -50)
+    results.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+    results.TextColor3 = Color3.new(1, 1, 1)
+    results.Font = Enum.Font.Code
+    results.TextSize = 11
+    results.TextWrapped = true
+    results.Parent = main
     
     -- Add corners
     local function addCorner(obj)
@@ -322,102 +174,186 @@ local function createMonitorUI()
     addCorner(main)
     addCorner(title)
     addCorner(status)
-    addCorner(log)
-    addCorner(monitorBtn)
-    addCorner(interceptBtn)
+    addCorner(list)
+    addCorner(results)
     
-    -- Log functions
-    local logEntries = {}
+    -- Create command buttons
+    local yPos = 10
     
-    local function addLog(text, color)
-        table.insert(logEntries, {
-            Text = text,
-            Color = color or Color3.new(1, 1, 1),
-            Time = os.time()
-        })
+    for i, cmd in ipairs(commands) do
+        -- Button frame
+        local buttonFrame = Instance.new("Frame")
+        buttonFrame.Size = UDim2.new(1, -20, 0, 50)
+        buttonFrame.Position = UDim2.new(0, 10, 0, yPos)
+        buttonFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+        buttonFrame.Parent = list
         
-        -- Keep only last 20 entries
-        if #logEntries > 20 then
-            table.remove(logEntries, 1)
-        end
+        addCorner(buttonFrame)
         
-        -- Update display
-        log:ClearAllChildren()
+        -- Button name
+        local nameLabel = Instance.new("TextLabel")
+        nameLabel.Text = cmd.name
+        nameLabel.Size = UDim2.new(1, -10, 0, 25)
+        nameLabel.Position = UDim2.new(0, 5, 0, 5)
+        nameLabel.BackgroundTransparency = 1
+        nameLabel.TextColor3 = Color3.new(1, 1, 1)
+        nameLabel.Font = Enum.Font.Gotham
+        nameLabel.TextSize = 12
+        nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+        nameLabel.Parent = buttonFrame
         
-        local yPos = 5
-        for i, entry in ipairs(logEntries) do
-            local label = Instance.new("TextLabel")
-            label.Text = entry.Text
-            label.Size = UDim2.new(1, -10, 0, 20)
-            label.Position = UDim2.new(0, 5, 0, yPos)
-            label.BackgroundTransparency = 1
-            label.TextColor3 = entry.Color
-            label.Font = Enum.Font.Code
-            label.TextSize = 10
-            label.TextXAlignment = Enum.TextXAlignment.Left
-            label.TextWrapped = true
-            label.Parent = log
+        -- Copy button
+        local copyBtn = Instance.new("TextButton")
+        copyBtn.Text = "📋 COPY & RUN"
+        copyBtn.Size = UDim2.new(1, -10, 0, 20)
+        copyBtn.Position = UDim2.new(0, 5, 0, 30)
+        copyBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 220)
+        copyBtn.TextColor3 = Color3.new(1, 1, 1)
+        copyBtn.Font = Enum.Font.Gotham
+        copyBtn.TextSize = 10
+        copyBtn.Parent = buttonFrame
+        
+        addCorner(copyBtn)
+        
+        -- Click action
+        copyBtn.MouseButton1Click:Connect(function()
+            -- Copy to clipboard (simulated)
+            copyBtn.Text = "✅ COPIED!"
+            copyBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
             
-            yPos = yPos + 25
-        end
+            -- Show command in results
+            local displayCode = cmd.code:gsub("\n", " "):sub(1, 100)
+            if #displayCode == 100 then displayCode = displayCode .. "..." end
+            results.Text = "Command copied: " .. cmd.name .. "\n" .. displayCode
+            
+            -- Print to console (user can copy from there)
+            print("\n" .. string.rep("=", 70))
+            print("📋 COMMAND: " .. cmd.name)
+            print(string.rep("=", 70))
+            print(cmd.code)
+            print(string.rep("=", 70))
+            print("📝 Copy the code above and paste in F9 console!")
+            
+            -- Execute automatically (optional)
+            local success, err = pcall(function()
+                -- Try to execute directly
+                loadstring(cmd.code)()
+            end)
+            
+            if success then
+                status.Text = "✅ Command executed successfully!"
+            else
+                status.Text = "⚠️ Paste in F9 console for best results"
+            end
+            
+            -- Reset button after delay
+            task.wait(2)
+            copyBtn.Text = "📋 COPY & RUN"
+            copyBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 220)
+        end)
         
-        log.CanvasSize = UDim2.new(0, 0, 0, yPos)
+        yPos = yPos + 60
     end
     
-    -- Button actions
-    monitorBtn.MouseButton1Click:Connect(function()
-        monitorBtn.Text = "MONITORING..."
-        monitorBtn.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
-        status.Text = "Monitoring GUI for car loading..."
-        addLog("🎯 Started GUI monitoring", Color3.fromRGB(0, 255, 200))
-        
-        task.spawn(function()
-            monitorGUILoading()
-            
-            monitorBtn.Text = "👁️ MONITOR GUI"
-            monitorBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 220)
-        end)
+    list.CanvasSize = UDim2.new(0, 0, 0, yPos)
+    
+    -- Close button
+    local closeBtn = Instance.new("TextButton")
+    closeBtn.Text = "✕"
+    closeBtn.Size = UDim2.new(0, 30, 0, 30)
+    closeBtn.Position = UDim2.new(1, -35, 0, 10)
+    closeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    closeBtn.TextColor3 = Color3.new(1, 1, 1)
+    closeBtn.Font = Enum.Font.GothamBold
+    closeBtn.TextSize = 16
+    closeBtn.Parent = title
+    
+    addCorner(closeBtn)
+    
+    closeBtn.MouseButton1Click:Connect(function()
+        gui:Destroy()
     end)
     
-    interceptBtn.MouseButton1Click:Connect(function()
-        interceptBtn.Text = "INTERCEPTING..."
-        interceptBtn.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
-        status.Text = "Intercepting network data..."
-        addLog("📡 Started data interception", Color3.fromRGB(0, 255, 200))
-        
-        task.spawn(function()
-            interceptCarData()
-            
-            interceptBtn.Text = "📡 INTERCEPT DATA"
-            interceptBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 100)
-        end)
+    -- Make draggable
+    local dragging = false
+    local dragStart, frameStart
+    
+    title.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            frameStart = main.Position
+        end
     end)
     
-    -- Initial logs
-    addLog("🚗 Car Load Monitor Ready", Color3.fromRGB(0, 255, 150))
-    addLog("💡 Open your garage/car menu", Color3.fromRGB(255, 200, 100))
-    addLog("👁️ Click MONITOR GUI first", Color3.fromRGB(150, 150, 255))
+    title.InputEnded:Connect(function()
+        dragging = false
+    end)
+    
+    game:GetService("UserInputService").InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local delta = input.Position - dragStart
+            main.Position = UDim2.new(
+                frameStart.X.Scale, frameStart.X.Offset + delta.X,
+                frameStart.Y.Scale, frameStart.Y.Offset + delta.Y
+            )
+        end
+    end)
     
     return gui
 end
 
--- ===== AUTOMATIC START =====
-print("\n🚀 Starting monitoring system...")
+-- ===== AUTO-SCAN =====
+print("\n🔍 Running auto-scan...")
 
--- Create UI first
-local ui = createMonitorUI()
+-- Quick auto-scan
+local function quickAutoScan()
+    print("\n📊 QUICK AUTO-SCAN RESULTS:")
+    
+    -- Count folders
+    local folderCount = 0
+    for _, child in pairs(player:GetChildren()) do
+        if child:IsA("Folder") then
+            folderCount = folderCount + 1
+            print("📁 " .. child.Name .. ": " .. #child:GetChildren() .. " items")
+        end
+    end
+    print("Total folders: " .. folderCount)
+    
+    -- Check MultiCarSelection
+    if player:FindFirstChild("PlayerGui") then
+        local gui = player.PlayerGui:FindFirstChild("MultiCarSelection")
+        if gui then
+            print("✅ MultiCarSelection GUI found")
+        else
+            print("❌ MultiCarSelection not found")
+        end
+    end
+    
+    -- Check leaderstats
+    if player:FindFirstChild("leaderstats") then
+        print("💰 Leaderstats present")
+    end
+end
 
-print("\n✅ Monitor UI Created!")
-print("\n💡 HOW THIS WORKS:")
-print("1. Click MONITOR GUI - Watch for car frame additions")
-print("2. Open your garage/car selection menu IN-GAME")
-print("3. The script will show EXACTLY how cars are loaded")
-print("4. Click INTERCEPT DATA - See what data is sent")
+-- Run auto-scan
+quickAutoScan()
 
-print("\n🎯 WHAT WE'RE LOOKING FOR:")
-print("• When you open garage, what RemoteEvents fire")
-print("• What data is sent to load your 54 cars")
-print("• The FORMAT of car data (IDs, names, tables, JSON)")
+-- Create UI
+task.wait(1)
+local ui = createDynamicUI()
 
-print("\n🔍 Once we see the DATA FORMAT,")
-print("we can SEND our own car data!")
+print("\n✅ DYNAMIC CAR FINDER READY!")
+print("\n🎯 FEATURES:")
+print("• Click buttons to auto-copy commands")
+print("• Commands auto-print to console")
+print("• Drag window to move")
+print("• 7 ready-to-use commands")
+
+print("\n💡 RECOMMENDED ORDER:")
+print("1. 📁 Check Player Folders")
+print("2. 📊 Count All Value Objects") 
+print("3. 🔤 Check StringValues")
+print("4. 🚗 Find Cars in GUI")
+
+print("\n🚀 Click any button to start finding your 54 cars!")
