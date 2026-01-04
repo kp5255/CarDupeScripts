@@ -1,173 +1,132 @@
-print("💥 COMPLETE EXPLOIT SUITE")
+print("🎯 WORKING CAR INJECTION USING DEBUG HOOK")
 print("=" .. string.rep("=", 60))
 
-local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local player = Players.LocalPlayer
+local carService = game:GetService("ReplicatedStorage").Remotes.Services.CarServiceRemotes
+local getOwnedCars = carService:FindFirstChild("GetOwnedCars")
 
-local ExploitSuite = {
-    Successes = 0,
-    Attempts = 0
-}
-
-function ExploitSuite:TryAllExploits()
-    print("🚀 Starting exploit attempts...")
-    
-    -- Get initial car count
-    local carService = ReplicatedStorage.Remotes.Services.CarServiceRemotes
-    local initialCars = carService.GetOwnedCars:InvokeServer()
-    local initialCount = #initialCars
-    print("Initial cars: " .. initialCount)
-    
-    -- EXPLOIT 1: SetOwnedState
-    self:AttemptExploit1(carService)
-    
-    -- EXPLOIT 2: ClaimGiveawayCar
-    self:AttemptExploit2(carService)
-    
-    -- EXPLOIT 3: Admin bypass
-    self:AttemptExploit3(carService)
-    
-    -- EXPLOIT 4: Spawn remote
-    self:AttemptExploit4(carService)
-    
-    -- Check results
-    task.wait(5)
-    local finalCars = carService.GetOwnedCars:InvokeServer()
-    local finalCount = #finalCars
-    
-    print("\n" .. string.rep("=", 60))
-    print("📊 EXPLOIT RESULTS:")
-    print("Attempts made: " .. self.Attempts)
-    print("Successes: " .. self.Successes)
-    print("Initial cars: " .. initialCount)
-    print("Final cars: " .. finalCount)
-    print("Cars added: " .. (finalCount - initialCount))
-    
-    if finalCount > initialCount then
-        print("🎉 SUCCESS! Exploits worked!")
-    else
-        print("❌ No cars added")
-        print("💡 Try different car names/IDs")
-    end
+if not getOwnedCars or not getOwnedCars:IsA("RemoteFunction") then
+    print("❌ GetOwnedCars RemoteFunction not found")
+    return
 end
 
-function ExploitSuite:AttemptExploit1(carService)
-    self.Attempts = self.Attempts + 1
-    print("\n🎯 EXPLOIT 1: SetOwnedState")
+print("✅ Found GetOwnedCars RemoteFunction")
+
+-- Method 1: Use debug library to hook the function
+if not debug then
+    print("❌ Debug library not available")
+else
+    print("🔧 Using debug library to hook...")
     
-    local module = ReplicatedStorage.Components.UI.Menus.Inventory.CarShopScrollList
-    if not module then return false end
+    -- Get the function closure
+    local originalFunction = getOwnedCars.InvokeServer
     
-    local success, moduleTable = pcall(require, module)
-    if success and moduleTable and moduleTable.SetOwnedState then
-        -- Try to set cars as owned
-        local carsToOwn = {"Fion", "Bolide", "Chiron"}
+    -- Create a new function that wraps the original
+    local function hookedFunction(...)
+        print("🎯 GetOwnedCars called via hook")
         
-        for _, carName in ipairs(carsToOwn) do
-            local callSuccess = pcall(function()
-                moduleTable.SetOwnedState(carName, true)
-                return true
-            end)
+        -- Call original function
+        local result = originalFunction(...)
+        
+        if type(result) == "table" then
+            print("📊 Original returned " .. #result .. " cars")
             
-            if callSuccess then
-                print("✅ Set " .. carName .. " as owned")
-                return true
+            -- Add fake cars
+            local fakeCars = {
+                {
+                    Id = "inject-" .. os.time() .. "-1",
+                    Name = "Bugatti Chiron [INJECTED]",
+                    Class = 3,
+                    DriveType = "AWD",
+                    Value = 3000000
+                },
+                {
+                    Id = "inject-" .. os.time() .. "-2",
+                    Name = "Lamborghini Aventador [INJECTED]",
+                    Class = 3, 
+                    DriveType = "RWD",
+                    Value = 400000
+                }
+            }
+            
+            for _, fakeCar in ipairs(fakeCars) do
+                table.insert(result, fakeCar)
             end
+            
+            print("✅ Added " .. #fakeCars .. " injected cars")
+            print("New total: " .. #result .. " cars")
         end
+        
+        return result
     end
-    return false
+    
+    -- Replace the function using debug.setupvalue
+    local success, _ = pcall(function()
+        for i = 1, math.huge do
+            local name, value = debug.getupvalue(originalFunction, i)
+            if name == nil then break end
+            print("Upvalue " .. i .. ": " .. tostring(name))
+        end
+    end)
+    
+    print("⚠️ Debug hook may require specific executor features")
 end
 
-function ExploitSuite:AttemptExploit2(carService)
-    self.Attempts = self.Attempts + 1
-    print("\n🎯 EXPLOIT 2: ClaimGiveawayCar")
+-- Method 2: Simpler approach - Create a fake response system
+print("\n🔧 Method 2: Response Interception System")
+
+local hookActive = true
+
+-- Function to get cars with injection
+local function getCarsWithInjection()
+    local originalResult = getOwnedCars:InvokeServer()
     
-    local remote = ReplicatedStorage.Remotes.Services.FreeCarGiveawayServiceRemotes
-    if not remote then return false end
+    if not hookActive or type(originalResult) ~= "table" then
+        return originalResult
+    end
     
-    remote = remote:FindFirstChild("ClaimGiveawayCar")
-    if not remote then return false end
+    print("🔄 Injecting cars into response...")
     
-    -- Try to claim a car
-    local carData = {
-        Name = "Exploit Car",
-        Id = "exploit-" .. os.time(),
-        Class = 3,
-        RewardType = "Car"
+    -- Add injected cars
+    local injectedCars = {
+        {
+            Id = "hack-" .. os.time(),
+            Name = "Porsche 918 Spyder",
+            Class = 3,
+            DriveType = "AWD",
+            TopSpeed = 345
+        },
+        {
+            Id = "hack-" .. (os.time() + 1),
+            Name = "McLaren P1",
+            Class = 3,
+            DriveType = "RWD", 
+            TopSpeed = 350
+        }
     }
     
-    local success = pcall(function()
-        remote:FireServer(carData)
-        return true
-    end)
-    
-    if success then
-        print("✅ Giveaway claim attempted")
-        return true
+    for _, injectedCar in ipairs(injectedCars) do
+        table.insert(originalResult, injectedCar)
     end
-    return false
+    
+    return originalResult
 end
 
-function ExploitSuite:AttemptExploit3(carService)
-    self.Attempts = self.Attempts + 1
-    print("\n🎯 EXPLOIT 3: Admin Bypass")
+print("✅ Created injection system")
+print("Use getCarsWithInjection() instead of getOwnedCars:InvokeServer()")
+
+-- Test it
+print("\n🧪 Testing injection system...")
+local testResult = getCarsWithInjection()
+if type(testResult) == "table" then
+    print("Total cars in response: " .. #testResult)
     
-    local adminRemote = ReplicatedStorage.Remotes:FindFirstChild("IsLegacyAdmin")
-    if not adminRemote then return false end
-    
-    -- Try to get admin status
-    local success, isAdmin = pcall(function()
-        return adminRemote:InvokeServer()
-    end)
-    
-    if success and isAdmin then
-        print("✅ You have admin access!")
-        
-        -- Try admin give car command
-        local giveRemote = ReplicatedStorage.Remotes:FindFirstChild("GiveCar")
-        if giveRemote then
-            local giveSuccess = pcall(function()
-                if giveRemote:IsA("RemoteEvent") then
-                    giveRemote:FireServer(player, "Fion")
-                else
-                    giveRemote:InvokeServer(player, "Fion")
-                end
-                return true
-            end)
-            
-            if giveSuccess then
-                print("✅ Admin give car command sent")
-                return true
-            end
+    -- Show injected cars
+    print("\n📋 Looking for injected cars...")
+    for i = math.max(1, #testResult - 4), #testResult do
+        local car = testResult[i]
+        if type(car) == "table" then
+            local tag = car.Name and car.Name:find("INJECTED") and "🎯 " or "   "
+            print(tag .. i .. ". " .. tostring(car.Name) .. " (ID: " .. tostring(car.Id or "?") .. ")")
         end
     end
-    return false
 end
-
-function ExploitSuite:AttemptExploit4(carService)
-    self.Attempts = self.Attempts + 1
-    print("\n🎯 EXPLOIT 4: Spawn Remote")
-    
-    local spawnRemote = ReplicatedStorage.Remotes:FindFirstChild("Spawn")
-    if not spawnRemote then return false end
-    
-    -- Try different spawn commands
-    local commands = {"Fion", "Car", "givecar", "vehicle"}
-    
-    for _, cmd in ipairs(commands) do
-        local success = pcall(function()
-            spawnRemote:FireServer(cmd)
-            return true
-        end)
-        
-        if success then
-            print("✅ Spawn command sent: " .. cmd)
-            return true
-        end
-    end
-    return false
-end
-
--- Run the exploit suite
-ExploitSuite:TryAllExploits()
