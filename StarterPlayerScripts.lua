@@ -1,198 +1,368 @@
--- 🎯 DYNAMIC CAR FINDER - AUTO-CLICK TO COPY
+-- 🚗 CAR DUPLICATION SYSTEM
 local Players = game:GetService("Players")
-local player = Players.LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
 
+local player = Players.LocalPlayer
+local carService = ReplicatedStorage.Remotes.Services.CarServiceRemotes
+
+-- Wait for game to load
 repeat task.wait() until game:IsLoaded()
 task.wait(2)
 
-print("🎯 DYNAMIC CAR FINDER")
-print("=" .. string.rep("=", 50))
+print("🚗 CAR DUPLICATION SYSTEM LOADED")
 
--- ===== COMMANDS DATABASE =====
-local commands = {
-    {
-        name = "📁 Check Player Folders",
-        code = [[for i,v in pairs(game.Players.LocalPlayer:GetChildren()) do 
-    if v:IsA("Folder") then 
-        print("FOLDER:", v.Name, "| Items:", #v:GetChildren())
-    end 
-end]]
-    },
-    {
-        name = "🔤 Check StringValues (Car IDs/Names)",
-        code = [[local count = 0
-for i,v in pairs(game.Players.LocalPlayer:GetDescendants()) do 
-    if v:IsA("StringValue") then 
-        print(v:GetFullName(), "=", v.Value)
-        count = count + 1
-    end 
-end
-print("TOTAL StringValues:", count)]]
-    },
-    {
-        name = "🔢 Check IntValues (Car Counts)",
-        code = [[for i,v in pairs(game.Players.LocalPlayer:GetDescendants()) do 
-    if v:IsA("IntValue") then 
-        print(v:GetFullName(), "=", v.Value)
-    end 
-end]]
-    },
-    {
-        name = "🚗 Find Cars in GUI",
-        code = [[local gui = game.Players.LocalPlayer.PlayerGui:FindFirstChild("MultiCarSelection")
-if gui then
-    print("✅ MultiCarSelection FOUND")
-    local frames = 0
-    for i,v in pairs(gui:GetDescendants()) do
-        if v:IsA("TextLabel") and #v.Text > 2 then
-            print("CAR TEXT:", v.Text, "| Path:", v:GetFullName())
-            frames = frames + 1
-        end
-    end
-    print("Total car labels found:", frames)
-else
-    print("❌ MultiCarSelection NOT FOUND")
-end]]
-    },
-    {
-        name = "🔍 Deep Scan for Car Data",
-        code = [[print("🔍 DEEP SCAN STARTED...")
-local interesting = {}
-for i,v in pairs(game.Players.LocalPlayer:GetDescendants()) do
-    if v:IsA("StringValue") or v:IsA("IntValue") then
-        local value = v.Value
-        if type(value) == "string" and #value > 20 then
-            table.insert(interesting, {path = v:GetFullName(), value = value})
-        elseif type(value) == "number" and value > 50 then
-            table.insert(interesting, {path = v:GetFullName(), value = value})
-        end
-    end
-end
-print("🎯 INTERESTING DATA FOUND:", #interesting)
-for i, item in ipairs(interesting) do
-    if i <= 10 then
-        print(i .. ". " .. item.path)
-        print("   Value: " .. tostring(item.value))
-    end
-end]]
-    },
-    {
-        name = "💰 Check Leaderstats",
-        code = [[local stats = game.Players.LocalPlayer:FindFirstChild("leaderstats")
-if stats then
-    print("💰 LEADERSTATS:")
-    for i,v in pairs(stats:GetChildren()) do
-        print(v.Name .. ": " .. tostring(v.Value))
-    end
-else
-    print("❌ No leaderstats found")
-end]]
-    },
-    {
-        name = "📊 Count All Value Objects",
-        code = [[local stringCount = 0
-local intCount = 0
-local folderCount = 0
-
-for i,v in pairs(game.Players.LocalPlayer:GetDescendants()) do
-    if v:IsA("StringValue") then stringCount = stringCount + 1 end
-    if v:IsA("IntValue") then intCount = intCount + 1 end
-    if v:IsA("Folder") then folderCount = folderCount + 1 end
-end
-
-print("📊 VALUE OBJECTS COUNT:")
-print("StringValues:", stringCount)
-print("IntValues:", intCount)
-print("Folders:", folderCount)]]
-    }
+-- ===== CAR DUPLICATION FUNCTIONS =====
+local CarDuplicator = {
+    OwnedCars = {},
+    SelectedCar = nil,
+    IsDuplicating = false
 }
 
--- ===== CREATE DYNAMIC UI =====
-local function createDynamicUI()
+-- Get owned cars
+function CarDuplicator:GetOwnedCars()
+    local success, result = pcall(function()
+        return carService.GetOwnedCars:InvokeServer()
+    end)
+    
+    if success and type(result) == "table" then
+        self.OwnedCars = result
+        return true
+    end
+    return false
+end
+
+-- Extract car name from car data
+function CarDuplicator:GetCarName(carData)
+    if type(carData) ~= "table" then return "Unknown Car" end
+    
+    -- Try different possible name fields
+    return carData.Name or carData.name or carData.CarName or 
+           carData.DisplayName or carData.NameTag or "Unknown Car"
+end
+
+-- Get car class
+function CarDuplicator:GetCarClass(carData)
+    if type(carData) ~= "table" then return 1 end
+    
+    local class = carData.Class or carData.class or carData.CarClass or 1
+    if type(class) == "string" then
+        if class:find("3") then return 3
+        elseif class:find("2") then return 2
+        else return 1 end
+    end
+    return math.floor(class)
+end
+
+-- Duplicate selected car
+function CarDuplicator:DuplicateCar()
+    if self.IsDuplicating then
+        return false, "Already duplicating..."
+    end
+    
+    if not self.SelectedCar then
+        return false, "No car selected!"
+    end
+    
+    self.IsDuplicating = true
+    
+    -- Try different duplication methods
+    local methods = {
+        -- Method 1: Try UpdateCarPack remote
+        function()
+            local updateRemote = carService:FindFirstChild("UpdateCarPack")
+            if updateRemote then
+                updateRemote:FireServer(self.SelectedCar)
+                return true, "UpdateCarPack method"
+            end
+            return false
+        end,
+        
+        -- Method 2: Try SetCarFavorite (might work for duplication)
+        function()
+            local favoriteRemote = ReplicatedStorage.Remotes:FindFirstChild("SetCarFavorite")
+            if favoriteRemote then
+                favoriteRemote:FireServer(self.SelectedCar)
+                return true, "SetCarFavorite method"
+            end
+            return false
+        end,
+        
+        -- Method 3: Try EnableCar remote
+        function()
+            local enableRemote = ReplicatedStorage.Remotes:FindFirstChild("EnableCar")
+            if enableRemote then
+                enableRemote:FireServer(self.SelectedCar)
+                return true, "EnableCar method"
+            end
+            return false
+        end,
+        
+        -- Method 4: Try UpdateCar remote
+        function()
+            local updateRemote = ReplicatedStorage.Remotes:FindFirstChild("UpdateCar")
+            if updateRemote then
+                updateRemote:FireServer(self.SelectedCar)
+                return true, "UpdateCar method"
+            end
+            return false
+        end
+    }
+    
+    -- Try each method
+    local success, methodName = false, "No method found"
+    for i, method in ipairs(methods) do
+        local result, name = method()
+        if result then
+            success, methodName = true, name
+            break
+        end
+    end
+    
+    self.IsDuplicating = false
+    
+    if success then
+        -- Refresh car list
+        task.wait(1)
+        self:GetOwnedCars()
+        return true, "Duplication attempted via " .. methodName
+    else
+        return false, "No duplication method worked"
+    end
+end
+
+-- ===== CREATE RESPONSIVE UI =====
+function CarDuplicator:CreateUI()
+    -- Destroy old UI if exists
+    if player.PlayerGui:FindFirstChild("CarDuplicatorUI") then
+        player.PlayerGui.CarDuplicatorUI:Destroy()
+    end
+    
+    -- Main GUI
     local gui = Instance.new("ScreenGui")
-    gui.Name = "DynamicCarFinder"
-    gui.Parent = player:WaitForChild("PlayerGui")
+    gui.Name = "CarDuplicatorUI"
+    gui.Parent = player.PlayerGui
     
-    -- Main window
-    local main = Instance.new("Frame")
-    main.Size = UDim2.new(0, 400, 0, 500)
-    main.Position = UDim2.new(0.5, -200, 0.5, -250)
-    main.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-    main.Parent = gui
+    -- Main Window
+    local mainFrame = Instance.new("Frame")
+    mainFrame.Size = UDim2.new(0, 500, 0, 600)
+    mainFrame.Position = UDim2.new(0.5, -250, 0.5, -300)
+    mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+    mainFrame.Parent = gui
     
-    -- Title
+    -- Title Bar
+    local titleBar = Instance.new("Frame")
+    titleBar.Size = UDim2.new(1, 0, 0, 40)
+    titleBar.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
+    titleBar.Parent = mainFrame
+    
     local title = Instance.new("TextLabel")
-    title.Text = "🎯 DYNAMIC CAR FINDER"
-    title.Size = UDim2.new(1, 0, 0, 50)
-    title.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
+    title.Text = "🚗 CAR DUPLICATION SYSTEM"
+    title.Size = UDim2.new(1, -50, 1, 0)
+    title.Position = UDim2.new(0, 10, 0, 0)
+    title.BackgroundTransparency = 1
     title.TextColor3 = Color3.new(1, 1, 1)
     title.Font = Enum.Font.GothamBold
     title.TextSize = 18
-    title.Parent = main
+    title.TextXAlignment = Enum.TextXAlignment.Left
+    title.Parent = titleBar
     
-    -- Status
-    local status = Instance.new("TextLabel")
-    status.Text = "Click any button below - Command auto-copies!"
-    status.Size = UDim2.new(1, -20, 0, 40)
-    status.Position = UDim2.new(0, 10, 0, 60)
-    status.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-    status.TextColor3 = Color3.new(1, 1, 1)
-    status.Font = Enum.Font.Gotham
-    status.TextSize = 12
-    status.TextWrapped = true
-    status.Parent = main
+    -- Close Button
+    local closeBtn = Instance.new("TextButton")
+    closeBtn.Text = "✕"
+    closeBtn.Size = UDim2.new(0, 30, 0, 30)
+    closeBtn.Position = UDim2.new(1, -35, 0, 5)
+    closeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    closeBtn.TextColor3 = Color3.new(1, 1, 1)
+    closeBtn.Font = Enum.Font.GothamBold
+    closeBtn.TextSize = 16
+    closeBtn.Parent = titleBar
     
-    -- Command list
-    local list = Instance.new("ScrollingFrame")
-    list.Size = UDim2.new(1, -20, 0, 350)
-    list.Position = UDim2.new(0, 10, 0, 110)
-    list.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-    list.BorderSizePixel = 0
-    list.ScrollBarThickness = 8
-    list.Parent = main
+    closeBtn.MouseButton1Click:Connect(function()
+        gui:Destroy()
+    end)
     
-    -- Results display
-    local results = Instance.new("TextLabel")
-    results.Name = "Results"
-    results.Text = "No command executed yet"
-    results.Size = UDim2.new(1, -20, 0, 40)
-    results.Position = UDim2.new(0, 10, 1, -50)
-    results.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
-    results.TextColor3 = Color3.new(1, 1, 1)
-    results.Font = Enum.Font.Code
-    results.TextSize = 11
-    results.TextWrapped = true
-    results.Parent = main
+    -- Status Bar
+    local statusBar = Instance.new("Frame")
+    statusBar.Size = UDim2.new(1, -20, 0, 40)
+    statusBar.Position = UDim2.new(0, 10, 0, 50)
+    statusBar.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+    statusBar.Parent = mainFrame
     
-    -- Add corners
-    local function addCorner(obj)
+    local statusText = Instance.new("TextLabel")
+    statusText.Name = "Status"
+    statusText.Text = "Loading your cars..."
+    statusText.Size = UDim2.new(1, -20, 1, -10)
+    statusText.Position = UDim2.new(0, 10, 0, 5)
+    statusText.BackgroundTransparency = 1
+    statusText.TextColor3 = Color3.new(1, 1, 1)
+    statusText.Font = Enum.Font.Gotham
+    statusText.TextSize = 12
+    statusText.TextXAlignment = Enum.TextXAlignment.Left
+    statusText.Parent = statusBar
+    
+    -- Car Count Display
+    local countFrame = Instance.new("Frame")
+    countFrame.Size = UDim2.new(1, -20, 0, 30)
+    countFrame.Position = UDim2.new(0, 10, 0, 100)
+    countFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+    countFrame.Parent = mainFrame
+    
+    local countText = Instance.new("TextLabel")
+    countText.Text = "Total Cars: 0"
+    countText.Size = UDim2.new(1, 0, 1, 0)
+    countText.BackgroundTransparency = 1
+    countText.TextColor3 = Color3.new(1, 1, 1)
+    countText.Font = Enum.Font.Gotham
+    countText.TextSize = 14
+    countText.Parent = countFrame
+    
+    -- Car List (Scrollable)
+    local scrollFrame = Instance.new("ScrollingFrame")
+    scrollFrame.Size = UDim2.new(1, -20, 0, 300)
+    scrollFrame.Position = UDim2.new(0, 10, 0, 140)
+    scrollFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+    scrollFrame.BorderSizePixel = 0
+    scrollFrame.ScrollBarThickness = 8
+    scrollFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    scrollFrame.Parent = mainFrame
+    
+    -- Selected Car Display
+    local selectedFrame = Instance.new("Frame")
+    selectedFrame.Size = UDim2.new(1, -20, 0, 60)
+    selectedFrame.Position = UDim2.new(0, 10, 0, 450)
+    selectedFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+    selectedFrame.Parent = mainFrame
+    
+    local selectedTitle = Instance.new("TextLabel")
+    selectedTitle.Text = "SELECTED CAR:"
+    selectedTitle.Size = UDim2.new(1, 0, 0, 20)
+    selectedTitle.Position = UDim2.new(0, 10, 0, 5)
+    selectedTitle.BackgroundTransparency = 1
+    selectedTitle.TextColor3 = Color3.fromRGB(200, 200, 200)
+    selectedTitle.Font = Enum.Font.Gotham
+    selectedTitle.TextSize = 12
+    selectedTitle.TextXAlignment = Enum.TextXAlignment.Left
+    selectedTitle.Parent = selectedFrame
+    
+    local selectedName = Instance.new("TextLabel")
+    selectedName.Name = "SelectedName"
+    selectedName.Text = "None"
+    selectedName.Size = UDim2.new(1, -20, 0, 30)
+    selectedName.Position = UDim2.new(0, 10, 0, 25)
+    selectedName.BackgroundTransparency = 1
+    selectedName.TextColor3 = Color3.new(1, 1, 1)
+    selectedName.Font = Enum.Font.GothamBold
+    selectedName.TextSize = 16
+    selectedName.TextXAlignment = Enum.TextXAlignment.Left
+    selectedName.Parent = selectedFrame
+    
+    -- Action Buttons
+    local buttonFrame = Instance.new("Frame")
+    buttonFrame.Size = UDim2.new(1, -20, 0, 50)
+    buttonFrame.Position = UDim2.new(0, 10, 1, -60)
+    buttonFrame.BackgroundTransparency = 1
+    buttonFrame.Parent = mainFrame
+    
+    local refreshBtn = Instance.new("TextButton")
+    refreshBtn.Text = "🔄 Refresh"
+    refreshBtn.Size = UDim2.new(0.3, -5, 1, 0)
+    refreshBtn.Position = UDim2.new(0, 0, 0, 0)
+    refreshBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 220)
+    refreshBtn.TextColor3 = Color3.new(1, 1, 1)
+    refreshBtn.Font = Enum.Font.Gotham
+    refreshBtn.TextSize = 14
+    refreshBtn.Parent = buttonFrame
+    
+    local duplicateBtn = Instance.new("TextButton")
+    duplicateBtn.Text = "🚗 Duplicate Car"
+    duplicateBtn.Size = UDim2.new(0.7, -5, 1, 0)
+    duplicateBtn.Position = UDim2.new(0.3, 5, 0, 0)
+    duplicateBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
+    duplicateBtn.TextColor3 = Color3.new(1, 1, 1)
+    duplicateBtn.Font = Enum.Font.GothamBold
+    duplicateBtn.TextSize = 14
+    duplicateBtn.Parent = buttonFrame
+    
+    -- Add rounded corners
+    local function addCorner(obj, radius)
         local corner = Instance.new("UICorner")
-        corner.CornerRadius = UDim.new(0, 6)
+        corner.CornerRadius = UDim.new(0, radius or 6)
         corner.Parent = obj
     end
     
-    addCorner(main)
-    addCorner(title)
-    addCorner(status)
-    addCorner(list)
-    addCorner(results)
+    addCorner(mainFrame, 8)
+    addCorner(titleBar, 8)
+    addCorner(statusBar, 6)
+    addCorner(countFrame, 6)
+    addCorner(scrollFrame, 6)
+    addCorner(selectedFrame, 6)
+    addCorner(refreshBtn, 6)
+    addCorner(duplicateBtn, 6)
+    addCorner(closeBtn, 15)
     
-    -- Create command buttons
-    local yPos = 10
+    -- Make window draggable
+    local dragging = false
+    local dragStart, frameStart
     
-    for i, cmd in ipairs(commands) do
-        -- Button frame
+    titleBar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            frameStart = mainFrame.Position
+        end
+    end)
+    
+    titleBar.InputEnded:Connect(function()
+        dragging = false
+    end)
+    
+    game:GetService("UserInputService").InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local delta = input.Position - dragStart
+            mainFrame.Position = UDim2.new(
+                frameStart.X.Scale, frameStart.X.Offset + delta.X,
+                frameStart.Y.Scale, frameStart.Y.Offset + delta.Y
+            )
+        end
+    end)
+    
+    -- ===== UI FUNCTIONS =====
+    local function updateStatus(text, color)
+        statusText.Text = text
+        statusText.TextColor3 = color or Color3.new(1, 1, 1)
+    end
+    
+    local function updateCarCount()
+        countText.Text = "Total Cars: " .. #CarDuplicator.OwnedCars
+    end
+    
+    local function updateSelectedDisplay()
+        if CarDuplicator.SelectedCar then
+            local carName = CarDuplicator:GetCarName(CarDuplicator.SelectedCar)
+            local carClass = CarDuplicator:GetCarClass(CarDuplicator.SelectedCar)
+            local classIcon = carClass == 3 and "🔴" or carClass == 2 and "🟡" or "🟢"
+            selectedName.Text = classIcon .. " " .. carName .. " (Class " .. carClass .. ")"
+        else
+            selectedName.Text = "None"
+        end
+    end
+    
+    local function createCarButton(carData, index)
         local buttonFrame = Instance.new("Frame")
-        buttonFrame.Size = UDim2.new(1, -20, 0, 50)
-        buttonFrame.Position = UDim2.new(0, 10, 0, yPos)
+        buttonFrame.Size = UDim2.new(1, -10, 0, 50)
+        buttonFrame.Position = UDim2.new(0, 5, 0, (index-1) * 55)
         buttonFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-        buttonFrame.Parent = list
+        buttonFrame.Parent = scrollFrame
         
-        addCorner(buttonFrame)
+        addCorner(buttonFrame, 6)
         
-        -- Button name
+        -- Car name
+        local carName = CarDuplicator:GetCarName(carData)
+        local carClass = CarDuplicator:GetCarClass(carData)
+        
         local nameLabel = Instance.new("TextLabel")
-        nameLabel.Text = cmd.name
+        nameLabel.Text = carName
         nameLabel.Size = UDim2.new(1, -10, 0, 25)
         nameLabel.Position = UDim2.new(0, 5, 0, 5)
         nameLabel.BackgroundTransparency = 1
@@ -202,158 +372,142 @@ local function createDynamicUI()
         nameLabel.TextXAlignment = Enum.TextXAlignment.Left
         nameLabel.Parent = buttonFrame
         
-        -- Copy button
-        local copyBtn = Instance.new("TextButton")
-        copyBtn.Text = "📋 COPY & RUN"
-        copyBtn.Size = UDim2.new(1, -10, 0, 20)
-        copyBtn.Position = UDim2.new(0, 5, 0, 30)
-        copyBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 220)
-        copyBtn.TextColor3 = Color3.new(1, 1, 1)
-        copyBtn.Font = Enum.Font.Gotham
-        copyBtn.TextSize = 10
-        copyBtn.Parent = buttonFrame
+        -- Class indicator
+        local classLabel = Instance.new("TextLabel")
+        local classIcon = carClass == 3 and "🔴 Class 3" or carClass == 2 and "🟡 Class 2" or "🟢 Class 1"
+        classLabel.Text = classIcon
+        classLabel.Size = UDim2.new(0.4, 0, 0, 20)
+        classLabel.Position = UDim2.new(0.6, 0, 0, 28)
+        classLabel.BackgroundTransparency = 1
+        classLabel.TextColor3 = Color3.new(1, 1, 1)
+        classLabel.Font = Enum.Font.Gotham
+        classLabel.TextSize = 10
+        classLabel.Parent = buttonFrame
         
-        addCorner(copyBtn)
+        -- Select button
+        local selectBtn = Instance.new("TextButton")
+        selectBtn.Text = "SELECT"
+        selectBtn.Size = UDim2.new(0.3, 0, 0, 20)
+        selectBtn.Position = UDim2.new(0, 5, 0, 28)
+        selectBtn.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
+        selectBtn.TextColor3 = Color3.new(1, 1, 1)
+        selectBtn.Font = Enum.Font.Gotham
+        selectBtn.TextSize = 10
+        selectBtn.Parent = buttonFrame
         
-        -- Click action
-        copyBtn.MouseButton1Click:Connect(function()
-            -- Copy to clipboard (simulated)
-            copyBtn.Text = "✅ COPIED!"
-            copyBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
-            
-            -- Show command in results
-            local displayCode = cmd.code:gsub("\n", " "):sub(1, 100)
-            if #displayCode == 100 then displayCode = displayCode .. "..." end
-            results.Text = "Command copied: " .. cmd.name .. "\n" .. displayCode
-            
-            -- Print to console (user can copy from there)
-            print("\n" .. string.rep("=", 70))
-            print("📋 COMMAND: " .. cmd.name)
-            print(string.rep("=", 70))
-            print(cmd.code)
-            print(string.rep("=", 70))
-            print("📝 Copy the code above and paste in F9 console!")
-            
-            -- Execute automatically (optional)
-            local success, err = pcall(function()
-                -- Try to execute directly
-                loadstring(cmd.code)()
-            end)
-            
-            if success then
-                status.Text = "✅ Command executed successfully!"
-            else
-                status.Text = "⚠️ Paste in F9 console for best results"
+        addCorner(selectBtn, 4)
+        
+        -- Selection indicator
+        local selectedIndicator = Instance.new("Frame")
+        selectedIndicator.Size = UDim2.new(0, 5, 1, 0)
+        selectedIndicator.Position = UDim2.new(0, 0, 0, 0)
+        selectedIndicator.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+        selectedIndicator.Visible = false
+        selectedIndicator.Parent = buttonFrame
+        
+        addCorner(selectedIndicator, 2)
+        
+        -- Button click handlers
+        selectBtn.MouseButton1Click:Connect(function()
+            -- Deselect all other cars
+            for _, child in pairs(scrollFrame:GetChildren()) do
+                if child:IsA("Frame") and child ~= buttonFrame then
+                    child.SelectedIndicator.Visible = false
+                    child.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+                end
             end
             
-            -- Reset button after delay
-            task.wait(2)
-            copyBtn.Text = "📋 COPY & RUN"
-            copyBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 220)
+            -- Select this car
+            CarDuplicator.SelectedCar = carData
+            selectedIndicator.Visible = true
+            buttonFrame.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+            
+            updateSelectedDisplay()
+            updateStatus("Selected: " .. carName, Color3.fromRGB(0, 200, 100))
         end)
         
-        yPos = yPos + 60
+        return buttonFrame
     end
     
-    list.CanvasSize = UDim2.new(0, 0, 0, yPos)
+    local function loadCars()
+        updateStatus("Loading cars...", Color3.fromRGB(255, 255, 0))
+        
+        -- Clear existing cars
+        for _, child in pairs(scrollFrame:GetChildren()) do
+            if child:IsA("Frame") then
+                child:Destroy()
+            end
+        end
+        
+        -- Load cars
+        if CarDuplicator:GetOwnedCars() then
+            updateCarCount()
+            
+            -- Create car buttons
+            for i, carData in ipairs(CarDuplicator.OwnedCars) do
+                if type(carData) == "table" then
+                    createCarButton(carData, i)
+                end
+            end
+            
+            updateStatus("Loaded " .. #CarDuplicator.OwnedCars .. " cars", Color3.fromRGB(0, 200, 100))
+        else
+            updateStatus("Failed to load cars", Color3.fromRGB(255, 50, 50))
+        end
+    end
     
-    -- Close button
-    local closeBtn = Instance.new("TextButton")
-    closeBtn.Text = "✕"
-    closeBtn.Size = UDim2.new(0, 30, 0, 30)
-    closeBtn.Position = UDim2.new(1, -35, 0, 10)
-    closeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-    closeBtn.TextColor3 = Color3.new(1, 1, 1)
-    closeBtn.Font = Enum.Font.GothamBold
-    closeBtn.TextSize = 16
-    closeBtn.Parent = title
-    
-    addCorner(closeBtn)
-    
-    closeBtn.MouseButton1Click:Connect(function()
-        gui:Destroy()
+    -- Button click handlers
+    refreshBtn.MouseButton1Click:Connect(function()
+        loadCars()
     end)
     
-    -- Make draggable
-    local dragging = false
-    local dragStart, frameStart
-    
-    title.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = true
-            dragStart = input.Position
-            frameStart = main.Position
+    duplicateBtn.MouseButton1Click:Connect(function()
+        if not CarDuplicator.SelectedCar then
+            updateStatus("Please select a car first!", Color3.fromRGB(255, 50, 50))
+            return
+        end
+        
+        local carName = CarDuplicator:GetCarName(CarDuplicator.SelectedCar)
+        updateStatus("Duplicating " .. carName .. "...", Color3.fromRGB(255, 255, 0))
+        
+        local success, message = CarDuplicator:DuplicateCar()
+        
+        if success then
+            updateStatus("✓ " .. message, Color3.fromRGB(0, 200, 100))
+            
+            -- Refresh after delay
+            task.wait(2)
+            loadCars()
+        else
+            updateStatus("✗ " .. message, Color3.fromRGB(255, 50, 50))
         end
     end)
     
-    title.InputEnded:Connect(function()
-        dragging = false
-    end)
-    
-    game:GetService("UserInputService").InputChanged:Connect(function(input)
-        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-            local delta = input.Position - dragStart
-            main.Position = UDim2.new(
-                frameStart.X.Scale, frameStart.X.Offset + delta.X,
-                frameStart.Y.Scale, frameStart.Y.Offset + delta.Y
-            )
-        end
-    end)
+    -- Initial load
+    loadCars()
     
     return gui
 end
 
--- ===== AUTO-SCAN =====
-print("\n🔍 Running auto-scan...")
+-- ===== START THE SYSTEM =====
+print("🚀 Initializing Car Duplication System...")
 
--- Quick auto-scan
-local function quickAutoScan()
-    print("\n📊 QUICK AUTO-SCAN RESULTS:")
-    
-    -- Count folders
-    local folderCount = 0
-    for _, child in pairs(player:GetChildren()) do
-        if child:IsA("Folder") then
-            folderCount = folderCount + 1
-            print("📁 " .. child.Name .. ": " .. #child:GetChildren() .. " items")
+-- Create the UI
+local ui = CarDuplicator:CreateUI()
+
+print("✅ Car Duplication System Ready!")
+print("💡 Features:")
+print("• Scrollable list of your 56 cars")
+print("• Select any car to duplicate")
+print("• One-click duplication")
+print("• Real-time status updates")
+print("• Drag and move window")
+
+-- Auto-refresh every 30 seconds
+spawn(function()
+    while task.wait(30) do
+        if ui and ui.Parent then
+            CarDuplicator:GetOwnedCars()
         end
     end
-    print("Total folders: " .. folderCount)
-    
-    -- Check MultiCarSelection
-    if player:FindFirstChild("PlayerGui") then
-        local gui = player.PlayerGui:FindFirstChild("MultiCarSelection")
-        if gui then
-            print("✅ MultiCarSelection GUI found")
-        else
-            print("❌ MultiCarSelection not found")
-        end
-    end
-    
-    -- Check leaderstats
-    if player:FindFirstChild("leaderstats") then
-        print("💰 Leaderstats present")
-    end
-end
-
--- Run auto-scan
-quickAutoScan()
-
--- Create UI
-task.wait(1)
-local ui = createDynamicUI()
-
-print("\n✅ DYNAMIC CAR FINDER READY!")
-print("\n🎯 FEATURES:")
-print("• Click buttons to auto-copy commands")
-print("• Commands auto-print to console")
-print("• Drag window to move")
-print("• 7 ready-to-use commands")
-
-print("\n💡 RECOMMENDED ORDER:")
-print("1. 📁 Check Player Folders")
-print("2. 📊 Count All Value Objects") 
-print("3. 🔤 Check StringValues")
-print("4. 🚗 Find Cars in GUI")
-
-print("\n🚀 Click any button to start finding your 54 cars!")
+end)
