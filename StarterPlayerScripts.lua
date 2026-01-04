@@ -1,487 +1,418 @@
--- 🎯 TARGETED ATTACK: NY SALE! Car Dealership Tycoon
--- Place ID: 1554960397
+-- 🏎️ ACTIVE CAR DUPLICATION WHILE DRIVING
+-- Place ID: 1554960397 - NY SALE! Car Dealership Tycoon
 
-print("🎯 TARGETED ATTACK: NY SALE! CAR DEALERSHIP")
+print("🏎️ ACTIVE CAR DUPLICATION SYSTEM")
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
 local player = Players.LocalPlayer
 
 repeat task.wait() until game:IsLoaded()
 task.wait(2)
 
--- ===== STEP 1: ANALYZE 18,844 MODULES =====
-local function analyzeModules()
-    print("\n🔍 ANALYZING 18,844 MODULES...")
+-- ===== STEP 1: FIND YOUR CURRENT DRIVING CAR =====
+local function findCurrentDrivingCar()
+    print("\n🔍 FINDING CURRENT DRIVING CAR...")
     
-    -- Look for car-related modules
-    local carModules = {}
-    local purchaseModules = {}
-    local moneyModules = {}
-    local garageModules = {}
+    local currentCar = nil
     
-    local checked = 0
-    local maxCheck = 500  -- Check first 500 modules
-    
-    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
-        if obj:IsA("ModuleScript") and checked < maxCheck then
-            checked = checked + 1
-            
-            local name = obj.Name:lower()
-            
-            if name:find("car") or name:find("vehicle") then
-                table.insert(carModules, obj)
-            end
-            
-            if name:find("purchase") or name:find("buy") then
-                table.insert(purchaseModules, obj)
-            end
-            
-            if name:find("money") or name:find("cash") then
-                table.insert(moneyModules, obj)
-            end
-            
-            if name:find("garage") or name:find("inventory") then
-                table.insert(garageModules, obj)
+    -- Method 1: Look for car with player as driver
+    if Workspace:FindFirstChild("Vehicles") then
+        for _, vehicle in pairs(Workspace.Vehicles:GetChildren()) do
+            if vehicle:IsA("Model") then
+                -- Check for driver seat
+                local driverSeat = vehicle:FindFirstChild("DriverSeat") or vehicle:FindFirstChild("Seat")
+                if driverSeat and driverSeat:FindFirstChild("Occupant") then
+                    local occupant = driverSeat.Occupant
+                    if occupant and occupant.Parent == player.Character then
+                        currentCar = vehicle
+                        print("✅ Found driving car: " .. vehicle.Name)
+                        break
+                    end
+                end
             end
         end
     end
     
-    print("Found:")
-    print("- Car modules: " .. #carModules)
-    print("- Purchase modules: " .. #purchaseModules)
-    print("- Money modules: " .. #moneyModules)
-    print("- Garage modules: " .. #garageModules)
-    
-    -- Show top modules
-    if #carModules > 0 then
-        print("\nTop car modules:")
-        for i = 1, math.min(5, #carModules) do
-            print("  " .. carModules[i].Name)
-        end
-    end
-    
-    return {
-        CarModules = carModules,
-        PurchaseModules = purchaseModules,
-        MoneyModules = moneyModules,
-        GarageModules = garageModules
-    }
-end
-
--- ===== STEP 2: ATTACK MODULES DIRECTLY =====
-local function attackModules(modules)
-    print("\n⚡ ATTACKING MODULES...")
-    
-    -- Try to require and exploit car modules
-    for _, module in pairs(modules.CarModules) do
-        local success, moduleTable = pcall(function()
-            return require(module)
-        end)
+    -- Method 2: Look for cars near player
+    if not currentCar and player.Character then
+        local charPos = player.Character:GetPivot().Position
         
-        if success and type(moduleTable) == "table" then
-            print("\n✅ Loaded module: " .. module.Name)
-            
-            -- Look for important functions
-            for key, value in pairs(moduleTable) do
-                if type(value) == "function" then
-                    print("  Function: " .. key)
-                    
-                    -- Try to call with car name
-                    if key:lower():find("add") or key:lower():find("give") or 
-                       key:lower():find("spawn") or key:lower():find("create") then
-                        
-                        pcall(function()
-                            value("LirrMedMuseumCar")
-                            print("    ✅ Called with LirrMedMuseumCar")
-                        end)
-                        
-                        pcall(function()
-                            value(player, "LirrMedMuseumCar")
-                            print("    ✅ Called with player")
-                        end)
-                    end
-                end
-            end
-            
-            -- Look for car tables/lists
-            for key, value in pairs(moduleTable) do
-                if type(value) == "table" then
-                    -- Check if it's a car list
-                    if key:lower():find("car") or key:lower():find("vehicle") then
-                        print("  Found car table: " .. key)
-                        
-                        -- Try to add our car
-                        pcall(function()
-                            table.insert(value, "LirrMedMuseumCar")
-                            print("    ✅ Added to car table")
-                        end)
-                    end
-                elseif type(value) == "string" then
-                    if value:lower():find("lirr") then
-                        print("  Found Lirr reference: " .. value)
-                    end
+        for _, vehicle in pairs(Workspace:GetChildren()) do
+            if vehicle:IsA("Model") and vehicle:GetAttribute("IsVehicle") then
+                local vehiclePos = vehicle:GetPivot().Position
+                local distance = (charPos - vehiclePos).Magnitude
+                
+                if distance < 20 then  -- Within 20 studs
+                    currentCar = vehicle
+                    print("✅ Found nearby car: " .. vehicle.Name)
+                    break
                 end
             end
         end
     end
+    
+    -- Method 3: Look for spawned player vehicles
+    for _, obj in pairs(Workspace:GetDescendants()) do
+        if obj:IsA("Model") then
+            local owner = obj:GetAttribute("Owner") or obj:FindFirstChild("Owner")
+            if owner and (owner.Value == player or owner.Value == player.Name or owner.Value == player.UserId) then
+                currentCar = obj
+                print("✅ Found owned car: " .. obj.Name)
+                break
+            end
+        end
+    end
+    
+    if currentCar then
+        print("Car details:")
+        print("- Name: " .. currentCar.Name)
+        print("- Class: " .. currentCar.ClassName)
+        
+        -- Get car model type
+        for _, child in pairs(currentCar:GetChildren()) do
+            if child:IsA("StringValue") and child.Name == "CarType" then
+                print("- Type: " .. child.Value)
+            end
+        end
+    else
+        print("❌ No car found! Get in a car first!")
+    end
+    
+    return currentCar
 end
 
--- ===== STEP 3: FIND CAR PURCHASE SYSTEM =====
-local function findPurchaseSystem()
-    print("\n💰 FINDING PURCHASE SYSTEM...")
+-- ===== STEP 2: DUPLICATE WHILE DRIVING =====
+local function duplicateWhileDriving(carModel)
+    print("\n⚡ DUPLICATING WHILE DRIVING...")
     
-    -- Look for purchase-related remotes
-    local purchaseRemotes = {}
+    if not carModel then
+        print("❌ No car to duplicate!")
+        return false
+    end
+    
+    local carName = carModel.Name
+    print("Target car: " .. carName)
+    
+    -- Strategy: Use driving/racing events since you're actively driving
+    
+    -- Look for driving/race events
+    local drivingEvents = {}
     
     for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
         if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
             local name = obj.Name:lower()
-            
-            if name:find("purchase") or name:find("buy") or 
-               name:find("shop") or name:find("store") then
-                table.insert(purchaseRemotes, obj)
-                print("Purchase remote: " .. obj.Name)
+            if name:find("drive") or name:find("race") or name:find("vehicle") or 
+               name:find("spawn") or name:find("savecar") then
+                table.insert(drivingEvents, obj)
+                print("Found driving event: " .. obj.Name)
             end
         end
     end
     
-    -- Try common purchase patterns for THIS game
+    -- Also check for generic car events
+    local carEvents = {}
+    for _, obj in pairs(ReplicatedStorage:GetChildren()) do
+        if obj:IsA("RemoteEvent") then
+            table.insert(carEvents, obj)
+        end
+    end
+    
+    print("Total events to try: " .. (#drivingEvents + #carEvents))
+    
+    -- Try to duplicate using driving context
     local attempts = 0
     
-    for _, remote in pairs(purchaseRemotes) do
-        -- Try different purchase formats
+    -- Method A: Try to save/spawn duplicate while driving
+    for _, event in pairs(drivingEvents) do
+        -- Different argument patterns for driving context
         local patterns = {
-            -- Format 1: Just car name
-            {"LirrMedMuseumCar"},
-            
-            -- Format 2: Car name + price
-            {"LirrMedMuseumCar", 0},
-            {"LirrMedMuseumCar", 1},
-            {"LirrMedMuseumCar", 100},
-            
-            -- Format 3: With player
-            {player, "LirrMedMuseumCar"},
-            {player.UserId, "LirrMedMuseumCar"},
-            
-            -- Format 4: Table format
-            {Car = "LirrMedMuseumCar", Price = 0},
-            {Vehicle = "LirrMedMuseumCar", Purchase = true},
-            
-            -- Format 5: String command
-            {"buycar", "LirrMedMuseumCar"},
-            {"purchase", "LirrMedMuseumCar"},
-            
-            -- Format 6: For NY SALE game
-            {"LirrMedMuseumCar", "SALE"},
-            {"LirrMedMuseumCar", true, "NY_SALE"},
-            {"LirrMedMuseumCar", player.Name, os.time()}
+            {carName, "duplicate"},
+            {player, carName, "save"},
+            {carName, player.UserId},
+            {Vehicle = carName, Action = "Clone"},
+            {"savevehicle", carName},
+            {"spawn", carName, player}
         }
         
         for _, args in pairs(patterns) do
             attempts = attempts + 1
             local success = pcall(function()
-                if remote:IsA("RemoteEvent") then
-                    remote:FireServer(unpack(args))
+                if event:IsA("RemoteEvent") then
+                    event:FireServer(unpack(args))
                 else
-                    remote:InvokeServer(unpack(args))
+                    event:InvokeServer(unpack(args))
                 end
             end)
             
             if success then
-                print("✅ Purchase attempt " .. attempts .. " via " .. remote.Name)
+                print("✅ Driving attempt " .. attempts .. " via " .. event.Name)
+                
+                -- Rapid fire while success
+                for i = 1, 3 do
+                    pcall(function()
+                        if event:IsA("RemoteEvent") then
+                            event:FireServer(unpack(args))
+                        end
+                    end)
+                    task.wait(0.02)
+                end
             end
             
             task.wait(0.05)
         end
     end
     
+    -- Method B: Try to trigger garage save from driving
+    print("\n🔄 Attempting garage save while driving...")
+    
+    -- Look for save/garage events
+    local saveEvents = {"SaveCar", "StoreVehicle", "ParkCar", "GarageSave"}
+    
+    for _, eventName in pairs(saveEvents) do
+        local event = ReplicatedStorage:FindFirstChild(eventName)
+        if event then
+            for i = 1, 5 do
+                pcall(function()
+                    if event:IsA("RemoteEvent") then
+                        event:FireServer(carName, player, i)  -- Try multiple saves
+                        print("✅ Save attempt " .. i .. " via " .. eventName)
+                    end
+                end)
+                task.wait(0.1)
+            end
+        end
+    end
+    
+    -- Method C: Try to exploit the "No boost launch" system
+    print("\n🚀 Exploiting boost system...")
+    
+    -- Since we see "No boost launch" messages, there's a boost system
+    local boostEvents = {"Boost", "Nitrous", "SpeedBoost", "LaunchCar"}
+    
+    for _, eventName in pairs(boostEvents) do
+        local event = ReplicatedStorage:FindFirstChild(eventName)
+        if event then
+            -- Try to trigger boost with car duplication
+            pcall(function()
+                event:FireServer(carName, "DUPLICATE", 999)  -- High value might trigger bug
+                print("✅ Boost exploit via " .. eventName)
+            end)
+        end
+    end
+    
     return attempts
 end
 
--- ===== STEP 4: EXPLOIT GARAGE SYSTEM =====
-local function exploitGarageSystem()
-    print("\n🏢 EXPLOITING GARAGE SYSTEM...")
+-- ===== STEP 3: QUICK INVENTORY CHECK =====
+local function quickInventoryCheck()
+    print("\n📦 QUICK INVENTORY CHECK...")
     
-    -- Look for garage/storage modules
-    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
-        if obj:IsA("ModuleScript") and obj.Name:lower():find("garage") then
-            local success, moduleTable = pcall(function()
-                return require(obj)
-            end)
-            
-            if success and type(moduleTable) == "table" then
-                print("Found garage module: " .. obj.Name)
-                
-                -- Look for add/get functions
-                for key, value in pairs(moduleTable) do
-                    if type(value) == "function" then
-                        if key:lower():find("add") or key:lower():find("store") then
-                            -- Try to add car
-                            pcall(function()
-                                value(player, "LirrMedMuseumCar")
-                                print("  ✅ Called " .. key .. " with our car")
-                            end)
-                            
-                            -- Try to add multiple
-                            for i = 1, 5 do
-                                pcall(function()
-                                    value(player, "LirrMedMuseumCar")
-                                end)
-                                task.wait(0.01)
-                            end
-                        end
-                        
-                        if key:lower():find("get") or key:lower():find("list") then
-                            -- Try to get garage contents
-                            pcall(function()
-                                local result = value(player)
-                                print("  Garage contents: " .. tostring(result))
-                            end)
-                        end
-                    end
-                end
+    local inventory = player:FindFirstChild("Inventory") or 
+                     player:FindFirstChild("Garage") or
+                     player:FindFirstChild("Cars")
+    
+    if inventory then
+        print("Inventory items (" .. #inventory:GetChildren() .. "):")
+        for _, item in pairs(inventory:GetChildren()) do
+            print("  - " .. item.Name .. " (" .. item.ClassName .. ")")
+        end
+    else
+        print("❌ No inventory found!")
+    end
+    
+    -- Also check player data
+    if player:FindFirstChild("PlayerData") then
+        local data = player.PlayerData
+        for _, value in pairs(data:GetChildren()) do
+            if value:IsA("StringValue") and value.Value:find("Car") then
+                print("Data: " .. value.Name .. " = " .. value.Value)
             end
         end
     end
 end
 
--- ===== STEP 5: INTERCEPT NETWORK TRAFFIC =====
-local function interceptNetwork()
-    print("\n📡 INTERCEPTING NETWORK...")
+-- ===== STEP 4: CONTINUOUS DRIVING EXPLOIT =====
+local function continuousDrivingExploit()
+    print("\n🏎️ STARTING CONTINUOUS DRIVING EXPLOIT")
     
-    -- Try to hook into network events
-    local hookedRemotes = {}
-    
-    for _, remote in pairs(ReplicatedStorage:GetChildren()) do
-        if remote:IsA("RemoteEvent") then
-            -- Hook OnClientEvent
-            local success = pcall(function()
-                local connection = remote.OnClientEvent:Connect(function(...)
-                    local args = {...}
-                    print("\n📨 Received from " .. remote.Name .. ":")
-                    
-                    -- Check if it's car-related
-                    for _, arg in pairs(args) do
-                        if type(arg) == "string" and arg:find("Lirr") then
-                            print("  ⚡ Contains our car! Attempting duplication...")
-                            
-                            -- Try to send duplicate request
-                            task.wait(0.1)
-                            pcall(function()
-                                remote:FireServer("LirrMedMuseumCar")
-                                print("  ✅ Sent duplicate request")
-                            end)
-                        end
-                    end
-                end)
-                
-                table.insert(hookedRemotes, {Remote = remote, Connection = connection})
-                print("Hooked: " .. remote.Name)
-            end)
-        end
-    end
-    
-    return hookedRemotes
-end
-
--- ===== STEP 6: DECOMPILE AND ANALYZE =====
-local function attemptDecompile()
-    print("\n🔧 ATTEMPTING TO ANALYZE GAME LOGIC...")
-    
-    -- Look for client scripts that handle car purchases
-    local clientScripts = {}
-    
-    if player:FindFirstChild("PlayerGui") then
-        for _, script in pairs(player.PlayerGui:GetDescendants()) do
-            if script:IsA("LocalScript") then
-                local name = script.Name:lower()
-                if name:find("car") or name:find("purchase") or name:find("shop") then
-                    table.insert(clientScripts, script)
-                end
-            end
-        end
-    end
-    
-    -- Also check StarterGui
-    pcall(function()
-        for _, script in pairs(game.StarterGui:GetDescendants()) do
-            if script:IsA("LocalScript") then
-                local name = script.Name:lower()
-                if name:find("car") or name:find("purchase") then
-                    table.insert(clientScripts, script)
-                end
-            end
-        end
-    end)
-    
-    print("Found " .. #clientScripts .. " car-related client scripts")
-    
-    -- Try to extract event names from scripts
-    for _, script in pairs(clientScripts) do
-        pcall(function()
-            local source = script.Source
-            if #source > 0 then
-                -- Look for remote event calls
-                for line in source:gmatch("[^\r\n]+") do
-                    if line:find("FireServer") or line:find("InvokeServer") then
-                        -- Extract event name
-                        for eventName in line:gmatch('["\']([^"\']+)["\']') do
-                            if not eventName:find(" ") then  -- Probably an event name
-                                print("Found event in script: " .. eventName)
-                                
-                                -- Try to call it
-                                local event = ReplicatedStorage:FindFirstChild(eventName)
-                                if event then
-                                    pcall(function()
-                                        event:FireServer("LirrMedMuseumCar")
-                                        print("  ✅ Called from script analysis")
-                                    end)
-                                end
-                            end
-                        end
-                    end
-                end
-            end
-        end)
-    end
-end
-
--- ===== STEP 7: CREATE BACKDOOR EVENT =====
-local function createBackdoorEvent()
-    print("\n🚪 CREATING BACKDOOR EVENT...")
-    
-    -- Create a custom event that might be picked up by game scripts
-    local backdoor = Instance.new("RemoteEvent")
-    backdoor.Name = "CarDealershipBackdoor"
-    backdoor.Parent = ReplicatedStorage
-    
-    -- Also create a BindableEvent for intra-client communication
-    local bindable = Instance.new("BindableEvent")
-    bindable.Name = "CarDuplicationSignal"
-    bindable.Parent = ReplicatedStorage
-    
-    -- Trigger our backdoor
-    pcall(function()
-        backdoor:FireServer("LirrMedMuseumCar", "DUPLICATE")
-        print("✅ Fired backdoor event")
-    end)
-    
-    pcall(function()
-        bindable:Fire("LirrMedMuseumCar", player)
-        print("✅ Fired bindable event")
-    end)
-    
-    -- Try to mimic game's own events
-    local fakeEvents = {
-        "CarPurchaseComplete",
-        "VehicleAddedToGarage", 
-        "DealershipTransaction",
-        "NY_SALE_Purchase"
-    }
-    
-    for _, eventName in pairs(fakeEvents) do
-        local fakeEvent = Instance.new("RemoteEvent")
-        fakeEvent.Name = eventName
-        fakeEvent.Parent = ReplicatedStorage
-        
-        pcall(function()
-            fakeEvent:FireServer("LirrMedMuseumCar", true, os.time())
-        end)
-        
-        print("Created fake event: " .. eventName)
-    end
-end
-
--- ===== STEP 8: MONITOR AND RETRY =====
-local function startMonitoring()
-    print("\n👁️ STARTING MONITORING...")
-    
-    -- Monitor car count
-    local lastCarCount = 0
+    -- This runs continuously while you drive
+    local lastCar = nil
+    local duplicateCount = 0
     
     while true do
-        task.wait(5)
+        task.wait(3)  -- Check every 3 seconds
         
-        -- Count Lirr cars
-        local currentCount = 0
-        for _, folder in pairs(player:GetChildren()) do
-            if folder:IsA("Folder") then
-                for _, item in pairs(folder:GetChildren()) do
-                    if tostring(item):find("Lirr") then
-                        currentCount = currentCount + 1
-                    end
-                end
+        -- Find current car
+        local currentCar = findCurrentDrivingCar()
+        
+        if currentCar and currentCar ~= lastCar then
+            print("\n🔄 NEW CAR DETECTED: " .. currentCar.Name)
+            lastCar = currentCar
+            
+            -- Try to duplicate it
+            local attempts = duplicateWhileDriving(currentCar)
+            duplicateCount = duplicateCount + 1
+            
+            print("Duplication cycle: " .. duplicateCount)
+            
+            -- Quick inventory check
+            quickInventoryCheck()
+            
+            -- If we've tried many times, wait longer
+            if duplicateCount > 5 then
+                print("⏳ Waiting 10 seconds before next attempt...")
+                task.wait(10)
             end
-        end
-        
-        if currentCount > lastCarCount then
-            print("🎉 CAR COUNT INCREASED: " .. lastCarCount .. " → " .. currentCount)
-            lastCarCount = currentCount
-        elseif currentCount < lastCarCount then
-            print("⚠️ Car count decreased: " .. currentCount)
-            lastCarCount = currentCount
-        end
-        
-        -- Periodically retry duplication
-        if math.random(1, 10) == 1 then  -- 10% chance each check
-            print("🔄 Periodic retry...")
-            local event = ReplicatedStorage:FindFirstChild("BuyCar")
-            if event then
-                pcall(function()
-                    event:FireServer("LirrMedMuseumCar")
-                end)
-            end
+        elseif not currentCar then
+            print("⚠️ Not in a car. Get in a vehicle to continue.")
         end
     end
 end
 
--- ===== MAIN ATTACK =====
+-- ===== STEP 5: CREATE DRIVING UI =====
+local function createDrivingUI()
+    local gui = Instance.new("ScreenGui")
+    gui.Parent = player:WaitForChild("PlayerGui")
+    
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 350, 0, 250)
+    frame.Position = UDim2.new(0.8, 0, 0.1, 0)  -- Top right corner
+    frame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+    frame.BorderSizePixel = 0
+    frame.Parent = gui
+    
+    local title = Instance.new("TextLabel")
+    title.Text = "🏎️ DRIVING DUPLICATOR"
+    title.Size = UDim2.new(1, 0, 0, 40)
+    title.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    title.TextColor3 = Color3.new(1, 1, 1)
+    title.Font = Enum.Font.GothamBold
+    title.TextSize = 18
+    title.Parent = frame
+    
+    local status = Instance.new("TextLabel")
+    status.Text = "Get in a car to start!\n\nDrive around while this runs.\n\nCheck console for updates."
+    status.Size = UDim2.new(1, -20, 0, 120)
+    status.Position = UDim2.new(0, 10, 0, 50)
+    status.BackgroundTransparency = 1
+    status.TextColor3 = Color3.new(1, 1, 1)
+    status.Font = Enum.Font.Gotham
+    status.TextSize = 14
+    status.TextWrapped = true
+    status.Parent = frame
+    
+    -- Buttons
+    local buttons = {
+        {
+            Text = "🔍 FIND CURRENT CAR",
+            Y = 180,
+            Action = function()
+                local car = findCurrentDrivingCar()
+                if car then
+                    status.Text = "Found: " .. car.Name .. "\n\nAttempting duplication..."
+                    task.wait(1)
+                    duplicateWhileDriving(car)
+                    task.wait(2)
+                    quickInventoryCheck()
+                    status.Text = "Duplication attempted!\nCheck inventory/garage."
+                else
+                    status.Text = "No car found!\nGet in a vehicle first."
+                end
+            end
+        },
+        {
+            Text = "⚡ QUICK DUPLICATE",
+            Y = 220,
+            Action = function()
+                local car = findCurrentDrivingCar()
+                if car then
+                    status.Text = "Quick dupe: " .. car.Name
+                    for i = 1, 10 do
+                        task.spawn(function()
+                            local event = ReplicatedStorage:FindFirstChild("SaveCar")
+                            if event then
+                                pcall(function()
+                                    event:FireServer(car.Name)
+                                end)
+                            end
+                        end)
+                    end
+                    task.wait(1)
+                    status.Text = "10 rapid attempts sent!\nCheck if car duplicated."
+                end
+            end
+        }
+    }
+    
+    for _, btn in pairs(buttons) do
+        local button = Instance.new("TextButton")
+        button.Text = btn.Text
+        button.Size = UDim2.new(1, -40, 0, 35)
+        button.Position = UDim2.new(0, 20, 0, btn.Y)
+        button.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
+        button.TextColor3 = Color3.new(1, 1, 1)
+        button.Font = Enum.Font.GothamBold
+        button.TextSize = 14
+        button.Parent = frame
+        
+        button.MouseButton1Click:Connect(btn.Action)
+    end
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 10)
+    corner.Parent = frame
+    
+    return gui, status
+end
+
+-- ===== MAIN EXECUTION =====
 print("\n" .. string.rep("=", 70))
-print("🎯 LAUNCHING TARGETED ATTACK ON NY SALE CAR DEALERSHIP")
+print("🏎️ ACTIVE DRIVING DUPLICATION SYSTEM")
 print(string.rep("=", 70))
+print("\nIMPORTANT: You must be DRIVING a car!")
+print("The console shows you're in driving mode.")
+print("\nThis script will:")
+print("1. Detect your current car")
+print("2. Attempt duplication WHILE you drive")
+print("3. Run continuously")
 
--- Step 1: Analyze modules
-local modules = analyzeModules()
-
--- Step 2: Attack modules
+-- Create UI
 task.wait(1)
-attackModules(modules)
+local gui, status = createDrivingUI()
 
--- Step 3: Find purchase system
-task.wait(1)
-local purchaseAttempts = findPurchaseSystem()
-print("Total purchase attempts: " .. purchaseAttempts)
+-- Initial car check
+task.wait(2)
+local currentCar = findCurrentDrivingCar()
 
--- Step 4: Exploit garage
-task.wait(1)
-exploitGarageSystem()
-
--- Step 5: Intercept network
-task.wait(1)
-local hooks = interceptNetwork()
-
--- Step 6: Decompile
-task.wait(1)
-attemptDecompile()
-
--- Step 7: Backdoor
-task.wait(1)
-createBackdoorEvent()
-
--- Step 8: Start monitoring
-task.wait(1)
-task.spawn(startMonitoring)
+if currentCar then
+    status.Text = "Found car: " .. currentCar.Name .. "\n\nStarting continuous exploit..."
+    
+    -- Start continuous exploit in background
+    task.spawn(function()
+        task.wait(2)
+        continuousDrivingExploit()
+    end)
+    
+    -- Initial duplication attempt
+    task.wait(1)
+    duplicateWhileDriving(currentCar)
+    
+else
+    status.Text = "❌ NO CAR DETECTED!\n\nGet in a vehicle first!\n\nDrive around, then check back."
+    print("\n❌ ERROR: You're not in a car!")
+    print("Get in a vehicle, then the script will work.")
+end
 
 -- Final instructions
 print("\n" .. string.rep("=", 70))
-print("📋 ATTACK DEPLOYED")
+print("📋 INSTRUCTIONS:")
 print(string.rep("=", 70))
-print("\nNOW DO THIS:")
-print("1. WAIT 30 seconds")
-print("2. Try to BUY a cheap car normally")
-print("3. Check if LirrMedMuseumCar duplicated")
-print("4. Walk around dealership")
-print("5. Open/close garage menu")
-print("\nThe script is MONITORING for changes.")
-print("If cars increase, you'll see a message.")
+print("\n1. DRIVE AROUND in your car")
+print("2. The script runs CONTINUOUSLY")
+print("3. Try DIFFERENT CARS")
+print("4. Check garage BETWEEN drives")
+print("5. Use the UI buttons for manual control")
+print("\nThe script exploits the DRIVING STATE")
+print("which might have weaker validation!")
