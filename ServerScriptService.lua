@@ -1,282 +1,439 @@
-print("🌟 SUPER-VISIBLE INVENTORY INJECTION")
+print("🎯 INTELLIGENT CAR DUPLICATION SYSTEM")
 print("=" .. string.rep("=", 60))
 
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
 
--- Create a ScreenGui with MAXIMUM priority
-local superGui = Instance.new("ScreenGui")
-superGui.Name = "SuperInjection"
-superGui.DisplayOrder = 99999  -- Highest possible
-superGui.IgnoreGuiInset = true  -- Cover entire screen
-superGui.ResetOnSpawn = false
-superGui.Parent = player.PlayerGui
-
-print("✅ Created SUPER GUI with DisplayOrder: 99999")
-
--- Create a semi-transparent background to dim everything else
-local background = Instance.new("Frame")
-background.Name = "Background"
-background.Size = UDim2.new(1, 0, 1, 0)
-background.BackgroundColor3 = Color3.new(0, 0, 0)
-background.BackgroundTransparency = 0.5  -- 50% transparent black
-background.Parent = superGui
-
-print("✅ Added semi-transparent background")
-
--- Create the MAIN injection container (CENTER OF SCREEN)
-local mainContainer = Instance.new("Frame")
-mainContainer.Name = "InjectionContainer"
-mainContainer.Size = UDim2.new(0.8, 0, 0.8, 0)  -- 80% of screen
-mainContainer.Position = UDim2.new(0.1, 0, 0.1, 0)  -- Centered
-mainContainer.BackgroundColor3 = Color3.fromRGB(255, 215, 0)  -- GOLD
-mainContainer.BackgroundTransparency = 0.1
-mainContainer.Parent = superGui
-
--- Add glowing border
-local glow = Instance.new("UIStroke")
-glow.Color = Color3.new(1, 1, 0)  -- Yellow glow
-glow.Thickness = 8
-glow.Transparency = 0.3
-glow.Parent = mainContainer
-
--- Add pulsing animation
-local pulseConn
-pulseConn = game:GetService("RunService").Heartbeat:Connect(function()
-    local pulse = math.sin(os.clock() * 5) * 0.1 + 0.9
-    glow.Thickness = 5 + math.sin(os.clock() * 3) * 3
-    glow.Transparency = 0.5 + math.sin(os.clock() * 2) * 0.2
-end)
-
-print("✅ Created GOLD container with pulsing glow")
-
--- Title with sparkles
-local title = Instance.new("TextLabel")
-title.Text = "✨🚗 INJECTED CARS COLLECTION 🚗✨"
-title.Size = UDim2.new(1, 0, 0, 80)
-title.Position = UDim2.new(0, 0, 0, 0)
-title.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
-title.TextColor3 = Color3.new(1, 1, 1)
-title.Font = Enum.Font.GothamBold
-title.TextSize = 28
-title.TextScaled = true
-title.Parent = mainContainer
-
-print("✅ Added sparkly title")
-
--- Create car grid
-local carGrid = Instance.new("ScrollingFrame")
-carGrid.Name = "CarGrid"
-carGrid.Size = UDim2.new(1, -40, 1, -100)
-carGrid.Position = UDim2.new(0, 20, 0, 90)
-carGrid.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
-carGrid.BackgroundTransparency = 0.3
-carGrid.BorderSizePixel = 0
-carGrid.ScrollBarThickness = 12
-carGrid.AutomaticCanvasSize = Enum.AutomaticSize.Y
-carGrid.Parent = mainContainer
-
--- Define premium cars
-local premiumCars = {
-    {Name = "Bugatti Chiron Super Sport", Class = 3, Color = Color3.new(0, 0.5, 1), Speed = 304, Price = "$3,000,000"},
-    {Name = "Lamborghini Revuelto", Class = 3, Color = Color3.new(1, 0, 0), Speed = 350, Price = "$600,000"},
-    {Name = "Ferrari SF90 Stradale", Class = 3, Color = Color3.new(1, 0, 0), Speed = 340, Price = "$625,000"},
-    {Name = "McLaren Speedtail", Class = 3, Color = Color3.new(1, 0.5, 0), Speed = 403, Price = "$2,200,000"},
-    {Name = "Porsche 918 Spyder", Class = 3, Color = Color3.new(0, 1, 0.5), Speed = 345, Price = "$845,000"},
-    {Name = "Koenigsegg Jesko Absolut", Class = 3, Color = Color3.new(0.5, 0, 1), Speed = 330, Price = "$3,000,000"},
-    {Name = "Pagani Huayra BC", Class = 3, Color = Color3.new(1, 1, 0), Speed = 238, Price = "$2,800,000"},
-    {Name = "Aston Martin Valkyrie", Class = 3, Color = Color3.new(0, 1, 1), Speed = 250, Price = "$3,200,000"},
-    {Name = "Rimac Nevera", Class = 3, Color = Color3.new(0.2, 0.8, 0.2), Speed = 258, Price = "$2,400,000"},
-    {Name = "Gordon Murray T.50", Class = 3, Color = Color3.new(1, 0.2, 0.5), Speed = 0, Price = "$3,000,000"}
+local CarDuplicator = {
+    CurrentCar = nil,
+    CarService = ReplicatedStorage.Remotes.Services.CarServiceRemotes,
+    DetectedCalls = {},
+    VulnerabilitiesFound = 0
 }
 
-print("🎨 Adding " .. #premiumCars .. " premium cars...")
-
--- Add cars to grid
-local cellWidth = 200
-local cellHeight = 180
-local padding = 15
-local columns = 4
-
-for i, carData in ipairs(premiumCars) do
-    local row = math.floor((i-1) / columns)
-    local col = (i-1) % columns
+-- Step 1: Detect current car
+function CarDuplicator:DetectCurrentCar()
+    print("🔍 Detecting current car...")
     
-    -- Car card
-    local carCard = Instance.new("Frame")
-    carCard.Name = "Car_" .. i
-    carCard.Size = UDim2.new(0, cellWidth, 0, cellHeight)
-    carCard.Position = UDim2.new(0, col * (cellWidth + padding), 0, row * (cellHeight + padding))
-    carCard.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-    carCard.BackgroundTransparency = 0.2
-    carCard.Parent = carGrid
+    -- Method 1: Check Workspace for player's vehicle
+    local character = player.Character or player.CharacterAdded:Wait()
     
-    -- Add rounded corners
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 12)
-    corner.Parent = carCard
-    
-    -- Color stripe
-    local colorStripe = Instance.new("Frame")
-    colorStripe.Size = UDim2.new(1, 0, 0, 10)
-    colorStripe.Position = UDim2.new(0, 0, 0, 0)
-    colorStripe.BackgroundColor3 = carData.Color
-    colorStripe.BorderSizePixel = 0
-    colorStripe.Parent = carCard
-    
-    -- Car name
-    local nameLabel = Instance.new("TextLabel")
-    nameLabel.Text = carData.Name
-    nameLabel.Size = UDim2.new(1, -20, 0, 40)
-    nameLabel.Position = UDim2.new(0, 10, 0, 15)
-    nameLabel.BackgroundTransparency = 1
-    nameLabel.TextColor3 = Color3.new(1, 1, 1)
-    nameLabel.Font = Enum.Font.GothamBold
-    nameLabel.TextSize = 14
-    nameLabel.TextScaled = true
-    nameLabel.Parent = carCard
-    
-    -- Class badge
-    local classBadge = Instance.new("Frame")
-    classBadge.Size = UDim2.new(0, 70, 0, 25)
-    classBadge.Position = UDim2.new(0, 10, 0, 60)
-    classBadge.BackgroundColor3 = Color3.new(1, 0, 0)
-    classBadge.Parent = carCard
-    
-    local classCorner = Instance.new("UICorner")
-    classCorner.CornerRadius = UDim.new(0, 6)
-    classCorner.Parent = classBadge
-    
-    local classText = Instance.new("TextLabel")
-    classText.Text = "CLASS " .. carData.Class
-    classText.Size = UDim2.new(1, 0, 1, 0)
-    classText.BackgroundTransparency = 1
-    classText.TextColor3 = Color3.new(1, 1, 1)
-    classText.Font = Enum.Font.GothamBold
-    classText.TextSize = 12
-    classText.Parent = classBadge
-    
-    -- Speed
-    if carData.Speed > 0 then
-        local speedLabel = Instance.new("TextLabel")
-        speedLabel.Text = "⚡ " .. carData.Speed .. " MPH"
-        speedLabel.Size = UDim2.new(1, -20, 0, 25)
-        speedLabel.Position = UDim2.new(0, 10, 0, 90)
-        speedLabel.BackgroundTransparency = 1
-        speedLabel.TextColor3 = Color3.new(1, 1, 1)
-        speedLabel.Font = Enum.Font.Gotham
-        speedLabel.TextSize = 12
-        speedLabel.Parent = carCard
-    end
-    
-    -- Price
-    local priceLabel = Instance.new("TextLabel")
-    priceLabel.Text = carData.Price
-    priceLabel.Size = UDim2.new(1, -20, 0, 25)
-    priceLabel.Position = UDim2.new(0, 10, 0, 120)
-    priceLabel.BackgroundTransparency = 1
-    priceLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
-    priceLabel.Font = Enum.Font.GothamBold
-    priceLabel.TextSize = 14
-    priceLabel.Parent = carCard
-    
-    -- Hover effect
-    carCard.MouseEnter:Connect(function()
-        carCard.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-    end)
-    
-    carCard.MouseLeave:Connect(function()
-        carCard.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-    end)
-    
-    print("   ✅ Added: " .. carData.Name)
-end
-
--- Set grid size
-local totalRows = math.ceil(#premiumCars / columns)
-carGrid.CanvasSize = UDim2.new(0, 0, 0, totalRows * (cellHeight + padding))
-
--- Control buttons
-local buttonFrame = Instance.new("Frame")
-buttonFrame.Size = UDim2.new(1, -40, 0, 60)
-buttonFrame.Position = UDim2.new(0, 20, 1, -70)
-buttonFrame.BackgroundTransparency = 1
-buttonFrame.Parent = mainContainer
-
--- Select All button
-local selectAllBtn = Instance.new("TextButton")
-selectAllBtn.Text = "🎮 SELECT ALL CARS"
-selectAllBtn.Size = UDim2.new(0.4, -10, 1, 0)
-selectAllBtn.Position = UDim2.new(0, 0, 0, 0)
-selectAllBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
-selectAllBtn.TextColor3 = Color3.new(1, 1, 1)
-selectAllBtn.Font = Enum.Font.GothamBold
-selectAllBtn.TextSize = 18
-selectAllBtn.Parent = buttonFrame
-
-selectAllBtn.MouseButton1Click:Connect(function()
-    print("🎯 Attempting to select all injected cars...")
-    selectAllBtn.Text = "⏳ PROCESSING..."
-    
-    -- Try to add cars via OnCarsAdded
-    local carService = game:GetService("ReplicatedStorage").Remotes.Services.CarServiceRemotes
-    local onCarsAdded = carService:FindFirstChild("OnCarsAdded")
-    
-    if onCarsAdded then
-        for i, carData in ipairs(premiumCars) do
-            local fakeCar = {
-                Id = "super-inject-" .. i .. "-" .. os.time(),
-                Name = carData.Name,
-                Class = carData.Class,
-                Injected = true
-            }
-            
-            local success = pcall(function()
-                onCarsAdded:FireServer({fakeCar})
-                return true
-            end)
-            
-            if success then
-                print("✅ Injection attempted: " .. carData.Name)
+    if character then
+        -- Check if sitting in vehicle seat
+        local humanoid = character:FindFirstChildWhichIsA("Humanoid")
+        if humanoid then
+            local seat = humanoid.SeatPart
+            if seat then
+                -- Trace up to find car model
+                local vehicle = seat.Parent
+                while vehicle and not vehicle:FindFirstChild("VehicleSeat") do
+                    vehicle = vehicle.Parent
+                end
+                
+                if vehicle then
+                    print("✅ Found vehicle: " .. vehicle.Name)
+                    self.CurrentCar = vehicle
+                    return vehicle
+                end
             end
         end
-        selectAllBtn.Text = "✅ INJECTION ATTEMPTED"
-    else
-        selectAllBtn.Text = "❌ REMOTE NOT FOUND"
     end
-end)
-
--- Close button
-local closeBtn = Instance.new("TextButton")
-closeBtn.Text = "❌ CLOSE INJECTION"
-closeBtn.Size = UDim2.new(0.4, -10, 1, 0)
-closeBtn.Position = UDim2.new(0.6, 0, 0, 0)
-closeBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
-closeBtn.TextColor3 = Color3.new(1, 1, 1)
-closeBtn.Font = Enum.Font.GothamBold
-closeBtn.TextSize = 18
-closeBtn.Parent = buttonFrame
-
-closeBtn.MouseButton1Click:Connect(function()
-    print("🛑 Closing injection interface...")
-    superGui:Destroy()
-    if pulseConn then
-        pulseConn:Disconnect()
+    
+    -- Method 2: Check CarReplication in PlayerGui
+    local carReplication = player.PlayerGui:FindFirstChild("CarReplication")
+    if carReplication then
+        print("📊 CarReplication folder found: " .. #carReplication:GetChildren() .. " cars")
+        
+        -- Get the most recent car (likely current)
+        local newestCar = nil
+        local newestTime = 0
+        
+        for _, carFrame in pairs(carReplication:GetChildren()) do
+            if carFrame:IsA("Frame") then
+                local stats = carFrame:FindFirstChild("Stats")
+                if stats then
+                    -- Check if this car is active
+                    if carFrame.Visible then
+                        self.CurrentCar = carFrame
+                        print("✅ Active car in CarReplication: " .. carFrame.Name)
+                        return carFrame
+                    end
+                end
+            end
+        end
     end
-end)
+    
+    print("❌ No car detected")
+    return nil
+end
 
--- Add rounded corners to main container
-local mainCorner = Instance.new("UICorner")
-mainCorner.CornerRadius = UDim.new(0, 20)
-mainCorner.Parent = mainContainer
+-- Step 2: Monitor car data access
+function CarDuplicator:MonitorDataAccess()
+    print("\n📡 Monitoring car data access...")
+    
+    -- Hook GetOwnedCars to see when it's called
+    local getOwnedCars = self.CarService:FindFirstChild("GetOwnedCars")
+    if getOwnedCars then
+        local original = getOwnedCars.InvokeServer
+        
+        getOwnedCars.InvokeServer = function(...)
+            local args = {...}
+            print("📞 GetOwnedCars called!")
+            print("   Args: " .. #args .. " arguments")
+            
+            -- Record the call
+            table.insert(self.DetectedCalls, {
+                time = os.time(),
+                function = "GetOwnedCars",
+                args = args
+            })
+            
+            return original(...)
+        end
+        print("✅ Hooked GetOwnedCars")
+    end
+    
+    -- Monitor other car-related remotes
+    for _, remote in pairs(self.CarService:GetChildren()) do
+        if remote:IsA("RemoteFunction") then
+            print("📞 Monitoring: " .. remote.Name)
+        end
+    end
+end
 
-print("\n" .. string.rep("=", 60))
-print("🎉 SUPER-VISIBLE INJECTION CREATED!")
-print("✅ 10 Premium cars displayed")
-print("✅ Pulsing gold border")
-print("✅ Semi-transparent background")
-print("✅ Control buttons")
-print("✅ DisplayOrder: 99999 (TOP MOST)")
-print("\n💡 Click 'SELECT ALL CARS' to attempt injection")
-print("💡 Click 'CLOSE INJECTION' to remove")
-print("\n🚨 THIS SHOULD BE IMPOSSIBLE TO MISS! 🚨")
+-- Step 3: Find vulnerabilities in car access
+function CarDuplicator:FindVulnerabilities()
+    print("\n🔓 Searching for vulnerabilities...")
+    
+    -- Check for OnCarsAdded remote (server event)
+    local onCarsAdded = self.CarService:FindFirstChild("OnCarsAdded")
+    if onCarsAdded then
+        print("✅ Found OnCarsAdded RemoteEvent")
+        print("   This might accept car data from client")
+        self.VulnerabilitiesFound = self.VulnerabilitiesFound + 1
+    end
+    
+    -- Check for UpdateCarPack remote
+    local updateCarPack = ReplicatedStorage.Remotes:FindFirstChild("UpdateCarPack")
+    if updateCarPack then
+        print("✅ Found UpdateCarPack RemoteEvent")
+        print("   Might accept car data updates")
+        self.VulnerabilitiesFound = self.VulnerabilitiesFound + 1
+    end
+    
+    -- Check for SetCarFavorite
+    local setFavorite = ReplicatedStorage.Remotes:FindFirstChild("SetCarFavorite")
+    if setFavorite then
+        print("✅ Found SetCarFavorite RemoteEvent")
+        print("   Might be used to manipulate car ownership")
+        self.VulnerabilitiesFound = self.VulnerabilitiesFound + 1
+    end
+    
+    -- Check CarReplication for editable values
+    local carReplication = player.PlayerGui:FindFirstChild("CarReplication")
+    if carReplication then
+        print("✅ Found CarReplication UI")
+        print("   Contains: " .. #carReplication:GetChildren() .. " car frames")
+        
+        -- Check if values can be modified
+        for _, carFrame in pairs(carReplication:GetChildren()) do
+            local stats = carFrame:FindFirstChild("Stats")
+            if stats then
+                for _, value in pairs(stats:GetChildren()) do
+                    if value:IsA("StringValue") or value:IsA("IntValue") then
+                        print("   Car " .. carFrame.Name .. " has value: " .. value.Name)
+                    end
+                end
+            end
+        end
+    end
+    
+    print("\n📊 Vulnerabilities found: " .. self.VulnerabilitiesFound)
+end
+
+-- Step 4: Extract car data from current car
+function CarDuplicator:ExtractCarData()
+    if not self.CurrentCar then
+        print("❌ No current car to extract data from")
+        return nil
+    end
+    
+    print("\n🔍 Extracting data from current car...")
+    
+    local carData = {
+        extractedAt = os.time(),
+        source = self.CurrentCar:GetFullName()
+    }
+    
+    -- Extract from Vehicle model (if in Workspace)
+    if self.CurrentCar:IsA("Model") then
+        carData.type = "Model"
+        carData.Name = self.CurrentCar.Name
+        
+        -- Try to get configuration
+        local configuration = self.CurrentCar:FindFirstChild("Configuration")
+        if configuration then
+            for _, attribute in pairs(configuration:GetAttributes()) do
+                carData[attribute] = configuration:GetAttribute(attribute)
+            end
+        end
+        
+        -- Check for VehicleSeat properties
+        local vehicleSeat = self.CurrentCar:FindFirstChild("VehicleSeat")
+        if vehicleSeat then
+            carData.SeatType = vehicleSeat.ClassName
+        end
+        
+        print("✅ Extracted from Model: " .. self.CurrentCar.Name)
+        
+    -- Extract from CarReplication frame
+    elseif self.CurrentCar:IsA("Frame") then
+        carData.type = "UIFrame"
+        carData.Name = self.CurrentCar.Name
+        
+        -- Extract from Stats folder
+        local stats = self.CurrentCar:FindFirstChild("Stats")
+        if stats then
+            for _, value in pairs(stats:GetChildren()) do
+                if value:IsA("StringValue") or value:IsA("IntValue") then
+                    carData[value.Name] = value.Value
+                end
+            end
+        end
+        
+        print("✅ Extracted from UI Frame: " .. self.CurrentCar.Name)
+        print("   Stats: " .. tostring(#stats:GetChildren()))
+    end
+    
+    -- Display extracted data
+    print("\n📋 EXTRACTED CAR DATA:")
+    for key, value in pairs(carData) do
+        if type(value) == "string" or type(value) == "number" then
+            print("  " .. key .. ": " .. tostring(value))
+        end
+    end
+    
+    return carData
+end
+
+-- Step 5: Attempt duplication via found vulnerabilities
+function CarDuplicator:AttemptDuplication(extractedData)
+    print("\n🎯 ATTEMPTING DUPLICATION...")
+    
+    if not extractedData then
+        print("❌ No data to duplicate")
+        return false
+    end
+    
+    local successCount = 0
+    
+    -- Method 1: Try OnCarsAdded
+    print("\n🔄 Method 1: OnCarsAdded")
+    local onCarsAdded = self.CarService:FindFirstChild("OnCarsAdded")
+    if onCarsAdded then
+        -- Create duplicate car data
+        local duplicateData = {}
+        for k, v in pairs(extractedData) do
+            duplicateData[k] = v
+        end
+        
+        -- Modify to make unique
+        duplicateData.Id = "dup-" .. os.time() .. "-" .. math.random(1000, 9999)
+        duplicateData.Name = duplicateData.Name .. " (DUPLICATE)"
+        duplicateData.Duplicated = true
+        duplicateData.DuplicateTime = os.time()
+        
+        -- Attempt to send
+        local success, result = pcall(function()
+            onCarsAdded:FireServer({duplicateData})
+            return "Fired"
+        end)
+        
+        if success then
+            print("✅ OnCarsAdded fired successfully")
+            successCount = successCount + 1
+        else
+            print("❌ Error: " .. tostring(result))
+        end
+    end
+    
+    -- Method 2: Try UpdateCarPack
+    print("\n🔄 Method 2: UpdateCarPack")
+    local updateCarPack = ReplicatedStorage.Remotes:FindFirstChild("UpdateCarPack")
+    if updateCarPack then
+        local duplicateData = {
+            Id = "pack-dup-" .. os.time(),
+            Name = extractedData.Name or "Duplicated Car",
+            Action = "add",
+            Player = player
+        }
+        
+        local success, result = pcall(function()
+            updateCarPack:FireServer(duplicateData)
+            return "Fired"
+        end)
+        
+        if success then
+            print("✅ UpdateCarPack fired")
+            successCount = successCount + 1
+        end
+    end
+    
+    -- Method 3: Try SetCarFavorite (might trigger ownership)
+    print("\n🔄 Method 3: SetCarFavorite")
+    local setFavorite = ReplicatedStorage.Remotes:FindFirstChild("SetCarFavorite")
+    if setFavorite then
+        -- Try to mark car as favorite (might give ownership)
+        local carId = extractedData.Id or "car-" .. os.time()
+        
+        local success, result = pcall(function()
+            setFavorite:FireServer(carId, true)  -- true = favorite
+            return "Fired"
+        end)
+        
+        if success then
+            print("✅ SetCarFavorite fired for ID: " .. carId)
+            successCount = successCount + 1
+        end
+    end
+    
+    -- Method 4: Direct CarReplication manipulation
+    print("\n🔄 Method 4: CarReplication manipulation")
+    local carReplication = player.PlayerGui:FindFirstChild("CarReplication")
+    if carReplication then
+        -- Create duplicate car frame
+        local duplicateFrame = Instance.new("Frame")
+        duplicateFrame.Name = "dup-" .. os.time()
+        duplicateFrame.Size = UDim2.new(0, 200, 0, 100)
+        duplicateFrame.Position = UDim2.new(0, 0, 0, 0)
+        duplicateFrame.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+        duplicateFrame.Visible = true
+        duplicateFrame.Parent = carReplication
+        
+        -- Add stats folder
+        local stats = Instance.new("Folder")
+        stats.Name = "Stats"
+        stats.Parent = duplicateFrame
+        
+        -- Add values
+        local nameValue = Instance.new("StringValue")
+        nameValue.Name = "Name"
+        nameValue.Value = extractedData.Name .. " [DUP]"
+        nameValue.Parent = stats
+        
+        local classValue = Instance.new("IntValue")
+        classValue.Name = "Class"
+        classValue.Value = extractedData.Class or 1
+        classValue.Parent = stats
+        
+        local ownerValue = Instance.new("StringValue")
+        ownerValue.Name = "Owner"
+        ownerValue.Value = player.Name
+        ownerValue.Parent = stats
+        
+        print("✅ Created duplicate in CarReplication")
+        successCount = successCount + 1
+    end
+    
+    print("\n📊 DUPLICATION RESULTS:")
+    print("Methods attempted: 4")
+    print("Methods successful: " .. successCount)
+    
+    return successCount > 0
+end
+
+-- Step 6: Monitor inventory access
+function CarDuplicator:MonitorInventory()
+    print("\n📊 Monitoring inventory access...")
+    
+    -- Track when inventory is opened
+    local inventoryOpened = false
+    local lastInventoryAccess = 0
+    
+    RunService.Heartbeat:Connect(function()
+        -- Check if inventory GUI is visible
+        local inventory = player.PlayerGui.Menu:FindFirstChild("Inventory")
+        if inventory and inventory.Visible then
+            if not inventoryOpened then
+                inventoryOpened = true
+                lastInventoryAccess = os.time()
+                print("📂 INVENTORY OPENED at " .. os.date("%H:%M:%S"))
+                
+                -- Log what happens when inventory opens
+                self:LogInventoryActivity()
+            end
+        else
+            inventoryOpened = false
+        end
+    end)
+    
+    print("✅ Inventory monitor active")
+end
+
+function CarDuplicator:LogInventoryActivity()
+    print("🔍 Recording inventory activity...")
+    
+    -- Check what remotes are called when inventory opens
+    task.wait(1)  -- Wait for inventory to load
+    
+    -- Get current car count
+    local carList = self.CarService.GetOwnedCars:InvokeServer()
+    print("📦 Cars in inventory: " .. #carList)
+    
+    -- Check CarReplication
+    local carReplication = player.PlayerGui:FindFirstChild("CarReplication")
+    if carReplication then
+        print("🔄 CarReplication updated, cars: " .. #carReplication:GetChildren())
+    end
+end
+
+-- Step 7: Run the complete system
+function CarDuplicator:Run()
+    print("🚀 Starting Intelligent Car Duplication System...")
+    
+    -- Detect current car
+    local currentCar = self:DetectCurrentCar()
+    if not currentCar then
+        print("⚠️ Please enter/sit in a car first!")
+        print("Then run the script again")
+        return
+    end
+    
+    -- Setup monitoring
+    self:MonitorDataAccess()
+    self:MonitorInventory()
+    
+    -- Find vulnerabilities
+    self:FindVulnerabilities()
+    
+    -- Extract car data
+    local extractedData = self:ExtractCarData()
+    
+    if extractedData then
+        -- Ask user if they want to duplicate
+        print("\n" .. string.rep("=", 60))
+        print("🎮 DUPLICATION READY!")
+        print("Current car: " .. tostring(extractedData.Name))
+        print("Vulnerabilities found: " .. self.VulnerabilitiesFound)
+        print("\n💡 Do you want to attempt duplication?")
+        print("Type: duplicate() to start")
+        
+        -- Make function available
+        _G.duplicate = function()
+            return self:AttemptDuplication(extractedData)
+        end
+        
+        print("\n✅ System ready! Type 'duplicate()' in console to duplicate")
+    end
+    
+    -- Auto-monitor for 5 minutes
+    delay(300, function()
+        print("\n🛑 Auto-monitoring ended")
+        print("Total calls detected: " .. #self.DetectedCalls)
+    end)
+end
+
+-- Start the system
+CarDuplicator:Run()
