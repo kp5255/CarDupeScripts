@@ -1,7 +1,7 @@
--- 🚗 STATIC CAR DUPLICATOR (NO MOVEMENT)
+-- 🎯 REAL CAR DUPLICATOR - CORRECT FORMAT
 -- Place ID: 1554960397 - NY SALE! Car Dealership Tycoon
 
-print("🚗 STATIC DUPLICATOR - NO MOVEMENT")
+print("🎯 REAL CAR DUPLICATOR - TARGETING YOUR ACTUAL CARS")
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -10,74 +10,70 @@ local player = Players.LocalPlayer
 repeat task.wait() until game:IsLoaded()
 task.wait(2)
 
--- Prevent any character movement
-local function disableMovement()
-    print("\n🛑 DISABLING CHARACTER MOVEMENT")
-    
-    if player.Character then
-        local humanoid = player.Character:FindFirstChild("Humanoid")
-        if humanoid then
-            -- Disable movement but keep script running
-            pcall(function()
-                humanoid.WalkSpeed = 0
-                humanoid.JumpPower = 0
-                print("✅ Movement disabled")
-            end)
-        end
-    end
-end
+-- ===== YOUR ACTUAL CARS FROM SCREENSHOT =====
+local YOUR_CARS = {
+    "Bontlay Bontaga",
+    "Jegar Model F", 
+    "Sportler Tecan",
+    "Lavish Ventoge",
+    "Lavish Ventoge Car",
+    "Corsaro T8"
+}
 
--- ===== STEP 1: CHECK INVENTORY WITHOUT MOVING =====
-local function checkInventoryStatic()
-    print("\n📦 CHECKING INVENTORY (STATIC)...")
+-- ===== STEP 1: FIND WHERE CARS ARE STORED =====
+local function findCarStorage()
+    print("\n🔍 FINDING CAR STORAGE SYSTEM...")
     
-    local carCount = 0
-    local carNames = {}
+    -- Look for OWNEDCARS or similar
+    local storageLocations = {}
     
-    -- Check all player folders without moving
+    -- Check all player folders
     for _, folder in pairs(player:GetChildren()) do
         if folder:IsA("Folder") then
+            print("Checking folder: " .. folder.Name)
+            
+            -- Check folder contents
             for _, item in pairs(folder:GetChildren()) do
-                if item.Name:find("Car") or item.Name:find("Vehicle") then
-                    carCount = carCount + 1
-                    table.insert(carNames, item.Name)
+                print("  - " .. item.Name .. " (" .. item.ClassName .. ")")
+                
+                -- If it's a car or has car data
+                if item:IsA("StringValue") or item:IsA("Folder") then
+                    local name = item.Name:lower()
+                    if name:find("car") or name:find("vehicle") or name:find("owned") then
+                        table.insert(storageLocations, folder)
+                        print("  ✅ Potential car storage!")
+                        break
+                    end
                 end
             end
         end
     end
     
-    -- Check leaderstats
-    if player:FindFirstChild("leaderstats") then
-        for _, stat in pairs(player.leaderstats:GetChildren()) do
-            if stat:IsA("IntValue") or stat:IsA("NumberValue") then
-                if stat.Name:lower():find("car") then
-                    print("Car stat: " .. stat.Name .. " = " .. stat.Value)
+    -- Check for specific values with car names
+    for _, value in pairs(player:GetDescendants()) do
+        if value:IsA("StringValue") then
+            for _, carName in pairs(YOUR_CARS) do
+                if value.Value == carName or value.Name == carName then
+                    print("Found car value: " .. value.Name .. " = " .. value.Value)
+                    table.insert(storageLocations, value.Parent)
                 end
             end
         end
     end
     
-    print("Found " .. carCount .. " cars in inventory")
-    if carCount > 0 then
-        print("Car names:")
-        for i, name in ipairs(carNames) do
-            print("  " .. i .. ". " .. name)
-        end
-    end
-    
-    return carNames
+    return storageLocations
 end
 
--- ===== STEP 2: STATIC DUPLICATION ATTEMPTS =====
-local function staticDuplicateCars(carNames)
-    print("\n⚡ STATIC DUPLICATION ATTEMPTS")
+-- ===== STEP 2: DUPLICATE YOUR ACTUAL CARS =====
+local function duplicateYourActualCars()
+    print("\n⚡ DUPLICATING YOUR ACTUAL CARS...")
     
-    if #carNames == 0 then
-        print("❌ No cars to duplicate!")
-        return false
+    print("Your cars to duplicate:")
+    for i, carName in pairs(YOUR_CARS) do
+        print(i .. ". " .. carName)
     end
     
-    -- Find events WITHOUT moving character
+    -- Find purchase events
     local events = {}
     
     for _, obj in pairs(ReplicatedStorage:GetChildren()) do
@@ -90,45 +86,69 @@ local function staticDuplicateCars(carNames)
         end
     end
     
-    print("Found " .. #events .. " events")
+    print("Found " .. #events .. " events to try")
     
-    -- Try duplication with each car
-    local attempts = 0
+    -- Try to duplicate EACH of your cars
+    local totalAttempts = 0
+    local successfulEvents = {}
     
-    for _, carName in pairs(carNames) do
-        print("\nTrying: " .. carName)
+    for _, carName in pairs(YOUR_CARS) do
+        print("\n🎯 Targeting: " .. carName)
         
         for _, eventData in pairs(events) do
             local event = eventData.Object
             
-            -- Simple argument patterns (no player movement)
+            -- Try different formats for THIS specific game
             local patterns = {
+                -- Basic format
                 {carName},
+                
+                -- With price
                 {carName, 0},
                 {carName, 1},
+                {carName, 100},
+                
+                -- With player
+                {player, carName},
+                
+                -- Purchase format
                 {"buy", carName},
+                {"purchase", carName},
                 {"add", carName},
-                {"duplicate", carName}
+                
+                -- For multi-word names like "Bontlay Bontaga"
+                {carName:gsub(" ", "")},  -- Remove spaces: "BontlayBontaga"
+                {carName:split(" ")[1]},  -- First word: "Bontlay"
+                {carName:split(" ")[2]},  -- Second word: "Bontaga"
+                
+                -- Special formats
+                {Vehicle = carName},
+                {CarName = carName},
+                {Model = carName}
             }
             
-            for i, args in pairs(patterns) do
-                attempts = attempts + 1
+            for patternIndex, args in pairs(patterns) do
+                totalAttempts = totalAttempts + 1
                 
                 local success, errorMsg = pcall(function()
                     if eventData.Type == "RemoteEvent" then
                         event:FireServer(unpack(args))
-                        return true
+                        return "sent"
                     else
                         event:InvokeServer(unpack(args))
-                        return true
+                        return "invoked"
                     end
                 end)
                 
                 if success then
-                    print("✅ Attempt " .. attempts .. " via " .. eventData.Name)
+                    print("✅ Attempt via " .. eventData.Name .. " (pattern " .. patternIndex .. ")")
                     
-                    -- Rapid fire a few times
-                    for j = 1, 3 do
+                    if not successfulEvents[eventData.Name] then
+                        successfulEvents[eventData.Name] = true
+                    end
+                    
+                    -- Rapid fire if successful
+                    for i = 1, 5 do
                         pcall(function()
                             if eventData.Type == "RemoteEvent" then
                                 event:FireServer(unpack(args))
@@ -143,48 +163,96 @@ local function staticDuplicateCars(carNames)
         end
     end
     
-    print("\n📊 Total attempts: " .. attempts)
-    return attempts > 0
+    print("\n📊 STATISTICS:")
+    print("Total attempts: " .. totalAttempts)
+    print("Successful events: " .. #(successfulEvents))
+    
+    if next(successfulEvents) then
+        print("Events that accepted calls:")
+        for eventName in pairs(successfulEvents) do
+            print("  - " .. eventName)
+        end
+    end
+    
+    return totalAttempts
 end
 
--- ===== STEP 3: SIMPLE UI (NO MOVEMENT) =====
-local function createStaticUI()
+-- ===== STEP 3: CHECK ACTUAL CAR COUNT =====
+local function checkActualCarCount()
+    print("\n📦 CHECKING ACTUAL CAR COUNT...")
+    
+    local foundCars = {}
+    
+    -- Look for your cars in ANY format
+    for _, carName in pairs(YOUR_CARS) do
+        -- Check if car exists in player data
+        local found = false
+        
+        for _, obj in pairs(player:GetDescendants()) do
+            if obj:IsA("StringValue") and obj.Value == carName then
+                found = true
+                break
+            elseif obj.Name == carName then
+                found = true
+                break
+            end
+        end
+        
+        if found then
+            table.insert(foundCars, carName)
+        end
+    end
+    
+    print("Found " .. #foundCars .. "/" .. #YOUR_CARS .. " of your cars")
+    
+    if #foundCars > 0 then
+        print("Your cars:")
+        for i, car in ipairs(foundCars) do
+            print(i .. ". " .. car)
+        end
+    end
+    
+    return #foundCars
+end
+
+-- ===== STEP 4: CREATE TARGETED UI =====
+local function createTargetedUI()
     local gui = Instance.new("ScreenGui")
-    gui.Name = "StaticDuplicator"
     gui.Parent = player:WaitForChild("PlayerGui")
     
     local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(0, 300, 0, 200)
-    frame.Position = UDim2.new(0.5, -150, 0.8, -100)  -- Bottom center
+    frame.Size = UDim2.new(0, 350, 0, 300)
+    frame.Position = UDim2.new(0.5, -175, 0.5, -150)
     frame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
     frame.BorderSizePixel = 0
     frame.Parent = gui
     
     local title = Instance.new("TextLabel")
-    title.Text = "🚗 STATIC DUPLICATOR"
+    title.Text = "🎯 TARGETED CAR DUPLICATOR"
     title.Size = UDim2.new(1, 0, 0, 40)
     title.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
     title.TextColor3 = Color3.new(1, 1, 1)
     title.Font = Enum.Font.GothamBold
-    title.TextSize = 18
+    title.TextSize = 16
     title.Parent = frame
     
     local status = Instance.new("TextLabel")
-    status.Text = "Ready. Will NOT move your character.\n\nClick buttons below."
-    status.Size = UDim2.new(1, -20, 0, 80)
+    status.Text = "Targeting YOUR cars:\n\n• Bontlay Bontaga\n• Jegar Model F\n• Sportler Tecan\n• Lavish Ventoge\n• Corsaro T8"
+    status.Size = UDim2.new(1, -20, 0, 130)
     status.Position = UDim2.new(0, 10, 0, 50)
     status.BackgroundTransparency = 1
     status.TextColor3 = Color3.new(1, 1, 1)
     status.Font = Enum.Font.Gotham
     status.TextSize = 14
     status.TextWrapped = true
+    status.TextXAlignment = Enum.TextXAlignment.Left
     status.Parent = frame
     
-    -- Button 1: Check Cars
+    -- Button 1: Check Storage
     local btn1 = Instance.new("TextButton")
-    btn1.Text = "🔍 CHECK CARS"
+    btn1.Text = "🔍 FIND STORAGE"
     btn1.Size = UDim2.new(1, -40, 0, 35)
-    btn1.Position = UDim2.new(0, 20, 0, 140)
+    btn1.Position = UDim2.new(0, 20, 0, 190)
     btn1.BackgroundColor3 = Color3.fromRGB(50, 120, 220)
     btn1.TextColor3 = Color3.new(1, 1, 1)
     btn1.Font = Enum.Font.GothamBold
@@ -192,26 +260,19 @@ local function createStaticUI()
     btn1.Parent = frame
     
     btn1.MouseButton1Click:Connect(function()
-        local cars = checkInventoryStatic()
-        if #cars > 0 then
-            local text = "Found " .. #cars .. " cars:\n"
-            for i = 1, math.min(3, #cars) do
-                text = text .. "• " .. cars[i] .. "\n"
-            end
-            if #cars > 3 then
-                text = text .. "... and " .. (#cars - 3) .. " more\n"
-            end
-            status.Text = text
-        else
-            status.Text = "No cars found!\nBuy some cars first."
-        end
+        status.Text = "Finding car storage..."
+        task.spawn(function()
+            findCarStorage()
+            local count = checkActualCarCount()
+            status.Text = "Found " .. count .. " cars in storage.\nCheck console for details."
+        end)
     end)
     
-    -- Button 2: Duplicate
+    -- Button 2: Duplicate All
     local btn2 = Instance.new("TextButton")
-    btn2.Text = "⚡ DUPLICATE"
+    btn2.Text = "⚡ DUPLICATE ALL"
     btn2.Size = UDim2.new(1, -40, 0, 35)
-    btn2.Position = UDim2.new(0, 20, 0, 185)
+    btn2.Position = UDim2.new(0, 20, 0, 235)
     btn2.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
     btn2.TextColor3 = Color3.new(1, 1, 1)
     btn2.Font = Enum.Font.GothamBold
@@ -219,21 +280,20 @@ local function createStaticUI()
     btn2.Parent = frame
     
     btn2.MouseButton1Click:Connect(function()
-        status.Text = "Duplicating...\nStay still!\n\nCheck console."
+        status.Text = "Duplicating ALL your cars...\nThis may take 10-15 seconds.\nCheck console!"
         btn2.Text = "WORKING..."
         btn2.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
         
         task.spawn(function()
-            local cars = checkInventoryStatic()
-            staticDuplicateCars(cars)
+            local beforeCount = checkActualCarCount()
+            local attempts = duplicateYourActualCars()
             
-            task.wait(2)
+            task.wait(3)
             
-            -- Check results
-            local newCars = checkInventoryStatic()
-            status.Text = "Complete!\n\nCars before: " .. #cars .. "\nCars after: " .. #newCars
+            local afterCount = checkActualCarCount()
+            status.Text = "Complete!\n\nBefore: " .. beforeCount .. " cars\nAfter: " .. afterCount .. " cars\n\nAttempts: " .. attempts
             
-            btn2.Text = "DUPLICATE"
+            btn2.Text = "DUPLICATE ALL"
             btn2.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
         end)
     end)
@@ -245,73 +305,60 @@ local function createStaticUI()
     return gui, status
 end
 
--- ===== STEP 4: SAFE AUTOMATIC DUPLICATION =====
-local function safeAutoDuplicate()
-    print("\n🤖 SAFE AUTOMATIC DUPLICATION")
-    
-    -- Step 1: Check current cars
-    local currentCars = checkInventoryStatic()
-    
-    if #currentCars == 0 then
-        print("❌ No cars found! Buy cars first.")
-        return false
-    end
-    
-    print("Starting with " .. #currentCars .. " cars")
-    
-    -- Step 2: Try duplication
-    local success = staticDuplicateCars(currentCars)
-    
-    -- Step 3: Check results
-    task.wait(3)
-    local newCars = checkInventoryStatic()
-    
-    print("\n" .. string.rep("=", 50))
-    print("RESULTS:")
-    print("Before: " .. #currentCars .. " cars")
-    print("After: " .. #newCars .. " cars")
-    
-    if #newCars > #currentCars then
-        print("🎉 SUCCESS! Gained " .. (#newCars - #currentCars) .. " cars!")
-        return true
-    else
-        print("⚠️ No new cars gained")
-        print("Server is rejecting requests.")
-        return false
-    end
-end
-
 -- ===== MAIN EXECUTION =====
 print("\n" .. string.rep("=", 70))
-print("🚗 STATIC CAR DUPLICATOR")
+print("🎯 TARGETING YOUR ACTUAL CARS")
 print(string.rep("=", 70))
-print("\n⚠️ IMPORTANT: This script will NOT move your character!")
-print("It works from your current position.")
-
--- Disable movement first
-disableMovement()
+print("\nYOUR CARS IDENTIFIED:")
+print("1. Bontlay Bontaga")
+print("2. Jegar Model F")
+print("3. Sportler Tecan")
+print("4. Lavish Ventoge")
+print("5. Corsaro T8")
 
 -- Create UI
 task.wait(1)
-local gui, status = createStaticUI()
+local gui, status = createTargetedUI()
 
 -- Auto-start after 3 seconds
 task.wait(3)
-status.Text = "Auto-starting in 3... 2... 1..."
-task.wait(1)
+status.Text = "Auto-starting duplication...\n\nTargeting your 5 cars.\nCheck console!"
 
-status.Text = "Running safe duplication...\n\nCheck console for details."
-safeAutoDuplicate()
+-- Initial check
+local initialCount = checkActualCarCount()
+print("\nInitial car count: " .. initialCount)
 
--- Final status
+-- Run duplication
 task.wait(2)
-status.Text = "Script complete!\n\nCheck your inventory.\nIf no new cars, server has protection."
+local attempts = duplicateYourActualCars()
+
+-- Check results
+task.wait(3)
+local finalCount = checkActualCarCount()
 
 print("\n" .. string.rep("=", 70))
-print("📋 STATIC METHOD COMPLETE")
+print("🎯 RESULTS")
 print(string.rep("=", 70))
-print("\nThis script:")
-print("1. Does NOT move your character")
-print("2. Works from current position")
-print("3. Only sends network requests")
-print("4. Cannot force movement or teleport")
+print("Cars before: " .. initialCount)
+print("Cars after: " .. finalCount)
+print("Duplication attempts: " .. attempts)
+
+if finalCount > initialCount then
+    print("\n🎉 SUCCESS! Gained " .. (finalCount - initialCount) .. " new cars!")
+    status.Text = "🎉 SUCCESS!\n\nGained " .. (finalCount - initialCount) .. " cars!\nCheck your garage!"
+else
+    print("\n⚠️ No new cars gained.")
+    print("\nPossible issues:")
+    print("1. Server rejecting all requests")
+    print("2. Cars stored in different format")
+    print("3. Need specific event arguments")
+    
+    status.Text = "⚠️ No new cars.\n\nServer is rejecting requests.\nTry buying/selling a car first."
+end
+
+-- Final tip
+print("\n💡 TIP: Try this:")
+print("1. Sell one of your cars")
+print("2. Buy it back")
+print("3. Run script again")
+print("4. Game might sync differently")
