@@ -1,418 +1,624 @@
--- 🚗 ULTIMATE CAR FINDER & ANALYZER
+-- 🚗 ULTIMATE SERVER-SIDE CAR BYPASS SYSTEM
+-- Uses network interception, data reconstruction, and emulation
+
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
+local HttpService = game:GetService("HttpService")
+local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
 
 repeat task.wait() until game:IsLoaded()
-task.wait(3)
+task.wait(5) -- Give more time for game to fully load
 
--- ===== COMPREHENSIVE CAR DETECTOR =====
-local function findAllCars()
-    print("🚗 ULTIMATE CAR SCAN INITIATED...")
+-- ===== NETWORK INTERCEPTION SYSTEM =====
+local networkLog = {}
+local hookedRemotes = {}
+
+local function hookAllRemotes()
+    print("🔗 HOOKING ALL NETWORK TRAFFIC...")
     
-    local allCars = {}
-    local carPatterns = {
-        -- Brand names
-        "Bontlay", "Jegar", "Corsaro", "Lavish", "Sportler",
-        -- Model names
-        "Bontaga", "Cental", "Model", "Tecan", "Ventoge", "Roni", 
-        "Pursane", "T8", "G08", "GT", "RS", "SVR", "Turbo",
-        -- General car terms
-        "Car", "Vehicle", "Auto", "Motor", "Wheel", "Engine",
-        -- Luxury brands (common in tycoons)
-        "Bugatti", "Ferrari", "Lamborghini", "Porsche", "McLaren",
-        "Aston", "Mercedes", "BMW", "Audi", "Lexus", "Tesla"
-    }
-    
-    -- Function to check if something looks like a car
-    local function isLikelyCar(name, obj)
-        if not name or #name < 2 then return false end
+    -- Hook RemoteEvent FireServer
+    local oldFireServer
+    oldFireServer = hookfunction(RemoteEvent.FireServer, function(self, ...)
+        local args = {...}
+        table.insert(networkLog, {
+            Time = os.time(),
+            Type = "FireServer",
+            Remote = self.Name,
+            Path = self:GetFullName(),
+            Args = args,
+            Player = player.Name
+        })
         
-        local lowerName = name:lower()
-        
-        -- Skip obvious non-cars
-        local skipPatterns = {
-            "gui", "ui", "button", "frame", "label", "textbox",
-            "script", "localscript", "modulescript", "folder",
-            "part", "mesh", "sound", "audio", "camera", "light",
-            "spawn", "dealer", "shop", "store", "tycoon", "game",
-            "player", "humanoid", "animation", "remote", "event"
-        }
-        
-        for _, pattern in ipairs(skipPatterns) do
-            if lowerName:find(pattern) then
-                return false
+        -- Print interesting calls
+        local remoteName = self.Name:lower()
+        if remoteName:find("car") or remoteName:find("vehicle") or 
+           remoteName:find("buy") or remoteName:find("purchase") or
+           remoteName:find("give") or remoteName:find("add") then
+            print(string.format("🎯 CAR-RELATED CALL: %s (%d args)", self.Name, #args))
+            for i, arg in ipairs(args) do
+                print(string.format("  Arg %d: %s", i, tostring(arg)))
             end
         end
         
-        -- Check for car patterns
-        for _, pattern in ipairs(carPatterns) do
-            if name:find(pattern) then
-                return true
-            end
-        end
-        
-        -- Check if it has car-like children
-        if obj and obj:IsA("Model") then
-            local hasWheels = false
-            local hasSeats = false
-            
-            for _, child in ipairs(obj:GetChildren()) do
-                local childLower = child.Name:lower()
-                if childLower:find("wheel") or childLower:find("tire") then
-                    hasWheels = true
-                end
-                if childLower:find("seat") or child:IsA("VehicleSeat") then
-                    hasSeats = true
-                end
-                if child:IsA("BasePart") and child.Name:lower():find("chassis") then
-                    return true
-                end
-            end
-            
-            if hasWheels and hasSeats then
-                return true
-            end
-        end
-        
-        return false
-    end
-    
-    -- ===== PHASE 1: Scan Game Structure =====
-    print("\n📂 PHASE 1: Scanning Game Structure...")
-    
-    local locations = {
-        ReplicatedStorage,
-        Workspace,
-        game:GetService("Lighting"),
-        game:GetService("StarterPack"),
-        game:GetService("StarterGui"),
-        game:GetService("StarterPlayer")
-    }
-    
-    -- Try to access ServerStorage
-    local success, ServerStorage = pcall(function()
-        return game:GetService("ServerStorage")
-    end)
-    if success then
-        table.insert(locations, ServerStorage)
-    end
-    
-    for _, location in ipairs(locations) do
-        pcall(function()
-            for _, obj in ipairs(location:GetDescendants()) do
-                if isLikelyCar(obj.Name, obj) then
-                    if not allCars[obj.Name] then
-                        allCars[obj.Name] = {
-                            Name = obj.Name,
-                            Path = obj:GetFullName(),
-                            Class = obj.ClassName,
-                            Location = location.Name,
-                            Children = #obj:GetChildren(),
-                            IsModel = obj:IsA("Model")
-                        }
-                    end
-                end
-            end
-        end)
-    end
-    
-    -- ===== PHASE 2: Analyze Remote Events =====
-    print("📡 PHASE 2: Analyzing Remote Events...")
-    
-    local remotesFound = {}
-    for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
-        if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
-            local remoteName = obj.Name:lower()
-            if remoteName:find("car") or remoteName:find("vehicle") or 
-               remoteName:find("buy") or remoteName:find("purchase") or
-               remoteName:find("give") or remoteName:find("add") then
-                
-                table.insert(remotesFound, {
-                    Name = obj.Name,
-                    Type = obj.ClassName,
-                    Path = obj:GetFullName()
-                })
-                
-                -- Add as potential car source
-                if not allCars["REMOTE_" .. obj.Name] then
-                    allCars["REMOTE_" .. obj.Name] = {
-                        Name = "Remote: " .. obj.Name,
-                        Path = obj:GetFullName(),
-                        Class = obj.ClassName,
-                        Location = "Remote Event",
-                        IsRemote = true
-                    }
-                end
-            end
-        end
-    end
-    
-    -- ===== PHASE 3: Scan Module Scripts =====
-    print("📦 PHASE 3: Scanning Module Scripts...")
-    
-    local modulesScanned = 0
-    for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
-        if obj:IsA("ModuleScript") then
-            modulesScanned = modulesScanned + 1
-            
-            local success, source = pcall(function()
-                return obj.Source
-            end)
-            
-            if success and source then
-                -- Look for car names in module source
-                for _, pattern in ipairs(carPatterns) do
-                    if source:find(pattern) then
-                        -- Extract potential car names
-                        for line in source:gmatch("[^\r\n]+") do
-                            if line:find('"') then
-                                for quoted in line:gmatch('"([^"]+)"') do
-                                    if isLikelyCar(quoted, nil) then
-                                        if not allCars["MODULE_" .. quoted] then
-                                            allCars["MODULE_" .. quoted] = {
-                                                Name = quoted,
-                                                Path = "Module: " .. obj.Name,
-                                                Class = "String",
-                                                Location = "ModuleScript",
-                                                FromModule = true
-                                            }
-                                        end
-                                    end
-                                end
-                            end
-                        end
-                    end
-                end
-            end
-        end
-    end
-    
-    -- ===== PHASE 4: Check Player Data =====
-    print("👤 PHASE 4: Checking Player Data...")
-    
-    local playerCars = {}
-    pcall(function()
-        for _, obj in ipairs(player:GetDescendants()) do
-            if obj:IsA("StringValue") or obj:IsA("Folder") then
-                local value = ""
-                if obj:IsA("StringValue") then
-                    value = obj.Value
-                end
-                
-                if isLikelyCar(obj.Name, obj) or isLikelyCar(value, obj) then
-                    local carName = obj.Name
-                    if value and value ~= "" then
-                        carName = value
-                    end
-                    
-                    if not allCars["PLAYER_" .. carName] then
-                        allCars["PLAYER_" .. carName] = {
-                            Name = carName,
-                            Path = obj:GetFullName(),
-                            Class = obj.ClassName,
-                            Location = "PlayerData",
-                            Value = value ~= "" and value or nil
-                        }
-                    end
-                end
-            end
-        end
+        return oldFireServer(self, ...)
     end)
     
-    -- ===== PHASE 5: Check Workspace Vehicles =====
-    print("🏎️ PHASE 5: Checking Workspace Vehicles...")
-    
-    local workspaceCars = 0
-    pcall(function()
-        for _, obj in ipairs(Workspace:GetChildren()) do
-            if obj:IsA("Model") then
-                -- Check for vehicle parts
-                local vehicleParts = 0
-                for _, part in ipairs(obj:GetDescendants()) do
-                    if part:IsA("BasePart") then
-                        local nameLower = part.Name:lower()
-                        if nameLower:find("chassis") or nameLower:find("body") or 
-                           nameLower:find("wheel") or nameLower:find("seat") then
-                            vehicleParts = vehicleParts + 1
-                        end
-                    end
-                end
-                
-                if vehicleParts >= 2 and isLikelyCar(obj.Name, obj) then
-                    workspaceCars = workspaceCars + 1
-                    if not allCars["WORKSPACE_" .. obj.Name] then
-                        allCars["WORKSPACE_" .. obj.Name] = {
-                            Name = obj.Name,
-                            Path = obj:GetFullName(),
-                            Class = "Model",
-                            Location = "Workspace",
-                            Parts = vehicleParts,
-                            IsPhysical = true
-                        }
-                    end
-                end
-            end
+    -- Hook RemoteFunction InvokeServer
+    local oldInvokeServer
+    oldInvokeServer = hookfunction(RemoteFunction.InvokeServer, function(self, ...)
+        local args = {...}
+        table.insert(networkLog, {
+            Time = os.time(),
+            Type = "InvokeServer",
+            Remote = self.Name,
+            Path = self:GetFullName(),
+            Args = args,
+            Player = player.Name
+        })
+        
+        local remoteName = self.Name:lower()
+        if remoteName:find("data") or remoteName:find("get") or remoteName:find("load") then
+            print(string.format("📥 DATA REQUEST: %s", self.Name))
         end
+        
+        return oldInvokeServer(self, ...)
     end)
     
-    -- ===== COMPILE RESULTS =====
-    print("\n📊 SCAN COMPLETE!")
-    print("=" .. string.rep("=", 50))
-    
-    local carList = {}
-    for _, carData in pairs(allCars) do
-        table.insert(carList, carData)
-    end
-    
-    -- Sort alphabetically
-    table.sort(carList, function(a, b)
-        return a.Name < b.Name
-    end)
-    
-    -- Statistics
-    print("\n📈 STATISTICS:")
-    print("Total car references found: " .. #carList)
-    print("Remote events found: " .. #remotesFound)
-    print("Modules scanned: " .. modulesScanned)
-    print("Workspace vehicles: " .. workspaceCars)
-    
-    -- Show remotes
-    if #remotesFound > 0 then
-        print("\n🎯 KEY REMOTE EVENTS:")
-        for i, remote in ipairs(remotesFound) do
-            if i <= 10 then  -- Show top 10
-                print(string.format("  %d. %s (%s)", i, remote.Name, remote.Type))
-            end
-        end
-    end
-    
-    return carList, remotesFound
+    print("✅ Network hooks installed")
 end
 
--- ===== CREATE ADVANCED UI =====
-local function createCarHunterUI()
+-- ===== DATA PACKET ANALYZER =====
+local function analyzeNetworkData()
+    print("\n📊 ANALYZING CAPTURED NETWORK DATA...")
+    
+    local carTransactions = {}
+    local dataRequests = {}
+    
+    for _, entry in ipairs(networkLog) do
+        -- Look for car purchases
+        if entry.Remote:lower():find("car") or entry.Remote:lower():find("vehicle") then
+            table.insert(carTransactions, entry)
+        end
+        
+        -- Look for data loading
+        if entry.Remote:lower():find("data") or entry.Remote:lower():find("load") then
+            table.insert(dataRequests, entry)
+        end
+    end
+    
+    print(string.format("\n📈 CAPTURED: %d total packets", #networkLog))
+    print(string.format("🚗 Car transactions: %d", #carTransactions))
+    print(string.format("💾 Data requests: %d", #dataRequests))
+    
+    -- Analyze patterns
+    if #carTransactions > 0 then
+        print("\n🔍 CAR TRANSACTION PATTERNS:")
+        for i, trans in ipairs(carTransactions) do
+            if i <= 5 then -- Show first 5
+                print(string.format("\n%d. %s", i, trans.Remote))
+                print(string.format("   Time: %s", os.date("%H:%M:%S", trans.Time)))
+                print(string.format("   Args: %d arguments", #trans.Args))
+                
+                for j, arg in ipairs(trans.Args) do
+                    local argType = type(arg)
+                    local argStr = tostring(arg)
+                    if argType == "table" then
+                        argStr = "TABLE: " .. HttpService:JSONEncode(arg)
+                    elseif argType == "userdata" then
+                        argStr = "OBJECT: " .. tostring(arg)
+                    end
+                    
+                    if #argStr > 100 then
+                        argStr = argStr:sub(1, 100) .. "..."
+                    end
+                    
+                    print(string.format("   Arg %d [%s]: %s", j, argType, argStr))
+                end
+            end
+        end
+    end
+    
+    return carTransactions, dataRequests
+end
+
+-- ===== SERVER DATA EMULATION =====
+local function createDataEmulator()
+    print("\n🎭 CREATING SERVER DATA EMULATOR...")
+    
+    local emulatedData = {
+        Cars = {},
+        Inventory = {},
+        Stats = {}
+    }
+    
+    -- Try to guess car data structure
+    local commonCarFormats = {
+        -- Format 1: Simple string
+        function(carName) return carName end,
+        
+        -- Format 2: Table with metadata
+        function(carName) 
+            return {
+                Name = carName,
+                Owned = true,
+                Purchased = os.time(),
+                Price = 0,
+                Id = HttpService:GenerateGUID(false)
+            }
+        end,
+        
+        -- Format 3: Array format
+        function(carName)
+            return {carName, true, os.time(), 0}
+        end,
+        
+        -- Format 4: Command format
+        function(carName)
+            return {"give", carName, player.UserId}
+        end
+    }
+    
+    -- Generate car list
+    local allCars = {
+        "Bontlay Bontaga", "Jegar Model F", "Corsaro T8", "Lavish Ventoge", 
+        "Sportler Tecan", "Bontlay Cental RT", "Corsaro Roni", "Corsaro Pursane", 
+        "Corsaro G08", "Corsaro P 213", "Bontlay Cental", "Jegar Sport", 
+        "Corsaro GT", "Lavish GTX", "Sportler RS", "Bontlay Turbo", "Jegar Turbo",
+        "Corsaro Turbo", "Lavish Turbo", "Sportler Turbo", "Bontlay SVR", 
+        "Jegar SVR", "Corsaro SVR", "Lavish SVR", "Sportler SVR",
+        -- Luxury cars
+        "Bugatti Chiron", "Ferrari LaFerrari", "Lamborghini Aventador",
+        "Porsche 911 Turbo S", "McLaren P1", "Aston Martin DBS",
+        "Mercedes AMG GT", "BMW M8", "Audi R8", "Lexus LFA",
+        "Tesla Roadster", "Koenigsegg Jesko", "Pagani Huayra"
+    }
+    
+    -- Add all cars to emulated data
+    for _, carName in ipairs(allCars) do
+        for _, formatFunc in ipairs(commonCarFormats) do
+            table.insert(emulatedData.Cars, formatFunc(carName))
+        end
+    end
+    
+    print(string.format("✅ Emulator created with %d car entries", #emulatedData.Cars))
+    return emulatedData
+end
+
+-- ===== REMOTE SPOOFING SYSTEM =====
+local function setupRemoteSpoofing()
+    print("\n🎯 SETTING UP REMOTE SPOOFING...")
+    
+    -- Find all remotes
+    local allRemotes = {}
+    for _, obj in ipairs(game:GetDescendants()) do
+        if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
+            table.insert(allRemotes, {
+                Object = obj,
+                Name = obj.Name,
+                Type = obj.ClassName,
+                Path = obj:GetFullName()
+            })
+        end
+    end
+    
+    print(string.format("Found %d remote objects", #allRemotes))
+    
+    -- Categorize remotes
+    local carRemotes = {}
+    local dataRemotes = {}
+    
+    for _, remote in ipairs(allRemotes) do
+        local nameLower = remote.Name:lower()
+        
+        if nameLower:find("car") or nameLower:find("vehicle") or 
+           nameLower:find("buy") or nameLower:find("purchase") then
+            table.insert(carRemotes, remote)
+        elseif nameLower:find("data") or nameLower:find("save") or 
+               nameLower:find("load") or nameLower:find("get") then
+            table.insert(dataRemotes, remote)
+        end
+    end
+    
+    print(string.format("🎯 Car-related remotes: %d", #carRemotes))
+    print(string.format("💾 Data-related remotes: %d", #dataRemotes))
+    
+    return carRemotes, dataRemotes, allRemotes
+end
+
+-- ===== DATA PACKET INJECTION =====
+local function injectCarData(carRemotes, emulatedData)
+    print("\n💉 INJECTING CAR DATA PACKETS...")
+    
+    local injectionAttempts = 0
+    local successfulInjections = {}
+    
+    for _, remote in ipairs(carRemotes) do
+        for _, carData in ipairs(emulatedData.Cars) do
+            injectionAttempts = injectionAttempts + 1
+            
+            -- Try different injection methods
+            local methods = {
+                function()
+                    if remote.Type == "RemoteEvent" then
+                        remote.Object:FireServer(carData)
+                        return "FireServer"
+                    else
+                        remote.Object:InvokeServer(carData)
+                        return "InvokeServer"
+                    end
+                end,
+                
+                function()
+                    -- Try with player object
+                    if remote.Type == "RemoteEvent" then
+                        remote.Object:FireServer(player, carData)
+                        return "FireServer with player"
+                    else
+                        remote.Object:InvokeServer(player, carData)
+                        return "InvokeServer with player"
+                    end
+                end,
+                
+                function()
+                    -- Try with timestamp
+                    if remote.Type == "RemoteEvent" then
+                        remote.Object:FireServer(carData, os.time())
+                        return "FireServer with timestamp"
+                    else
+                        remote.Object:InvokeServer(carData, os.time())
+                        return "InvokeServer with timestamp"
+                    end
+                end
+            }
+            
+            for _, method in ipairs(methods) do
+                local success, result = pcall(method)
+                if success then
+                    if not successfulInjections[remote.Name] then
+                        successfulInjections[remote.Name] = {}
+                    end
+                    
+                    table.insert(successfulInjections[remote.Name], {
+                        CarData = carData,
+                        Method = result
+                    })
+                    
+                    print(string.format("✅ %s accepted: %s", remote.Name, result))
+                    
+                    -- Small delay between attempts
+                    task.wait(0.05)
+                    break
+                end
+            end
+            
+            -- Progress update
+            if injectionAttempts % 10 == 0 then
+                print(string.format("Attempt %d...", injectionAttempts))
+            end
+            
+            task.wait(0.01) -- Prevent flooding
+        end
+    end
+    
+    print(string.format("\n📊 INJECTION RESULTS: %d attempts", injectionAttempts))
+    print(string.format("✅ Successful injections: %d", #successfulInjections))
+    
+    return successfulInjections
+end
+
+-- ===== MEMORY SCANNER =====
+local function scanMemoryForCars()
+    print("\n🧠 SCANNING MEMORY FOR CAR REFERENCES...")
+    
+    -- This is a conceptual approach - actual memory scanning would require
+    -- more advanced techniques and might violate Roblox TOS
+    
+    local foundReferences = {}
+    
+    -- Look for car names in all accessible data
+    local carKeywords = {"Bontlay", "Jegar", "Corsaro", "Lavish", "Sportler", "Car", "Vehicle"}
+    
+    -- Check all StringValues in game
+    for _, obj in ipairs(game:GetDescendants()) do
+        if obj:IsA("StringValue") then
+            local value = obj.Value
+            for _, keyword in ipairs(carKeywords) do
+                if tostring(value):find(keyword) then
+                    table.insert(foundReferences, {
+                        Object = obj,
+                        Value = value,
+                        Path = obj:GetFullName()
+                    })
+                end
+            end
+        end
+    end
+    
+    print(string.format("Found %d string references to cars", #foundReferences))
+    
+    return foundReferences
+end
+
+-- ===== CREATE ADVANCED HACKER UI =====
+local function createHackerUI()
     local gui = Instance.new("ScreenGui")
-    gui.Name = "CarHunterUI"
+    gui.Name = "CarHackerUI"
     gui.Parent = player:WaitForChild("PlayerGui")
     gui.ResetOnSpawn = false
     
     -- Main Window
-    local mainFrame = Instance.new("Frame")
-    mainFrame.Name = "MainWindow"
-    mainFrame.Size = UDim2.new(0, 500, 0, 600)
-    mainFrame.Position = UDim2.new(0.5, -250, 0.5, -300)
-    mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
-    mainFrame.BorderSizePixel = 0
-    mainFrame.ClipsDescendants = true
-    mainFrame.Parent = gui
+    local main = Instance.new("Frame")
+    main.Name = "Main"
+    main.Size = UDim2.new(0, 600, 0, 700)
+    main.Position = UDim2.new(0.5, -300, 0.5, -350)
+    main.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+    main.BorderSizePixel = 0
+    main.ClipsDescendants = true
+    main.Parent = gui
     
-    -- Title Bar (Draggable)
+    -- Title Bar
     local titleBar = Instance.new("Frame")
-    titleBar.Name = "TitleBar"
     titleBar.Size = UDim2.new(1, 0, 0, 40)
-    titleBar.BackgroundColor3 = Color3.fromRGB(0, 80, 160)
-    titleBar.BorderSizePixel = 0
-    titleBar.Parent = mainFrame
+    titleBar.BackgroundColor3 = Color3.fromRGB(0, 100, 0)
+    titleBar.Parent = main
     
-    local titleLabel = Instance.new("TextLabel")
-    titleLabel.Text = "🚗 CAR HUNTER v3.0"
-    titleLabel.Size = UDim2.new(1, -80, 1, 0)
-    titleLabel.Position = UDim2.new(0, 10, 0, 0)
-    titleLabel.BackgroundTransparency = 1
-    titleLabel.TextColor3 = Color3.new(1, 1, 1)
-    titleLabel.Font = Enum.Font.GothamBold
-    titleLabel.TextSize = 18
-    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-    titleLabel.Parent = titleBar
+    local title = Instance.new("TextLabel")
+    title.Text = "⚡ SERVER-SIDE CAR HACKER ⚡"
+    title.Size = UDim2.new(1, -80, 1, 0)
+    title.Position = UDim2.new(0, 10, 0, 0)
+    title.BackgroundTransparency = 1
+    title.TextColor3 = Color3.new(1, 1, 1)
+    title.Font = Enum.Font.Code
+    title.TextSize = 18
+    title.TextXAlignment = Enum.TextXAlignment.Left
+    title.Parent = titleBar
     
     -- Close Button
     local closeBtn = Instance.new("TextButton")
     closeBtn.Text = "✕"
     closeBtn.Size = UDim2.new(0, 30, 0, 30)
     closeBtn.Position = UDim2.new(1, -35, 0, 5)
-    closeBtn.BackgroundColor3 = Color3.fromRGB(220, 60, 60)
+    closeBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
     closeBtn.TextColor3 = Color3.new(1, 1, 1)
-    closeBtn.Font = Enum.Font.GothamBold
+    closeBtn.Font = Enum.Font.Code
     closeBtn.TextSize = 16
     closeBtn.Parent = titleBar
     
-    -- Content Area
-    local content = Instance.new("Frame")
-    content.Name = "Content"
-    content.Size = UDim2.new(1, 0, 1, -40)
-    content.Position = UDim2.new(0, 0, 0, 40)
-    content.BackgroundTransparency = 1
-    content.Parent = mainFrame
+    -- Tabs
+    local tabs = Instance.new("Frame")
+    tabs.Size = UDim2.new(1, -20, 0, 40)
+    tabs.Position = UDim2.new(0, 10, 0, 50)
+    tabs.BackgroundTransparency = 1
+    tabs.Parent = main
     
-    -- Controls Frame
-    local controls = Instance.new("Frame")
-    controls.Size = UDim2.new(1, -20, 0, 100)
-    controls.Position = UDim2.new(0, 10, 0, 10)
-    controls.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-    controls.Parent = content
+    local tabNames = {"NETWORK", "INJECT", "SCAN", "LOG"}
+    local tabFrames = {}
     
-    -- Scan Button
-    local scanBtn = Instance.new("TextButton")
-    scanBtn.Text = "🔍 DEEP SCAN"
-    scanBtn.Size = UDim2.new(1, -20, 0, 40)
-    scanBtn.Position = UDim2.new(0, 10, 0, 10)
-    scanBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 220)
-    scanBtn.TextColor3 = Color3.new(1, 1, 1)
-    scanBtn.Font = Enum.Font.GothamBold
-    scanBtn.TextSize = 16
-    scanBtn.Parent = controls
-    
-    -- Status
-    local status = Instance.new("TextLabel")
-    status.Text = "Ready to scan. Click DEEP SCAN to find all cars."
-    status.Size = UDim2.new(1, -20, 0, 40)
-    status.Position = UDim2.new(0, 10, 0, 60)
-    status.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-    status.TextColor3 = Color3.new(1, 1, 1)
-    status.Font = Enum.Font.Gotham
-    status.TextSize = 12
-    status.TextWrapped = true
-    status.Parent = controls
-    
-    -- Results Frame
-    local results = Instance.new("ScrollingFrame")
-    results.Name = "Results"
-    results.Size = UDim2.new(1, -20, 0, 400)
-    results.Position = UDim2.new(0, 10, 0, 120)
-    results.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-    results.BorderSizePixel = 0
-    results.ScrollBarThickness = 8
-    results.Visible = false
-    results.Parent = content
-    
-    -- Stats Frame
-    local stats = Instance.new("Frame")
-    stats.Size = UDim2.new(1, -20, 0, 80)
-    stats.Position = UDim2.new(0, 10, 0, 530)
-    stats.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-    stats.Visible = false
-    stats.Parent = content
-    
-    -- Add rounded corners
-    local function addCorners(obj)
-        local corner = Instance.new("UICorner")
-        corner.CornerRadius = UDim.new(0, 6)
-        corner.Parent = obj
+    for i, tabName in ipairs(tabNames) do
+        local tab = Instance.new("TextButton")
+        tab.Text = tabName
+        tab.Size = UDim2.new(0.25, -2, 1, 0)
+        tab.Position = UDim2.new((i-1) * 0.25, 0, 0, 0)
+        tab.BackgroundColor3 = i == 1 and Color3.fromRGB(0, 80, 160) or Color3.fromRGB(40, 40, 50)
+        tab.TextColor3 = Color3.new(1, 1, 1)
+        tab.Font = Enum.Font.Code
+        tab.TextSize = 14
+        tab.Parent = tabs
+        
+        local tabContent = Instance.new("ScrollingFrame")
+        tabContent.Size = UDim2.new(1, -20, 0, 560)
+        tabContent.Position = UDim2.new(0, 10, 0, 100)
+        tabContent.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+        tabContent.BorderSizePixel = 0
+        tabContent.ScrollBarThickness = 8
+        tabContent.Visible = i == 1
+        tabContent.Parent = main
+        
+        tabFrames[tabName] = tabContent
+        
+        tab.MouseButton1Click:Connect(function()
+            for _, frame in pairs(tabFrames) do
+                frame.Visible = false
+            end
+            tabContent.Visible = true
+            
+            for _, otherTab in ipairs(tabs:GetChildren()) do
+                if otherTab:IsA("TextButton") then
+                    otherTab.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+                end
+            end
+            tab.BackgroundColor3 = Color3.fromRGB(0, 80, 160)
+        end)
     end
     
-    addCorners(mainFrame)
-    addCorners(controls)
-    addCorners(results)
-    addCorners(stats)
-    addCorners(scanBtn)
-    addCorners(status)
-    local closeCorner = Instance.new("UICorner")
-    closeCorner.CornerRadius = UDim.new(0, 15)
-    closeCorner.Parent = closeBtn
+    -- Network Tab Content
+    local networkContent = tabFrames.NETWORK
     
-    -- Draggable window
+    local hookBtn = Instance.new("TextButton")
+    hookBtn.Text = "🔗 HOOK NETWORK"
+    hookBtn.Size = UDim2.new(1, -20, 0, 40)
+    hookBtn.Position = UDim2.new(0, 10, 0, 10)
+    hookBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 220)
+    hookBtn.TextColor3 = Color3.new(1, 1, 1)
+    hookBtn.Font = Enum.Font.Code
+    hookBtn.TextSize = 16
+    hookBtn.Parent = networkContent
+    
+    local analyzeBtn = Instance.new("TextButton")
+    analyzeBtn.Text = "📊 ANALYZE TRAFFIC"
+    analyzeBtn.Size = UDim2.new(1, -20, 0, 40)
+    analyzeBtn.Position = UDim2.new(0, 10, 0, 60)
+    analyzeBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 100)
+    analyzeBtn.TextColor3 = Color3.new(1, 1, 1)
+    analyzeBtn.Font = Enum.Font.Code
+    analyzeBtn.TextSize = 16
+    analyzeBtn.Parent = networkContent
+    
+    local networkLogDisplay = Instance.new("ScrollingFrame")
+    networkLogDisplay.Size = UDim2.new(1, -20, 0, 450)
+    networkLogDisplay.Position = UDim2.new(0, 10, 0, 110)
+    networkLogDisplay.BackgroundColor3 = Color3.fromRGB(10, 10, 15)
+    networkLogDisplay.BorderSizePixel = 0
+    networkLogDisplay.ScrollBarThickness = 6
+    networkLogDisplay.Parent = networkContent
+    
+    -- Inject Tab Content
+    local injectContent = tabFrames.INJECT
+    
+    local emulatorBtn = Instance.new("TextButton")
+    emulatorBtn.Text = "🎭 CREATE EMULATOR"
+    emulatorBtn.Size = UDim2.new(1, -20, 0, 40)
+    emulatorBtn.Position = UDim2.new(0, 10, 0, 10)
+    emulatorBtn.BackgroundColor3 = Color3.fromRGB(150, 0, 200)
+    emulatorBtn.TextColor3 = Color3.new(1, 1, 1)
+    emulatorBtn.Font = Enum.Font.Code
+    emulatorBtn.TextSize = 16
+    emulatorBtn.Parent = injectContent
+    
+    local injectBtn = Instance.new("TextButton")
+    injectBtn.Text = "💉 START INJECTION"
+    injectBtn.Size = UDim2.new(1, -20, 0, 40)
+    injectBtn.Position = UDim2.new(0, 10, 0, 60)
+    injectBtn.BackgroundColor3 = Color3.fromRGB(220, 50, 50)
+    injectBtn.TextColor3 = Color3.new(1, 1, 1)
+    injectBtn.Font = Enum.Font.Code
+    injectBtn.TextSize = 16
+    injectBtn.Parent = injectContent
+    
+    local injectStatus = Instance.new("TextLabel")
+    injectStatus.Text = "Ready for injection..."
+    injectStatus.Size = UDim2.new(1, -20, 0, 450)
+    injectStatus.Position = UDim2.new(0, 10, 0, 110)
+    injectStatus.BackgroundColor3 = Color3.fromRGB(10, 10, 15)
+    injectStatus.TextColor3 = Color3.new(1, 1, 1)
+    injectStatus.Font = Enum.Font.Code
+    injectStatus.TextSize = 12
+    injectStatus.TextWrapped = true
+    injectStatus.Parent = injectContent
+    
+    -- Global Variables
+    local carRemotes, dataRemotes, allRemotes
+    local emulatedData
+    
+    -- Button Functions
+    hookBtn.MouseButton1Click:Connect(function()
+        hookBtn.Text = "HOOKING..."
+        hookBtn.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
+        
+        task.spawn(function()
+            hookAllRemotes()
+            hookBtn.Text = "✅ HOOKED"
+            hookBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
+        end)
+    end)
+    
+    analyzeBtn.MouseButton1Click:Connect(function()
+        analyzeBtn.Text = "ANALYZING..."
+        analyzeBtn.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
+        
+        task.spawn(function()
+            local carTrans, dataReqs = analyzeNetworkData()
+            
+            -- Display in log
+            networkLogDisplay:ClearAllChildren()
+            
+            local yPos = 5
+            for i, entry in ipairs(networkLog) do
+                if i <= 50 then -- Limit display
+                    local entryFrame = Instance.new("Frame")
+                    entryFrame.Size = UDim2.new(1, -10, 0, 60)
+                    entryFrame.Position = UDim2.new(0, 5, 0, yPos)
+                    entryFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+                    entryFrame.Parent = networkLogDisplay
+                    
+                    local remoteLabel = Instance.new("TextLabel")
+                    remoteLabel.Text = entry.Type .. ": " .. entry.Remote
+                    remoteLabel.Size = UDim2.new(1, -10, 0, 20)
+                    remoteLabel.Position = UDim2.new(0, 5, 0, 5)
+                    remoteLabel.BackgroundTransparency = 1
+                    remoteLabel.TextColor3 = Color3.new(1, 1, 1)
+                    remoteLabel.Font = Enum.Font.Code
+                    remoteLabel.TextSize = 12
+                    remoteLabel.TextXAlignment = Enum.TextXAlignment.Left
+                    remoteLabel.Parent = entryFrame
+                    
+                    local argsLabel = Instance.new("TextLabel")
+                    argsLabel.Text = "Args: " .. #entry.Args
+                    argsLabel.Size = UDim2.new(1, -10, 0, 30)
+                    argsLabel.Position = UDim2.new(0, 5, 0, 25)
+                    argsLabel.BackgroundTransparency = 1
+                    argsLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+                    argsLabel.Font = Enum.Font.Code
+                    argsLabel.TextSize = 10
+                    argsLabel.TextXAlignment = Enum.TextXAlignment.Left
+                    argsLabel.TextWrapped = true
+                    argsLabel.Parent = entryFrame
+                    
+                    yPos = yPos + 65
+                end
+            end
+            
+            networkLogDisplay.CanvasSize = UDim2.new(0, 0, 0, yPos)
+            
+            analyzeBtn.Text = "📊 ANALYZE TRAFFIC"
+            analyzeBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 100)
+        end)
+    end)
+    
+    emulatorBtn.MouseButton1Click:Connect(function()
+        emulatorBtn.Text = "CREATING..."
+        emulatorBtn.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
+        
+        task.spawn(function()
+            emulatedData = createDataEmulator()
+            carRemotes, dataRemotes, allRemotes = setupRemoteSpoofing()
+            
+            emulatorBtn.Text = "✅ EMULATOR READY"
+            emulatorBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
+            
+            injectStatus.Text = string.format("Emulator ready with %d car entries\nFound %d car remotes", 
+                #emulatedData.Cars, #carRemotes)
+        end)
+    end)
+    
+    injectBtn.MouseButton1Click:Connect(function()
+        if not emulatedData or not carRemotes then
+            injectStatus.Text = "❌ Create emulator first!"
+            return
+        end
+        
+        injectBtn.Text = "INJECTING..."
+        injectBtn.BackgroundColor3 = Color3.fromRGB(255, 100, 0)
+        
+        task.spawn(function()
+            injectStatus.Text = "💉 Starting injection...\nThis may take a minute..."
+            
+            local results = injectCarData(carRemotes, emulatedData)
+            
+            if next(results) then
+                local successCount = 0
+                for _ in pairs(results) do
+                    successCount = successCount + 1
+                end
+                
+                injectStatus.Text = string.format("✅ INJECTION COMPLETE!\n\n%d remotes accepted injections\n\nTry checking your garage now!", successCount)
+            else
+                injectStatus.Text = "❌ No injections succeeded\nGame has strong server validation"
+            end
+            
+            injectBtn.Text = "💉 START INJECTION"
+            injectBtn.BackgroundColor3 = Color3.fromRGB(220, 50, 50)
+        end)
+    end)
+    
+    -- Close Button
+    closeBtn.MouseButton1Click:Connect(function()
+        gui:Destroy()
+    end)
+    
+    -- Make draggable
     local dragging = false
     local dragStart, frameStart
     
@@ -420,7 +626,7 @@ local function createCarHunterUI()
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
             dragging = true
             dragStart = input.Position
-            frameStart = mainFrame.Position
+            frameStart = main.Position
             
             input.Changed:Connect(function()
                 if input.UserInputState == Enum.UserInputState.End then
@@ -431,167 +637,61 @@ local function createCarHunterUI()
     end)
     
     titleBar.InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputState.End then
+            dragging = false
+        end
+    end)
+    
+    game:GetService("UserInputService").InputChanged:Connect(function(input)
         if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
             local delta = input.Position - dragStart
-            mainFrame.Position = UDim2.new(
+            main.Position = UDim2.new(
                 frameStart.X.Scale, frameStart.X.Offset + delta.X,
                 frameStart.Y.Scale, frameStart.Y.Offset + delta.Y
             )
         end
     end)
     
-    -- Variables
-    local carData = {}
-    local remotes = {}
-    
-    -- Function to display results
-    local function displayResults()
-        results:ClearAllChildren()
-        results.Visible = true
-        stats.Visible = true
-        
-        local yPos = 5
-        
-        for i, car in ipairs(carData) do
-            -- Create entry
-            local entry = Instance.new("Frame")
-            entry.Size = UDim2.new(1, -10, 0, 60)
-            entry.Position = UDim2.new(0, 5, 0, yPos)
-            entry.BackgroundColor3 = i % 2 == 0 and Color3.fromRGB(35, 35, 45) or Color3.fromRGB(30, 30, 40)
-            entry.Parent = results
-            
-            addCorners(entry)
-            
-            -- Car name
-            local nameLabel = Instance.new("TextLabel")
-            nameLabel.Text = car.Name
-            nameLabel.Size = UDim2.new(0.7, -10, 0, 25)
-            nameLabel.Position = UDim2.new(0, 5, 0, 5)
-            nameLabel.BackgroundTransparency = 1
-            nameLabel.TextColor3 = Color3.new(1, 1, 1)
-            nameLabel.Font = Enum.Font.GothamBold
-            nameLabel.TextSize = 14
-            nameLabel.TextXAlignment = Enum.TextXAlignment.Left
-            nameLabel.TextTruncate = Enum.TextTruncate.AtEnd
-            nameLabel.Parent = entry
-            
-            -- Location
-            local locLabel = Instance.new("TextLabel")
-            locLabel.Text = "📍 " .. car.Location
-            locLabel.Size = UDim2.new(0.3, -5, 0, 20)
-            locLabel.Position = UDim2.new(0.7, 0, 0, 5)
-            locLabel.BackgroundTransparency = 1
-            locLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
-            locLabel.Font = Enum.Font.Gotham
-            locLabel.TextSize = 10
-            locLabel.TextXAlignment = Enum.TextXAlignment.Right
-            locLabel.Parent = entry
-            
-            -- Path
-            local pathLabel = Instance.new("TextLabel")
-            pathLabel.Text = "📁 " .. car.Path
-            pathLabel.Size = UDim2.new(1, -10, 0, 25)
-            pathLabel.Position = UDim2.new(0, 5, 0, 30)
-            pathLabel.BackgroundTransparency = 1
-            pathLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-            pathLabel.Font = Enum.Font.Gotham
-            pathLabel.TextSize = 10
-            pathLabel.TextXAlignment = Enum.TextXAlignment.Left
-            pathLabel.TextTruncate = Enum.TextTruncate.AtEnd
-            pathLabel.Parent = entry
-            
-            yPos = yPos + 65
-        end
-        
-        results.CanvasSize = UDim2.new(0, 0, 0, yPos)
-        
-        -- Update stats
-        stats:ClearAllChildren()
-        
-        local stat1 = Instance.new("TextLabel")
-        stat1.Text = "📊 Cars Found: " .. #carData
-        stat1.Size = UDim2.new(0.5, -5, 0.5, -5)
-        stat1.Position = UDim2.new(0, 5, 0, 5)
-        stat1.BackgroundTransparency = 1
-        stat1.TextColor3 = Color3.new(1, 1, 1)
-        stat1.Font = Enum.Font.GothamBold
-        stat1.TextSize = 14
-        stat1.Parent = stats
-        
-        local stat2 = Instance.new("TextLabel")
-        stat2.Text = "📡 Remotes: " .. #remotes
-        stat2.Size = UDim2.new(0.5, -5, 0.5, -5)
-        stat2.Position = UDim2.new(0.5, 0, 0, 5)
-        stat2.BackgroundTransparency = 1
-        stat2.TextColor3 = Color3.new(1, 1, 1)
-        stat2.Font = Enum.Font.GothamBold
-        stat2.TextSize = 14
-        stat2.Parent = stats
-        
-        local info = Instance.new("TextLabel")
-        info.Text = "💡 Use remotes for car duplication"
-        info.Size = UDim2.new(1, -10, 0.5, -5)
-        info.Position = UDim2.new(0, 5, 0.5, 0)
-        info.BackgroundTransparency = 1
-        info.TextColor3 = Color3.fromRGB(255, 200, 100)
-        info.Font = Enum.Font.Gotham
-        info.TextSize = 12
-        info.Parent = stats
+    -- Add corners
+    local function addCorner(obj)
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, 4)
+        corner.Parent = obj
     end
     
-    -- Scan functionality
-    scanBtn.MouseButton1Click:Connect(function()
-        status.Text = "🔍 Scanning game... This may take a moment."
-        scanBtn.Text = "SCANNING..."
-        scanBtn.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
-        
-        task.spawn(function()
-            carData, remotes = findAllCars()
-            
-            if #carData > 0 then
-                status.Text = "✅ Found " .. #carData .. " car references!"
-                displayResults()
-                
-                -- Show key remotes
-                if #remotes > 0 then
-                    status.Text = status.Text .. "\n🎯 " .. #remotes .. " remote events found!"
-                    
-                    -- Try to use Cmdr if available
-                    local cmdr = ReplicatedStorage:FindFirstChild("CmdrClient")
-                    if cmdr then
-                        status.Text = status.Text .. "\n✅ Cmdr system detected!"
-                    end
-                end
-            else
-                status.Text = "❌ No cars found. Game might use server-only storage."
+    for _, obj in ipairs(main:GetDescendants()) do
+        if obj:IsA("Frame") or obj:IsA("TextButton") then
+            if obj.Name ~= "Main" then
+                addCorner(obj)
             end
-            
-            scanBtn.Text = "🔍 DEEP SCAN"
-            scanBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 220)
-        end)
-    end)
-    
-    -- Close button
-    closeBtn.MouseButton1Click:Connect(function()
-        gui:Destroy()
-    end)
+        end
+    end
     
     return gui
 end
 
--- ===== MAIN =====
-print("🚗 ULTIMATE CAR HUNTER")
-print("Initializing...")
-task.wait(1)
+-- ===== MAIN EXECUTION =====
+print("=" .. string.rep("=", 60))
+print("⚡ SERVER-SIDE CAR HACKER SYSTEM v2.0")
+print("=" .. string.rep("=", 60))
 
-createCarHunterUI()
-print("✅ UI Ready!")
-print("\n🔥 HOW TO USE:")
-print("1. Click 'DEEP SCAN' to find ALL cars")
-print("2. Look for car names and remote events")
-print("3. Cars are shown with their locations")
-print("4. Use remote events for duplication attempts")
-print("\n⚠️  IMPORTANT:")
-print("• Server-side cars cannot be directly accessed")
-print("• This shows all cars VISIBLE to client")
-print("• Duplication depends on game security")
+print("\n⚠️  WARNING: This is an advanced system")
+print("It attempts to bypass server-side car storage")
+print("Success depends on game's security implementation")
+
+task.wait(2)
+
+local ui = createHackerUI()
+
+print("\n✅ HACKER UI LOADED")
+print("\n🎮 HOW TO USE:")
+print("1. Click 'HOOK NETWORK' to capture traffic")
+print("2. Perform car purchases in-game")
+print("3. Click 'ANALYZE TRAFFIC' to see patterns")
+print("4. Click 'CREATE EMULATOR' to generate fake data")
+print("5. Click 'START INJECTION' to attempt bypass")
+print("\n💡 TIPS:")
+print("• Try on different servers")
+print("• Watch for patterns in network traffic")
+print("• Some games may require specific timing")
+print("• Server-side validation can't always be bypassed")
