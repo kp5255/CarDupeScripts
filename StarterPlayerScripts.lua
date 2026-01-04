@@ -1,244 +1,422 @@
--- 🚗 TARGETED CAR DUPLICATOR - Based on Game Structure
+-- 🎯 SERVER-SIDE CAR TRACKER & ID GRABBER
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
+local HttpService = game:GetService("HttpService")
 local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
 
 repeat task.wait() until game:IsLoaded()
-task.wait(2)
+task.wait(3)
 
--- ===== FIND CAR DEALERSHIPS =====
-local function findDealerships()
-    print("🔍 Looking for dealerships...")
+-- ===== NETWORK TRAFFIC ANALYZER =====
+local capturedData = {}
+local carIDs = {}
+local carPurchasePatterns = {}
+
+local function startNetworkAnalysis()
+    print("📡 Analyzing network traffic for car IDs...")
     
-    local dealerships = {}
-    
-    -- Based on the error, we know the path pattern
-    -- "Workspace.Tycoons.Slot [number].Dealership"
-    local tycoons = Workspace:FindFirstChild("Tycoons")
-    if tycoons then
-        for _, slot in pairs(tycoons:GetChildren()) do
-            if slot.Name:find("Slot") then
-                local dealership = slot:FindFirstChild("Dealership")
-                if dealership then
-                    table.insert(dealerships, {
-                        Slot = slot.Name,
-                        Dealership = dealership,
-                        Path = dealership:GetFullName()
-                    })
+    -- Monitor all RemoteEvents
+    for _, obj in pairs(game:GetDescendants()) do
+        if obj:IsA("RemoteEvent") then
+            local success, original = pcall(function()
+                return obj.FireServer
+            end)
+            
+            if success and original then
+                -- Create a wrapper to intercept calls
+                obj.FireServer = function(self, ...)
+                    local args = {...}
+                    local remoteName = self.Name:lower()
+                    
+                    -- Look for car-related traffic
+                    if remoteName:find("car") or remoteName:find("vehicle") or 
+                       remoteName:find("buy") or remoteName:find("purchase") or
+                       remoteName:find("give") or remoteName:find("add") then
+                        
+                        local timestamp = os.time()
+                        local data = {
+                            Time = timestamp,
+                            Remote = self.Name,
+                            Path = self:GetFullName(),
+                            Args = args
+                        }
+                        
+                        table.insert(capturedData, data)
+                        
+                        -- Try to extract car IDs
+                        extractCarIDsFromData(data)
+                        
+                        -- Show in console
+                        print(string.format("🚗 CAR-RELATED CALL: %s", self.Name))
+                        print(string.format("   Path: %s", self:GetFullName()))
+                        print(string.format("   Args: %d arguments", #args))
+                        
+                        for i, arg in ipairs(args) do
+                            local argType = type(arg)
+                            local argStr = tostring(arg)
+                            
+                            if argType == "table" then
+                                -- Try to decode tables
+                                local success, json = pcall(function()
+                                    return HttpService:JSONEncode(arg)
+                                end)
+                                if success and #json < 100 then
+                                    print(string.format("   Arg %d [TABLE]: %s", i, json))
+                                end
+                            elseif argType == "string" and #argStr < 50 then
+                                print(string.format("   Arg %d [STRING]: %s", i, argStr))
+                            elseif argType == "number" then
+                                print(string.format("   Arg %d [NUMBER]: %s", i, argStr))
+                            end
+                        end
+                    end
+                    
+                    return original(self, ...)
                 end
             end
         end
     end
     
-    print("Found " .. #dealerships .. " dealerships")
-    return dealerships
+    print("✅ Network analysis started")
 end
 
--- ===== FIND CARS IN DEALERSHIPS =====
-local function findCarsInDealerships(dealerships)
-    print("🚗 Looking for cars in dealerships...")
+-- ===== CAR ID EXTRACTOR =====
+local function extractCarIDsFromData(data)
+    local foundIDs = {}
     
-    local allCars = {}
-    
-    for _, dealer in pairs(dealerships) do
-        local dealership = dealer.Dealership
+    for i, arg in ipairs(data.Args) do
+        local argType = type(arg)
         
-        -- Look for Cars folder (based on the error)
-        local carsFolder = dealership:FindFirstChild("Cars")
-        if carsFolder then
-            for _, car in pairs(carsFolder:GetChildren()) do
-                if car:IsA("Model") then
-                    table.insert(allCars, {
-                        Name = car.Name,
-                        Model = car,
-                        Dealership = dealer.Slot,
-                        Path = car:GetFullName()
-                    })
+        if argType == "string" then
+            -- Look for UUIDs or hash-like strings
+            local str = tostring(arg)
+            
+            -- Check for common ID patterns
+            if #str == 36 and str:match("^%x%x%x%x%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x$") then
+                -- UUID format
+                if not carIDs[str] then
+                    carIDs[str] = {
+                        ID = str,
+                        Type = "UUID",
+                        Remote = data.Remote,
+                        FirstSeen = data.Time
+                    }
+                    print(string.format("🎯 FOUND UUID CAR ID: %s", str))
                 end
-            end
-        end
-        
-        -- Also check for Purchased folder (owned cars)
-        local purchased = dealership:FindFirstChild("Purchased")
-        if purchased then
-            for _, car in pairs(purchased:GetChildren()) do
-                if car:IsA("Model") then
-                    table.insert(allCars, {
-                        Name = car.Name,
-                        Model = car,
-                        Dealership = dealer.Slot,
-                        Path = car:GetFullName(),
-                        IsPurchased = true
-                    })
+                foundIDs[str] = true
+                
+            elseif #str == 32 and str:match("^%x+$") then
+                -- 32-character hex (MD5-like)
+                if not carIDs[str] then
+                    carIDs[str] = {
+                        ID = str,
+                        Type = "HEX32",
+                        Remote = data.Remote,
+                        FirstSeen = data.Time
+                    }
+                    print(string.format("🎯 FOUND HEX32 CAR ID: %s", str))
                 end
+                foundIDs[str] = true
+                
+            elseif #str >= 16 and #str <= 24 and str:match("^%d+$") then
+                -- Numeric ID
+                if not carIDs[str] then
+                    carIDs[str] = {
+                        ID = str,
+                        Type = "NUMERIC",
+                        Remote = data.Remote,
+                        FirstSeen = data.Time
+                    }
+                    print(string.format("🎯 FOUND NUMERIC CAR ID: %s", str))
+                end
+                foundIDs[str] = true
+                
+            elseif str:find("car_") or str:find("vehicle_") or str:find("_id") then
+                -- Named ID with prefix
+                if not carIDs[str] then
+                    carIDs[str] = {
+                        ID = str,
+                        Type = "NAMED_ID",
+                        Remote = data.Remote,
+                        FirstSeen = data.Time
+                    }
+                    print(string.format("🎯 FOUND NAMED CAR ID: %s", str))
+                end
+                foundIDs[str] = true
             end
-        end
-        
-        -- Check for any car models directly in dealership
-        for _, obj in pairs(dealership:GetDescendants()) do
-            if obj:IsA("Model") and obj.Name:find("Car") then
-                local found = false
-                for _, existing in pairs(allCars) do
-                    if existing.Name == obj.Name then
-                        found = true
-                        break
+            
+        elseif argType == "table" then
+            -- Recursively search tables
+            local function searchTable(tbl, path)
+                for k, v in pairs(tbl) do
+                    local keyStr = tostring(k)
+                    local valueStr = tostring(v)
+                    local fullPath = path .. "." .. keyStr
+                    
+                    -- Check keys
+                    if (keyStr:find("id") or keyStr:find("Id") or keyStr:find("ID")) and 
+                       type(v) == "string" and #valueStr > 5 then
+                        if not carIDs[valueStr] then
+                            carIDs[valueStr] = {
+                                ID = valueStr,
+                                Type = "TABLE_KEY_" .. keyStr,
+                                Remote = data.Remote,
+                                Path = fullPath,
+                                FirstSeen = data.Time
+                            }
+                            print(string.format("🎯 FOUND CAR ID IN TABLE: %s = %s", keyStr, valueStr))
+                        end
+                        foundIDs[valueStr] = true
+                    end
+                    
+                    -- Recursively search nested tables
+                    if type(v) == "table" then
+                        searchTable(v, fullPath)
                     end
                 end
-                if not found then
-                    table.insert(allCars, {
+            end
+            
+            searchTable(arg, "root")
+        end
+    end
+    
+    return foundIDs
+end
+
+-- ===== CAR ID TESTER =====
+local function testCarIDs()
+    print("\n🧪 Testing captured car IDs...")
+    
+    local testedRemotes = {}
+    local successfulTests = {}
+    
+    -- First, find all car-related remotes
+    for _, obj in pairs(game:GetDescendants()) do
+        if obj:IsA("RemoteEvent") then
+            local nameLower = obj.Name:lower()
+            if nameLower:find("car") or nameLower:find("vehicle") or 
+               nameLower:find("give") or nameLower:find("add") then
+                testedRemotes[obj] = obj.Name
+            end
+        end
+    end
+    
+    -- Test each ID on each remote
+    for carID, data in pairs(carIDs) do
+        print(string.format("\nTesting ID: %s (%s)", carID, data.Type))
+        
+        for remoteObj, remoteName in pairs(testedRemotes) do
+            -- Try different formats
+            local testFormats = {
+                carID,  -- Just the ID
+                {carID},  -- Array with ID
+                {CarId = carID},  -- Table with key
+                {ID = carID, Player = player.Name},  -- Full data
+                {player, carID},  -- Player + ID
+                {player.UserId, carID}  -- UserId + ID
+            }
+            
+            for _, testData in ipairs(testFormats) do
+                local success, result = pcall(function()
+                    remoteObj:FireServer(testData)
+                    return "Success"
+                end)
+                
+                if success then
+                    if not successfulTests[remoteName] then
+                        successfulTests[remoteName] = {}
+                    end
+                    
+                    table.insert(successfulTests[remoteName], {
+                        CarID = carID,
+                        Format = testData,
+                        Result = result
+                    })
+                    
+                    print(string.format("✅ %s accepted ID!", remoteName))
+                    
+                    -- Send multiple times
+                    for i = 1, 5 do
+                        pcall(function()
+                            remoteObj:FireServer(testData)
+                        end)
+                        task.wait(0.05)
+                    end
+                    
+                    break
+                end
+            end
+            
+            task.wait(0.1)  -- Small delay between remotes
+        end
+    end
+    
+    -- Show results
+    print("\n📊 TEST RESULTS:")
+    if next(successfulTests) then
+        local totalSuccess = 0
+        for remoteName, tests in pairs(successfulTests) do
+            totalSuccess = totalSuccess + #tests
+            print(string.format("• %s: %d successful tests", remoteName, #tests))
+        end
+        print(string.format("\n🎉 %d total successful ID tests!", totalSuccess))
+        print("Check your inventory for new cars!")
+    else
+        print("❌ No remotes accepted the car IDs")
+    end
+    
+    return successfulTests
+end
+
+-- ===== INVENTORY SCANNER =====
+local function scanForInventory()
+    print("\n📦 Looking for inventory system...")
+    
+    local inventoryFound = false
+    
+    -- Check player for inventory folders
+    for _, child in pairs(player:GetChildren()) do
+        if child:IsA("Folder") then
+            local nameLower = child.Name:lower()
+            if nameLower:find("inventory") or nameLower:find("cars") or 
+               nameLower:find("vehicles") or nameLower:find("items") then
+                print(string.format("✅ Found inventory folder: %s", child.Name))
+                print(string.format("   Contains %d items", #child:GetChildren()))
+                inventoryFound = true
+                
+                -- List contents
+                for _, item in pairs(child:GetChildren()) do
+                    print(string.format("   • %s (%s)", item.Name, item.ClassName))
+                end
+            end
+        end
+    end
+    
+    -- Check for leaderstats
+    if player:FindFirstChild("leaderstats") then
+        print("✅ Found leaderstats:")
+        for _, stat in pairs(player.leaderstats:GetChildren()) do
+            print(string.format("   • %s: %s", stat.Name, tostring(stat.Value)))
+        end
+        inventoryFound = true
+    end
+    
+    -- Check for data value objects
+    local valueObjects = {}
+    for _, obj in pairs(player:GetDescendants()) do
+        if obj:IsA("StringValue") or obj:IsA("IntValue") or obj:IsA("NumberValue") then
+            local value = obj.Value
+            if type(value) == "string" and #value > 10 then
+                -- Check if it looks like a car ID
+                if value:match("^%x+$") or value:match("^%d+$") or 
+                   value:find("car_") or value:find("vehicle_") then
+                    table.insert(valueObjects, {
                         Name = obj.Name,
-                        Model = obj,
-                        Dealership = dealer.Slot,
-                        Path = obj:GetFullName()
+                        Path = obj:GetFullName(),
+                        Value = value,
+                        Type = obj.ClassName
                     })
                 end
             end
         end
     end
     
-    print("Found " .. #allCars .. " cars")
-    return allCars
+    if #valueObjects > 0 then
+        print("\n🔍 Possible car IDs in player data:")
+        for _, obj in ipairs(valueObjects) do
+            print(string.format("   • %s = %s", obj.Path, tostring(obj.Value)))
+        end
+        inventoryFound = true
+    end
+    
+    if not inventoryFound then
+        print("❌ No inventory system found")
+        print("   Cars might be stored server-side only")
+    end
+    
+    return inventoryFound
 end
 
--- ===== FIND TASK CONTROLLER =====
-local function findTaskController()
-    print("🔧 Looking for TaskController...")
+-- ===== AUTO-DUPLICATION SYSTEM =====
+local function autoDuplicateCars()
+    print("\n⚡ Starting auto-duplication...")
     
-    local modules = ReplicatedStorage:FindFirstChild("Modules")
-    if modules then
-        local taskController = modules:FindFirstChild("TaskController")
-        if taskController then
-            print("✅ Found TaskController module")
-            
-            -- Try to understand how it works
-            local success, source = pcall(function()
-                return taskController.Source
-            end)
-            
-            if success and source then
-                -- Look for car-related functions
-                if source:find("Cars") then
-                    print("📝 TaskController handles cars")
-                end
-                if source:find("purchase") or source:find("buy") then
-                    print("💰 TaskController handles purchases")
-                end
-            end
-            
-            return taskController
+    -- Step 1: Scan for inventory
+    scanForInventory()
+    
+    -- Step 2: Start network analysis
+    startNetworkAnalysis()
+    
+    -- Step 3: Wait for car interactions
+    print("\n🎮 Now play the game normally:")
+    print("1. Buy cars from dealership")
+    print("2. Enter/exist cars")
+    print("3. Check inventory")
+    print("4. Sell/trade cars")
+    print("\nThe script will capture all car IDs...")
+    
+    -- Wait for some traffic
+    for i = 1, 30 do
+        task.wait(1)
+        if i % 10 == 0 then
+            print(string.format("⏳ Waiting... %d/30 seconds", i))
         end
     end
     
-    print("❌ TaskController not found")
-    return nil
-end
-
--- ===== TRY TO DUPLICATE CARS =====
-local function tryDuplicateCar(carName, dealershipSlot)
-    print("🔄 Attempting to duplicate: " .. carName)
-    
-    -- Method 1: Try to find purchase remotes
-    local purchaseRemotes = {}
-    
-    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
-        if obj:IsA("RemoteEvent") then
-            local nameLower = obj.Name:lower()
-            if nameLower:find("purchase") or nameLower:find("buy") or 
-               nameLower:find("car") or nameLower:find("vehicle") then
-                table.insert(purchaseRemotes, {
-                    Object = obj,
-                    Name = obj.Name,
-                    Path = obj:GetFullName()
-                })
+    -- Step 4: Test captured IDs
+    if next(carIDs) then
+        print(string.format("\n🎯 Captured %d car IDs, testing them...", #carIDs))
+        local results = testCarIDs()
+        
+        if next(results) then
+            print("\n✅ AUTO-DUPLICATION COMPLETE!")
+            print("Check your inventory for duplicated cars!")
+            
+            -- Try rapid duplication of successful IDs
+            print("\n🚀 Attempting rapid duplication...")
+            for remoteName, tests in pairs(results) do
+                for _, test in ipairs(tests) do
+                    -- Find the remote
+                    local remoteObj
+                    for _, obj in pairs(game:GetDescendants()) do
+                        if obj.Name == remoteName and obj:IsA("RemoteEvent") then
+                            remoteObj = obj
+                            break
+                        end
+                    end
+                    
+                    if remoteObj then
+                        for i = 1, 10 do
+                            pcall(function()
+                                remoteObj:FireServer(test.Format)
+                            end)
+                            task.wait(0.05)
+                        end
+                        print(string.format("   Sent 10 duplicates via %s", remoteName))
+                    end
+                end
             end
         end
+    else
+        print("❌ No car IDs captured")
+        print("Try buying/selling cars in the game")
     end
-    
-    print("Found " .. #purchaseRemotes .. " purchase remotes")
-    
-    -- Try different data formats based on the dealership structure
-    local testData = {
-        -- Format 1: Simple car name
-        carName,
-        
-        -- Format 2: With dealership slot
-        {carName, dealershipSlot},
-        {carName, tonumber(dealershipSlot:match("%d+"))},
-        
-        -- Format 3: Player + car
-        {player, carName},
-        {player.UserId, carName},
-        
-        -- Format 4: Complex structure
-        {
-            Car = carName,
-            Slot = dealershipSlot,
-            Player = player.Name,
-            Price = 0
-        },
-        
-        -- Format 5: Just slot number
-        tonumber(dealershipSlot:match("%d+")),
-        
-        -- Format 6: Command format
-        {"buy", carName},
-        {"purchase", carName, dealershipSlot}
-    }
-    
-    local successfulCalls = {}
-    
-    for _, remote in pairs(purchaseRemotes) do
-        print("Testing remote: " .. remote.Name)
-        
-        for _, data in pairs(testData) do
-            local success, result = pcall(function()
-                remote.Object:FireServer(data)
-                return "Success"
-            end)
-            
-            if success then
-                if not successfulCalls[remote.Name] then
-                    successfulCalls[remote.Name] = {}
-                end
-                table.insert(successfulCalls[remote.Name], {
-                    Data = data,
-                    Result = result
-                })
-                
-                print("✅ " .. remote.Name .. " accepted data")
-                
-                -- Send multiple times
-                for i = 1, 5 do
-                    pcall(function()
-                        remote.Object:FireServer(data)
-                    end)
-                    task.wait(0.05)
-                end
-                print("   Sent 5 duplicates")
-                
-                break
-            end
-            
-            task.wait(0.05)
-        end
-    end
-    
-    return successfulCalls
 end
 
 -- ===== SIMPLE UI =====
 local function createSimpleUI()
     local gui = Instance.new("ScreenGui")
-    gui.Name = "CarDuplicator"
+    gui.Name = "CarIDTracker"
     gui.Parent = player:WaitForChild("PlayerGui")
     gui.ResetOnSpawn = false
     
     -- Main Window
     local main = Instance.new("Frame")
-    main.Size = UDim2.new(0, 300, 0, 400)
-    main.Position = UDim2.new(0.5, -150, 0.5, -200)
-    main.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+    main.Size = UDim2.new(0, 320, 0, 350)
+    main.Position = UDim2.new(0.5, -160, 0.5, -175)
+    main.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
     main.BorderSizePixel = 0
     main.Parent = gui
     
@@ -249,7 +427,7 @@ local function createSimpleUI()
     titleBar.Parent = main
     
     local title = Instance.new("TextLabel")
-    title.Text = "🚗 TARGETED DUPE"
+    title.Text = "🎯 CAR ID TRACKER"
     title.Size = UDim2.new(1, -60, 1, 0)
     title.Position = UDim2.new(0, 10, 0, 0)
     title.BackgroundTransparency = 1
@@ -278,7 +456,7 @@ local function createSimpleUI()
     
     -- Status
     local status = Instance.new("TextLabel")
-    status.Text = "Ready to find cars..."
+    status.Text = "Ready to track car IDs\nPlay the game to capture data"
     status.Size = UDim2.new(1, -20, 0, 50)
     status.Position = UDim2.new(0, 10, 0, 10)
     status.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
@@ -289,44 +467,44 @@ local function createSimpleUI()
     status.Parent = content
     
     -- Buttons
-    local findBtn = Instance.new("TextButton")
-    findBtn.Text = "🔍 FIND CARS"
-    findBtn.Size = UDim2.new(1, -20, 0, 30)
-    findBtn.Position = UDim2.new(0, 10, 0, 70)
-    findBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 220)
-    findBtn.TextColor3 = Color3.new(1, 1, 1)
-    findBtn.Font = Enum.Font.GothamBold
-    findBtn.TextSize = 12
-    findBtn.Parent = content
+    local scanBtn = Instance.new("TextButton")
+    scanBtn.Text = "🔍 SCAN INVENTORY"
+    scanBtn.Size = UDim2.new(1, -20, 0, 30)
+    scanBtn.Position = UDim2.new(0, 10, 0, 70)
+    scanBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 220)
+    scanBtn.TextColor3 = Color3.new(1, 1, 1)
+    scanBtn.Font = Enum.Font.GothamBold
+    scanBtn.TextSize = 12
+    scanBtn.Parent = content
     
-    local dupeBtn = Instance.new("TextButton")
-    dupeBtn.Text = "🎯 DUPLICATE"
-    dupeBtn.Size = UDim2.new(1, -20, 0, 30)
-    dupeBtn.Position = UDim2.new(0, 10, 0, 110)
-    dupeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-    dupeBtn.TextColor3 = Color3.new(1, 1, 1)
-    dupeBtn.Font = Enum.Font.GothamBold
-    dupeBtn.TextSize = 12
-    dupeBtn.Parent = content
+    local trackBtn = Instance.new("TextButton")
+    trackBtn.Text = "📡 START TRACKING"
+    trackBtn.Size = UDim2.new(1, -20, 0, 30)
+    trackBtn.Position = UDim2.new(0, 10, 0, 110)
+    trackBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 100)
+    trackBtn.TextColor3 = Color3.new(1, 1, 1)
+    trackBtn.Font = Enum.Font.GothamBold
+    trackBtn.TextSize = 12
+    trackBtn.Parent = content
     
-    local rapidBtn = Instance.new("TextButton")
-    rapidBtn.Text = "⚡ RAPID x10"
-    rapidBtn.Size = UDim2.new(1, -20, 0, 30)
-    rapidBtn.Position = UDim2.new(0, 10, 0, 150)
-    rapidBtn.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
-    rapidBtn.TextColor3 = Color3.new(1, 1, 1)
-    rapidBtn.Font = Enum.Font.GothamBold
-    rapidBtn.TextSize = 12
-    rapidBtn.Parent = content
+    local autoBtn = Instance.new("TextButton")
+    autoBtn.Text = "⚡ AUTO-DUPE"
+    autoBtn.Size = UDim2.new(1, -20, 0, 30)
+    autoBtn.Position = UDim2.new(0, 10, 0, 150)
+    autoBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    autoBtn.TextColor3 = Color3.new(1, 1, 1)
+    autoBtn.Font = Enum.Font.GothamBold
+    autoBtn.TextSize = 12
+    autoBtn.Parent = content
     
-    -- Car List
-    local carList = Instance.new("ScrollingFrame")
-    carList.Size = UDim2.new(1, -20, 0, 170)
-    carList.Position = UDim2.new(0, 10, 0, 190)
-    carList.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-    carList.BorderSizePixel = 0
-    carList.ScrollBarThickness = 4
-    carList.Parent = content
+    -- Results Display
+    local results = Instance.new("ScrollingFrame")
+    results.Size = UDim2.new(1, -20, 0, 130)
+    results.Position = UDim2.new(0, 10, 0, 190)
+    results.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+    results.BorderSizePixel = 0
+    results.ScrollBarThickness = 4
+    results.Parent = content
     
     -- Add rounded corners
     local function addCorner(obj)
@@ -338,10 +516,10 @@ local function createSimpleUI()
     addCorner(main)
     addCorner(titleBar)
     addCorner(status)
-    addCorner(findBtn)
-    addCorner(dupeBtn)
-    addCorner(rapidBtn)
-    addCorner(carList)
+    addCorner(scanBtn)
+    addCorner(trackBtn)
+    addCorner(autoBtn)
+    addCorner(results)
     addCorner(closeBtn)
     
     -- === DRAGGABLE WINDOW ===
@@ -372,165 +550,107 @@ local function createSimpleUI()
         end
     end)
     
-    -- === VARIABLES ===
-    local foundCars = {}
-    local selectedCar = nil
-    local selectedDealership = nil
-    
     -- === FUNCTIONS ===
-    local function updateCarList()
-        carList:ClearAllChildren()
+    local function updateResults(text, color)
+        results:ClearAllChildren()
         
-        local yPos = 5
-        for i, car in ipairs(foundCars) do
-            local entry = Instance.new("Frame")
-            entry.Size = UDim2.new(1, -10, 0, 40)
-            entry.Position = UDim2.new(0, 5, 0, yPos)
-            
-            -- Highlight selected car
-            if selectedCar == car.Name then
-                entry.BackgroundColor3 = Color3.fromRGB(60, 80, 60)
-            else
-                entry.BackgroundColor3 = i % 2 == 0 and Color3.fromRGB(35, 35, 45) or Color3.fromRGB(30, 30, 40)
-            end
-            
-            addCorner(entry)
-            entry.Parent = carList
-            
-            -- Car name
-            local nameLabel = Instance.new("TextLabel")
-            nameLabel.Text = car.Name
-            nameLabel.Size = UDim2.new(0.7, -5, 1, -10)
-            nameLabel.Position = UDim2.new(0, 5, 0, 5)
-            nameLabel.BackgroundTransparency = 1
-            nameLabel.TextColor3 = Color3.new(1, 1, 1)
-            nameLabel.Font = Enum.Font.Gotham
-            nameLabel.TextSize = 12
-            nameLabel.TextXAlignment = Enum.TextXAlignment.Left
-            nameLabel.TextTruncate = Enum.TextTruncate.AtEnd
-            nameLabel.Parent = entry
-            
-            -- Dealership
-            local dealerLabel = Instance.new("TextLabel")
-            dealerLabel.Text = car.Dealership
-            dealerLabel.Size = UDim2.new(0.3, -5, 1, -10)
-            dealerLabel.Position = UDim2.new(0.7, 0, 0, 5)
-            dealerLabel.BackgroundTransparency = 1
-            dealerLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
-            dealerLabel.Font = Enum.Font.Gotham
-            dealerLabel.TextSize = 10
-            dealerLabel.TextXAlignment = Enum.TextXAlignment.Right
-            dealerLabel.Parent = entry
-            
-            -- Select button (invisible overlay)
-            local selectBtn = Instance.new("TextButton")
-            selectBtn.Text = ""
-            selectBtn.Size = UDim2.new(1, 0, 1, 0)
-            selectBtn.BackgroundTransparency = 1
-            selectBtn.Parent = entry
-            
-            selectBtn.MouseButton1Click:Connect(function()
-                selectedCar = car.Name
-                selectedDealership = car.Dealership
-                status.Text = "Selected: " .. car.Name .. "\nDealership: " .. car.Dealership
-                updateCarList()
-            end)
-            
-            yPos = yPos + 45
-        end
-        
-        carList.CanvasSize = UDim2.new(0, 0, 0, yPos)
+        local label = Instance.new("TextLabel")
+        label.Text = text
+        label.Size = UDim2.new(1, -10, 1, -10)
+        label.Position = UDim2.new(0, 5, 0, 5)
+        label.BackgroundTransparency = 1
+        label.TextColor3 = color or Color3.new(1, 1, 1)
+        label.Font = Enum.Font.Code
+        label.TextSize = 10
+        label.TextWrapped = true
+        label.TextXAlignment = Enum.TextXAlignment.Left
+        label.TextYAlignment = Enum.TextYAlignment.Top
+        label.Parent = results
     end
     
     -- === BUTTON ACTIONS ===
-    findBtn.MouseButton1Click:Connect(function()
-        findBtn.Text = "SEARCHING..."
-        findBtn.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
-        status.Text = "Searching for dealerships..."
+    scanBtn.MouseButton1Click:Connect(function()
+        scanBtn.Text = "SCANNING..."
+        scanBtn.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
+        status.Text = "Scanning inventory system..."
         
         task.spawn(function()
-            -- Find task controller first
-            local taskController = findTaskController()
+            local found = scanForInventory()
             
-            -- Find dealerships
-            local dealerships = findDealerships()
-            
-            if #dealerships == 0 then
-                status.Text = "❌ No dealerships found!\nIs this a car game?"
-                findBtn.Text = "🔍 FIND CARS"
-                findBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 220)
-                return
-            end
-            
-            -- Find cars in dealerships
-            foundCars = findCarsInDealerships(dealerships)
-            
-            if #foundCars == 0 then
-                status.Text = "❌ No cars found in dealerships"
+            if found then
+                status.Text = "✅ Inventory system found!\nCheck console for details."
+                updateResults("Inventory scan complete.\nSee console for car IDs.", Color3.fromRGB(0, 255, 150))
             else
-                status.Text = "✅ Found " .. #foundCars .. " cars!\nClick a car to select it."
-                updateCarList()
+                status.Text = "❌ No inventory found\nCars are server-side only"
+                updateResults("No local inventory found.\nCars stored server-side.", Color3.fromRGB(255, 100, 100))
             end
             
-            if taskController then
-                status.Text = status.Text .. "\n\n⚠️ TaskController detected"
-                status.Text = status.Text .. "\nGame has anti-dupe protection"
-            end
-            
-            findBtn.Text = "🔍 FIND CARS"
-            findBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 220)
+            scanBtn.Text = "🔍 SCAN INVENTORY"
+            scanBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 220)
         end)
     end)
     
-    dupeBtn.MouseButton1Click:Connect(function()
-        if not selectedCar then
-            status.Text = "❌ Select a car first!\nClick on a car from the list."
-            return
-        end
-        
-        dupeBtn.Text = "WORKING..."
-        dupeBtn.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
-        status.Text = "Duplicating " .. selectedCar + "..."
+    trackBtn.MouseButton1Click:Connect(function()
+        trackBtn.Text = "TRACKING..."
+        trackBtn.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
+        status.Text = "Starting network tracking...\nPlay the game to capture data"
         
         task.spawn(function()
-            local results = tryDuplicateCar(selectedCar, selectedDealership)
+            startNetworkAnalysis()
             
-            local successCount = 0
-            for _ in pairs(results) do
-                successCount = successCount + 1
-            end
-            
-            if successCount > 0 then
-                status.Text = "✅ " .. successCount .. " remotes accepted!\nCheck your inventory!"
-            else
-                status.Text = "❌ No remotes accepted data.\nTry a different car or server."
-            end
-            
-            dupeBtn.Text = "🎯 DUPLICATE"
-            dupeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-        end)
-    end)
-    
-    rapidBtn.MouseButton1Click:Connect(function()
-        if not selectedCar then
-            status.Text = "❌ Select a car first!"
-            return
-        end
-        
-        rapidBtn.Text = "SENDING x10..."
-        rapidBtn.BackgroundColor3 = Color3.fromRGB(255, 100, 0)
-        status.Text = "Sending 10 duplicates of " .. selectedCar + "..."
-        
-        task.spawn(function()
+            -- Monitor for 10 seconds
             for i = 1, 10 do
-                tryDuplicateCar(selectedCar, selectedDealership)
-                status.Text = "Sending " .. i .. "/10..."
-                task.wait(0.5)
+                status.Text = string.format("Tracking... %d/10 seconds\nPerform car actions", i)
+                task.wait(1)
             end
             
-            rapidBtn.Text = "⚡ RAPID x10"
-            rapidBtn.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
-            status.Text = "✅ 10 duplicates sent!\nCheck your inventory!"
+            if next(carIDs) then
+                local idCount = 0
+                for _ in pairs(carIDs) do
+                    idCount = idCount + 1
+                end
+                
+                status.Text = string.format("✅ Captured %d car IDs!\nClick AUTO-DUPE to test", idCount)
+                
+                local resultText = string.format("Captured %d car IDs:\n\n", idCount)
+                local count = 0
+                for id, data in pairs(carIDs) do
+                    if count < 5 then  -- Show first 5
+                        resultText = resultText .. string.format("• %s (%s)\n", id:sub(1, 20) .. "...", data.Type)
+                        count = count + 1
+                    end
+                end
+                
+                updateResults(resultText, Color3.fromRGB(0, 255, 150))
+            else
+                status.Text = "❌ No car IDs captured\nTry buying/selling cars"
+                updateResults("No car IDs captured yet.\nBuy/sell cars in the game.", Color3.fromRGB(255, 100, 100))
+            end
+            
+            trackBtn.Text = "📡 START TRACKING"
+            trackBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 100)
+        end)
+    end)
+    
+    autoBtn.MouseButton1Click:Connect(function()
+        autoBtn.Text = "RUNNING..."
+        autoBtn.BackgroundColor3 = Color3.fromRGB(255, 100, 0)
+        status.Text = "Running auto-duplication...\nThis will take 30 seconds"
+        
+        task.spawn(function()
+            updateResults("Auto-duplication started...\nSee console for progress.", Color3.fromRGB(255, 200, 100))
+            
+            autoDuplicateCars()
+            
+            autoBtn.Text = "⚡ AUTO-DUPE"
+            autoBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+            
+            if next(carIDs) then
+                status.Text = "✅ Auto-dupe complete!\nCheck inventory for cars"
+                updateResults("Auto-duplication complete!\nCheck your inventory.", Color3.fromRGB(0, 255, 0))
+            else
+                status.Text = "❌ No car IDs found\nTry manual tracking first"
+            end
         end)
     end)
     
@@ -538,19 +658,22 @@ local function createSimpleUI()
         gui:Destroy()
     end)
     
+    -- Initial display
+    updateResults("Click SCAN INVENTORY to start\nThen START TRACKING to capture IDs", Color3.fromRGB(150, 150, 150))
+    
     return gui
 end
 
 -- ===== MAIN =====
 print("=" .. string.rep("=", 60))
-print("🚗 TARGETED CAR DUPLICATOR")
-print("Based on game structure analysis")
+print("🎯 SERVER-SIDE CAR ID TRACKER")
 print("=" .. string.rep("=", 60))
 
-print("\n🎯 Game Structure Detected:")
-print("• Workspace.Tycoons.Slot [X].Dealership")
-print("• Cars stored in Dealership.Cars folder")
-print("• TaskController module for purchases")
+print("\n🎯 This script:")
+print("• Captures car IDs from network traffic")
+print("• Identifies UUIDs, numeric IDs, and hash-based IDs")
+print("• Tests captured IDs on all car-related remotes")
+print("• Attempts to add cars to your inventory")
 
 print("\n🔧 Initializing...")
 task.wait(1)
@@ -558,12 +681,13 @@ task.wait(1)
 local ui = createSimpleUI()
 print("\n✅ UI Ready!")
 print("\n💡 How to use:")
-print("1. Click FIND CARS to locate dealerships")
-print("2. Select a car from the list")
-print("3. Click DUPLICATE to try duplication")
-print("4. Use RAPID x10 for multiple attempts")
+print("1. Click SCAN INVENTORY first")
+print("2. Click START TRACKING and play the game")
+print("3. Buy/sell/enter cars to capture IDs")
+print("4. Click AUTO-DUPE to test all IDs")
 print("5. Check inventory after testing")
 
-print("\n⚠️  Note:")
-print("TaskController detected - game has anti-dupe")
-print("Might not work on all servers")
+print("\n⚠️  Important:")
+print("• This works by capturing REAL car IDs")
+print("• You need to actually interact with cars")
+print("• Success depends on the game's security")
