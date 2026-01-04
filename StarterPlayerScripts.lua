@@ -1,300 +1,177 @@
--- 🏎️ ACTIVE CAR DUPLICATION WHILE DRIVING
+-- 🚗 STATIC CAR DUPLICATOR (NO MOVEMENT)
 -- Place ID: 1554960397 - NY SALE! Car Dealership Tycoon
 
-print("🏎️ ACTIVE CAR DUPLICATION SYSTEM")
+print("🚗 STATIC DUPLICATOR - NO MOVEMENT")
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Workspace = game:GetService("Workspace")
 local player = Players.LocalPlayer
 
 repeat task.wait() until game:IsLoaded()
 task.wait(2)
 
--- ===== STEP 1: FIND YOUR CURRENT DRIVING CAR =====
-local function findCurrentDrivingCar()
-    print("\n🔍 FINDING CURRENT DRIVING CAR...")
+-- Prevent any character movement
+local function disableMovement()
+    print("\n🛑 DISABLING CHARACTER MOVEMENT")
     
-    local currentCar = nil
-    
-    -- Method 1: Look for car with player as driver
-    if Workspace:FindFirstChild("Vehicles") then
-        for _, vehicle in pairs(Workspace.Vehicles:GetChildren()) do
-            if vehicle:IsA("Model") then
-                -- Check for driver seat
-                local driverSeat = vehicle:FindFirstChild("DriverSeat") or vehicle:FindFirstChild("Seat")
-                if driverSeat and driverSeat:FindFirstChild("Occupant") then
-                    local occupant = driverSeat.Occupant
-                    if occupant and occupant.Parent == player.Character then
-                        currentCar = vehicle
-                        print("✅ Found driving car: " .. vehicle.Name)
-                        break
-                    end
-                end
-            end
+    if player.Character then
+        local humanoid = player.Character:FindFirstChild("Humanoid")
+        if humanoid then
+            -- Disable movement but keep script running
+            pcall(function()
+                humanoid.WalkSpeed = 0
+                humanoid.JumpPower = 0
+                print("✅ Movement disabled")
+            end)
         end
     end
-    
-    -- Method 2: Look for cars near player
-    if not currentCar and player.Character then
-        local charPos = player.Character:GetPivot().Position
-        
-        for _, vehicle in pairs(Workspace:GetChildren()) do
-            if vehicle:IsA("Model") and vehicle:GetAttribute("IsVehicle") then
-                local vehiclePos = vehicle:GetPivot().Position
-                local distance = (charPos - vehiclePos).Magnitude
-                
-                if distance < 20 then  -- Within 20 studs
-                    currentCar = vehicle
-                    print("✅ Found nearby car: " .. vehicle.Name)
-                    break
-                end
-            end
-        end
-    end
-    
-    -- Method 3: Look for spawned player vehicles
-    for _, obj in pairs(Workspace:GetDescendants()) do
-        if obj:IsA("Model") then
-            local owner = obj:GetAttribute("Owner") or obj:FindFirstChild("Owner")
-            if owner and (owner.Value == player or owner.Value == player.Name or owner.Value == player.UserId) then
-                currentCar = obj
-                print("✅ Found owned car: " .. obj.Name)
-                break
-            end
-        end
-    end
-    
-    if currentCar then
-        print("Car details:")
-        print("- Name: " .. currentCar.Name)
-        print("- Class: " .. currentCar.ClassName)
-        
-        -- Get car model type
-        for _, child in pairs(currentCar:GetChildren()) do
-            if child:IsA("StringValue") and child.Name == "CarType" then
-                print("- Type: " .. child.Value)
-            end
-        end
-    else
-        print("❌ No car found! Get in a car first!")
-    end
-    
-    return currentCar
 end
 
--- ===== STEP 2: DUPLICATE WHILE DRIVING =====
-local function duplicateWhileDriving(carModel)
-    print("\n⚡ DUPLICATING WHILE DRIVING...")
+-- ===== STEP 1: CHECK INVENTORY WITHOUT MOVING =====
+local function checkInventoryStatic()
+    print("\n📦 CHECKING INVENTORY (STATIC)...")
     
-    if not carModel then
-        print("❌ No car to duplicate!")
+    local carCount = 0
+    local carNames = {}
+    
+    -- Check all player folders without moving
+    for _, folder in pairs(player:GetChildren()) do
+        if folder:IsA("Folder") then
+            for _, item in pairs(folder:GetChildren()) do
+                if item.Name:find("Car") or item.Name:find("Vehicle") then
+                    carCount = carCount + 1
+                    table.insert(carNames, item.Name)
+                end
+            end
+        end
+    end
+    
+    -- Check leaderstats
+    if player:FindFirstChild("leaderstats") then
+        for _, stat in pairs(player.leaderstats:GetChildren()) do
+            if stat:IsA("IntValue") or stat:IsA("NumberValue") then
+                if stat.Name:lower():find("car") then
+                    print("Car stat: " .. stat.Name .. " = " .. stat.Value)
+                end
+            end
+        end
+    end
+    
+    print("Found " .. carCount .. " cars in inventory")
+    if carCount > 0 then
+        print("Car names:")
+        for i, name in ipairs(carNames) do
+            print("  " .. i .. ". " .. name)
+        end
+    end
+    
+    return carNames
+end
+
+-- ===== STEP 2: STATIC DUPLICATION ATTEMPTS =====
+local function staticDuplicateCars(carNames)
+    print("\n⚡ STATIC DUPLICATION ATTEMPTS")
+    
+    if #carNames == 0 then
+        print("❌ No cars to duplicate!")
         return false
     end
     
-    local carName = carModel.Name
-    print("Target car: " .. carName)
+    -- Find events WITHOUT moving character
+    local events = {}
     
-    -- Strategy: Use driving/racing events since you're actively driving
-    
-    -- Look for driving/race events
-    local drivingEvents = {}
-    
-    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
-        if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
-            local name = obj.Name:lower()
-            if name:find("drive") or name:find("race") or name:find("vehicle") or 
-               name:find("spawn") or name:find("savecar") then
-                table.insert(drivingEvents, obj)
-                print("Found driving event: " .. obj.Name)
-            end
-        end
-    end
-    
-    -- Also check for generic car events
-    local carEvents = {}
     for _, obj in pairs(ReplicatedStorage:GetChildren()) do
-        if obj:IsA("RemoteEvent") then
-            table.insert(carEvents, obj)
+        if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
+            table.insert(events, {
+                Object = obj,
+                Name = obj.Name,
+                Type = obj.ClassName
+            })
         end
     end
     
-    print("Total events to try: " .. (#drivingEvents + #carEvents))
+    print("Found " .. #events .. " events")
     
-    -- Try to duplicate using driving context
+    -- Try duplication with each car
     local attempts = 0
     
-    -- Method A: Try to save/spawn duplicate while driving
-    for _, event in pairs(drivingEvents) do
-        -- Different argument patterns for driving context
-        local patterns = {
-            {carName, "duplicate"},
-            {player, carName, "save"},
-            {carName, player.UserId},
-            {Vehicle = carName, Action = "Clone"},
-            {"savevehicle", carName},
-            {"spawn", carName, player}
-        }
+    for _, carName in pairs(carNames) do
+        print("\nTrying: " .. carName)
         
-        for _, args in pairs(patterns) do
-            attempts = attempts + 1
-            local success = pcall(function()
-                if event:IsA("RemoteEvent") then
-                    event:FireServer(unpack(args))
-                else
-                    event:InvokeServer(unpack(args))
-                end
-            end)
+        for _, eventData in pairs(events) do
+            local event = eventData.Object
             
-            if success then
-                print("✅ Driving attempt " .. attempts .. " via " .. event.Name)
+            -- Simple argument patterns (no player movement)
+            local patterns = {
+                {carName},
+                {carName, 0},
+                {carName, 1},
+                {"buy", carName},
+                {"add", carName},
+                {"duplicate", carName}
+            }
+            
+            for i, args in pairs(patterns) do
+                attempts = attempts + 1
                 
-                -- Rapid fire while success
-                for i = 1, 3 do
-                    pcall(function()
-                        if event:IsA("RemoteEvent") then
-                            event:FireServer(unpack(args))
-                        end
-                    end)
-                    task.wait(0.02)
-                end
-            end
-            
-            task.wait(0.05)
-        end
-    end
-    
-    -- Method B: Try to trigger garage save from driving
-    print("\n🔄 Attempting garage save while driving...")
-    
-    -- Look for save/garage events
-    local saveEvents = {"SaveCar", "StoreVehicle", "ParkCar", "GarageSave"}
-    
-    for _, eventName in pairs(saveEvents) do
-        local event = ReplicatedStorage:FindFirstChild(eventName)
-        if event then
-            for i = 1, 5 do
-                pcall(function()
-                    if event:IsA("RemoteEvent") then
-                        event:FireServer(carName, player, i)  -- Try multiple saves
-                        print("✅ Save attempt " .. i .. " via " .. eventName)
+                local success, errorMsg = pcall(function()
+                    if eventData.Type == "RemoteEvent" then
+                        event:FireServer(unpack(args))
+                        return true
+                    else
+                        event:InvokeServer(unpack(args))
+                        return true
                     end
                 end)
-                task.wait(0.1)
+                
+                if success then
+                    print("✅ Attempt " .. attempts .. " via " .. eventData.Name)
+                    
+                    -- Rapid fire a few times
+                    for j = 1, 3 do
+                        pcall(function()
+                            if eventData.Type == "RemoteEvent" then
+                                event:FireServer(unpack(args))
+                            end
+                        end)
+                        task.wait(0.01)
+                    end
+                end
+                
+                task.wait(0.05)
             end
         end
     end
     
-    -- Method C: Try to exploit the "No boost launch" system
-    print("\n🚀 Exploiting boost system...")
-    
-    -- Since we see "No boost launch" messages, there's a boost system
-    local boostEvents = {"Boost", "Nitrous", "SpeedBoost", "LaunchCar"}
-    
-    for _, eventName in pairs(boostEvents) do
-        local event = ReplicatedStorage:FindFirstChild(eventName)
-        if event then
-            -- Try to trigger boost with car duplication
-            pcall(function()
-                event:FireServer(carName, "DUPLICATE", 999)  -- High value might trigger bug
-                print("✅ Boost exploit via " .. eventName)
-            end)
-        end
-    end
-    
-    return attempts
+    print("\n📊 Total attempts: " .. attempts)
+    return attempts > 0
 end
 
--- ===== STEP 3: QUICK INVENTORY CHECK =====
-local function quickInventoryCheck()
-    print("\n📦 QUICK INVENTORY CHECK...")
-    
-    local inventory = player:FindFirstChild("Inventory") or 
-                     player:FindFirstChild("Garage") or
-                     player:FindFirstChild("Cars")
-    
-    if inventory then
-        print("Inventory items (" .. #inventory:GetChildren() .. "):")
-        for _, item in pairs(inventory:GetChildren()) do
-            print("  - " .. item.Name .. " (" .. item.ClassName .. ")")
-        end
-    else
-        print("❌ No inventory found!")
-    end
-    
-    -- Also check player data
-    if player:FindFirstChild("PlayerData") then
-        local data = player.PlayerData
-        for _, value in pairs(data:GetChildren()) do
-            if value:IsA("StringValue") and value.Value:find("Car") then
-                print("Data: " .. value.Name .. " = " .. value.Value)
-            end
-        end
-    end
-end
-
--- ===== STEP 4: CONTINUOUS DRIVING EXPLOIT =====
-local function continuousDrivingExploit()
-    print("\n🏎️ STARTING CONTINUOUS DRIVING EXPLOIT")
-    
-    -- This runs continuously while you drive
-    local lastCar = nil
-    local duplicateCount = 0
-    
-    while true do
-        task.wait(3)  -- Check every 3 seconds
-        
-        -- Find current car
-        local currentCar = findCurrentDrivingCar()
-        
-        if currentCar and currentCar ~= lastCar then
-            print("\n🔄 NEW CAR DETECTED: " .. currentCar.Name)
-            lastCar = currentCar
-            
-            -- Try to duplicate it
-            local attempts = duplicateWhileDriving(currentCar)
-            duplicateCount = duplicateCount + 1
-            
-            print("Duplication cycle: " .. duplicateCount)
-            
-            -- Quick inventory check
-            quickInventoryCheck()
-            
-            -- If we've tried many times, wait longer
-            if duplicateCount > 5 then
-                print("⏳ Waiting 10 seconds before next attempt...")
-                task.wait(10)
-            end
-        elseif not currentCar then
-            print("⚠️ Not in a car. Get in a vehicle to continue.")
-        end
-    end
-end
-
--- ===== STEP 5: CREATE DRIVING UI =====
-local function createDrivingUI()
+-- ===== STEP 3: SIMPLE UI (NO MOVEMENT) =====
+local function createStaticUI()
     local gui = Instance.new("ScreenGui")
+    gui.Name = "StaticDuplicator"
     gui.Parent = player:WaitForChild("PlayerGui")
     
     local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(0, 350, 0, 250)
-    frame.Position = UDim2.new(0.8, 0, 0.1, 0)  -- Top right corner
+    frame.Size = UDim2.new(0, 300, 0, 200)
+    frame.Position = UDim2.new(0.5, -150, 0.8, -100)  -- Bottom center
     frame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
     frame.BorderSizePixel = 0
     frame.Parent = gui
     
     local title = Instance.new("TextLabel")
-    title.Text = "🏎️ DRIVING DUPLICATOR"
+    title.Text = "🚗 STATIC DUPLICATOR"
     title.Size = UDim2.new(1, 0, 0, 40)
-    title.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    title.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
     title.TextColor3 = Color3.new(1, 1, 1)
     title.Font = Enum.Font.GothamBold
     title.TextSize = 18
     title.Parent = frame
     
     local status = Instance.new("TextLabel")
-    status.Text = "Get in a car to start!\n\nDrive around while this runs.\n\nCheck console for updates."
-    status.Size = UDim2.new(1, -20, 0, 120)
+    status.Text = "Ready. Will NOT move your character.\n\nClick buttons below."
+    status.Size = UDim2.new(1, -20, 0, 80)
     status.Position = UDim2.new(0, 10, 0, 50)
     status.BackgroundTransparency = 1
     status.TextColor3 = Color3.new(1, 1, 1)
@@ -303,62 +180,63 @@ local function createDrivingUI()
     status.TextWrapped = true
     status.Parent = frame
     
-    -- Buttons
-    local buttons = {
-        {
-            Text = "🔍 FIND CURRENT CAR",
-            Y = 180,
-            Action = function()
-                local car = findCurrentDrivingCar()
-                if car then
-                    status.Text = "Found: " .. car.Name .. "\n\nAttempting duplication..."
-                    task.wait(1)
-                    duplicateWhileDriving(car)
-                    task.wait(2)
-                    quickInventoryCheck()
-                    status.Text = "Duplication attempted!\nCheck inventory/garage."
-                else
-                    status.Text = "No car found!\nGet in a vehicle first."
-                end
-            end
-        },
-        {
-            Text = "⚡ QUICK DUPLICATE",
-            Y = 220,
-            Action = function()
-                local car = findCurrentDrivingCar()
-                if car then
-                    status.Text = "Quick dupe: " .. car.Name
-                    for i = 1, 10 do
-                        task.spawn(function()
-                            local event = ReplicatedStorage:FindFirstChild("SaveCar")
-                            if event then
-                                pcall(function()
-                                    event:FireServer(car.Name)
-                                end)
-                            end
-                        end)
-                    end
-                    task.wait(1)
-                    status.Text = "10 rapid attempts sent!\nCheck if car duplicated."
-                end
-            end
-        }
-    }
+    -- Button 1: Check Cars
+    local btn1 = Instance.new("TextButton")
+    btn1.Text = "🔍 CHECK CARS"
+    btn1.Size = UDim2.new(1, -40, 0, 35)
+    btn1.Position = UDim2.new(0, 20, 0, 140)
+    btn1.BackgroundColor3 = Color3.fromRGB(50, 120, 220)
+    btn1.TextColor3 = Color3.new(1, 1, 1)
+    btn1.Font = Enum.Font.GothamBold
+    btn1.TextSize = 14
+    btn1.Parent = frame
     
-    for _, btn in pairs(buttons) do
-        local button = Instance.new("TextButton")
-        button.Text = btn.Text
-        button.Size = UDim2.new(1, -40, 0, 35)
-        button.Position = UDim2.new(0, 20, 0, btn.Y)
-        button.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
-        button.TextColor3 = Color3.new(1, 1, 1)
-        button.Font = Enum.Font.GothamBold
-        button.TextSize = 14
-        button.Parent = frame
+    btn1.MouseButton1Click:Connect(function()
+        local cars = checkInventoryStatic()
+        if #cars > 0 then
+            local text = "Found " .. #cars .. " cars:\n"
+            for i = 1, math.min(3, #cars) do
+                text = text .. "• " .. cars[i] .. "\n"
+            end
+            if #cars > 3 then
+                text = text .. "... and " .. (#cars - 3) .. " more\n"
+            end
+            status.Text = text
+        else
+            status.Text = "No cars found!\nBuy some cars first."
+        end
+    end)
+    
+    -- Button 2: Duplicate
+    local btn2 = Instance.new("TextButton")
+    btn2.Text = "⚡ DUPLICATE"
+    btn2.Size = UDim2.new(1, -40, 0, 35)
+    btn2.Position = UDim2.new(0, 20, 0, 185)
+    btn2.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    btn2.TextColor3 = Color3.new(1, 1, 1)
+    btn2.Font = Enum.Font.GothamBold
+    btn2.TextSize = 14
+    btn2.Parent = frame
+    
+    btn2.MouseButton1Click:Connect(function()
+        status.Text = "Duplicating...\nStay still!\n\nCheck console."
+        btn2.Text = "WORKING..."
+        btn2.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
         
-        button.MouseButton1Click:Connect(btn.Action)
-    end
+        task.spawn(function()
+            local cars = checkInventoryStatic()
+            staticDuplicateCars(cars)
+            
+            task.wait(2)
+            
+            -- Check results
+            local newCars = checkInventoryStatic()
+            status.Text = "Complete!\n\nCars before: " .. #cars .. "\nCars after: " .. #newCars
+            
+            btn2.Text = "DUPLICATE"
+            btn2.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        end)
+    end)
     
     local corner = Instance.new("UICorner")
     corner.CornerRadius = UDim.new(0, 10)
@@ -367,52 +245,73 @@ local function createDrivingUI()
     return gui, status
 end
 
+-- ===== STEP 4: SAFE AUTOMATIC DUPLICATION =====
+local function safeAutoDuplicate()
+    print("\n🤖 SAFE AUTOMATIC DUPLICATION")
+    
+    -- Step 1: Check current cars
+    local currentCars = checkInventoryStatic()
+    
+    if #currentCars == 0 then
+        print("❌ No cars found! Buy cars first.")
+        return false
+    end
+    
+    print("Starting with " .. #currentCars .. " cars")
+    
+    -- Step 2: Try duplication
+    local success = staticDuplicateCars(currentCars)
+    
+    -- Step 3: Check results
+    task.wait(3)
+    local newCars = checkInventoryStatic()
+    
+    print("\n" .. string.rep("=", 50))
+    print("RESULTS:")
+    print("Before: " .. #currentCars .. " cars")
+    print("After: " .. #newCars .. " cars")
+    
+    if #newCars > #currentCars then
+        print("🎉 SUCCESS! Gained " .. (#newCars - #currentCars) .. " cars!")
+        return true
+    else
+        print("⚠️ No new cars gained")
+        print("Server is rejecting requests.")
+        return false
+    end
+end
+
 -- ===== MAIN EXECUTION =====
 print("\n" .. string.rep("=", 70))
-print("🏎️ ACTIVE DRIVING DUPLICATION SYSTEM")
+print("🚗 STATIC CAR DUPLICATOR")
 print(string.rep("=", 70))
-print("\nIMPORTANT: You must be DRIVING a car!")
-print("The console shows you're in driving mode.")
-print("\nThis script will:")
-print("1. Detect your current car")
-print("2. Attempt duplication WHILE you drive")
-print("3. Run continuously")
+print("\n⚠️ IMPORTANT: This script will NOT move your character!")
+print("It works from your current position.")
+
+-- Disable movement first
+disableMovement()
 
 -- Create UI
 task.wait(1)
-local gui, status = createDrivingUI()
+local gui, status = createStaticUI()
 
--- Initial car check
+-- Auto-start after 3 seconds
+task.wait(3)
+status.Text = "Auto-starting in 3... 2... 1..."
+task.wait(1)
+
+status.Text = "Running safe duplication...\n\nCheck console for details."
+safeAutoDuplicate()
+
+-- Final status
 task.wait(2)
-local currentCar = findCurrentDrivingCar()
+status.Text = "Script complete!\n\nCheck your inventory.\nIf no new cars, server has protection."
 
-if currentCar then
-    status.Text = "Found car: " .. currentCar.Name .. "\n\nStarting continuous exploit..."
-    
-    -- Start continuous exploit in background
-    task.spawn(function()
-        task.wait(2)
-        continuousDrivingExploit()
-    end)
-    
-    -- Initial duplication attempt
-    task.wait(1)
-    duplicateWhileDriving(currentCar)
-    
-else
-    status.Text = "❌ NO CAR DETECTED!\n\nGet in a vehicle first!\n\nDrive around, then check back."
-    print("\n❌ ERROR: You're not in a car!")
-    print("Get in a vehicle, then the script will work.")
-end
-
--- Final instructions
 print("\n" .. string.rep("=", 70))
-print("📋 INSTRUCTIONS:")
+print("📋 STATIC METHOD COMPLETE")
 print(string.rep("=", 70))
-print("\n1. DRIVE AROUND in your car")
-print("2. The script runs CONTINUOUSLY")
-print("3. Try DIFFERENT CARS")
-print("4. Check garage BETWEEN drives")
-print("5. Use the UI buttons for manual control")
-print("\nThe script exploits the DRIVING STATE")
-print("which might have weaker validation!")
+print("\nThis script:")
+print("1. Does NOT move your character")
+print("2. Works from current position")
+print("3. Only sends network requests")
+print("4. Cannot force movement or teleport")
