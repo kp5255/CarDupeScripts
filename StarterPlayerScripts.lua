@@ -1,7 +1,7 @@
--- 🎯 REAL CAR DUPLICATOR - CORRECT FORMAT
+-- 🔍 DEEP CAR STORAGE ANALYSIS
 -- Place ID: 1554960397 - NY SALE! Car Dealership Tycoon
 
-print("🎯 REAL CAR DUPLICATOR - TARGETING YOUR ACTUAL CARS")
+print("🔍 DEEP CAR STORAGE ANALYSIS")
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -10,355 +10,455 @@ local player = Players.LocalPlayer
 repeat task.wait() until game:IsLoaded()
 task.wait(2)
 
--- ===== YOUR ACTUAL CARS FROM SCREENSHOT =====
-local YOUR_CARS = {
-    "Bontlay Bontaga",
-    "Jegar Model F", 
-    "Sportler Tecan",
-    "Lavish Ventoge",
-    "Lavish Ventoge Car",
-    "Corsaro T8"
-}
-
--- ===== STEP 1: FIND WHERE CARS ARE STORED =====
-local function findCarStorage()
-    print("\n🔍 FINDING CAR STORAGE SYSTEM...")
+-- ===== STEP 1: COMPLETE PLAYER DATA SCAN =====
+local function deepScanPlayerData()
+    print("\n🔬 COMPLETE PLAYER DATA SCAN")
     
-    -- Look for OWNEDCARS or similar
-    local storageLocations = {}
+    local allData = {}
     
-    -- Check all player folders
-    for _, folder in pairs(player:GetChildren()) do
-        if folder:IsA("Folder") then
-            print("Checking folder: " .. folder.Name)
+    -- Scan ALL player objects
+    for _, obj in pairs(player:GetDescendants()) do
+        local data = {
+            Path = obj:GetFullName(),
+            Name = obj.Name,
+            Class = obj.ClassName,
+            Children = #obj:GetChildren()
+        }
+        
+        -- Get value if it's a ValueBase
+        if obj:IsA("ValueBase") then
+            data.Value = obj.Value
+        end
+        
+        -- Get attributes
+        local attributes = {}
+        for _, attrName in pairs(obj:GetAttributes()) do
+            attributes[attrName] = obj:GetAttribute(attrName)
+        end
+        if next(attributes) then
+            data.Attributes = attributes
+        end
+        
+        table.insert(allData, data)
+    end
+    
+    print("Scanned " .. #allData .. " player objects")
+    
+    -- Look for patterns
+    print("\n📊 LOOKING FOR PATTERNS:")
+    
+    -- Group by similar names
+    local namePatterns = {}
+    for _, data in pairs(allData) do
+        if not namePatterns[data.Name] then
+            namePatterns[data.Name] = 0
+        end
+        namePatterns[data.Name] = namePatterns[data.Name] + 1
+    end
+    
+    -- Show most common names
+    print("\nMost common object names:")
+    local sortedNames = {}
+    for name, count in pairs(namePatterns) do
+        table.insert(sortedNames, {Name = name, Count = count})
+    end
+    table.sort(sortedNames, function(a, b) return a.Count > b.Count end)
+    
+    for i = 1, math.min(10, #sortedNames) do
+        print(string.format("%d. %s (x%d)", i, sortedNames[i].Name, sortedNames[i].Count))
+    end
+    
+    -- Look for car-related data
+    print("\n🔍 CAR-RELATED OBJECTS:")
+    for _, data in pairs(allData) do
+        local nameLower = data.Name:lower()
+        if nameLower:find("car") or nameLower:find("vehicle") or 
+           (data.Value and tostring(data.Value):lower():find("car")) then
             
-            -- Check folder contents
-            for _, item in pairs(folder:GetChildren()) do
-                print("  - " .. item.Name .. " (" .. item.ClassName .. ")")
-                
-                -- If it's a car or has car data
-                if item:IsA("StringValue") or item:IsA("Folder") then
-                    local name = item.Name:lower()
-                    if name:find("car") or name:find("vehicle") or name:find("owned") then
-                        table.insert(storageLocations, folder)
-                        print("  ✅ Potential car storage!")
-                        break
-                    end
+            print("\n" .. data.Path)
+            print("  Class: " .. data.Class)
+            print("  Children: " .. data.Children)
+            if data.Value then
+                print("  Value: " .. tostring(data.Value))
+            end
+            if data.Attributes then
+                print("  Attributes:")
+                for attrName, attrValue in pairs(data.Attributes) do
+                    print("    " .. attrName .. " = " .. tostring(attrValue))
                 end
             end
         end
     end
     
-    -- Check for specific values with car names
-    for _, value in pairs(player:GetDescendants()) do
-        if value:IsA("StringValue") then
-            for _, carName in pairs(YOUR_CARS) do
-                if value.Value == carName or value.Name == carName then
-                    print("Found car value: " .. value.Name .. " = " .. value.Value)
-                    table.insert(storageLocations, value.Parent)
-                end
-            end
-        end
-    end
-    
-    return storageLocations
+    return allData
 end
 
--- ===== STEP 2: DUPLICATE YOUR ACTUAL CARS =====
-local function duplicateYourActualCars()
-    print("\n⚡ DUPLICATING YOUR ACTUAL CARS...")
+-- ===== STEP 2: FIND CAR PURCHASE EVENTS =====
+local function findRealPurchaseEvents()
+    print("\n💰 FINDING REAL PURCHASE EVENTS")
     
-    print("Your cars to duplicate:")
-    for i, carName in pairs(YOUR_CARS) do
-        print(i .. ". " .. carName)
-    end
-    
-    -- Find purchase events
-    local events = {}
-    
-    for _, obj in pairs(ReplicatedStorage:GetChildren()) do
+    -- Get ALL remotes
+    local allRemotes = {}
+    for _, obj in pairs(game:GetDescendants()) do
         if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
-            table.insert(events, {
+            local remoteData = {
                 Object = obj,
                 Name = obj.Name,
-                Type = obj.ClassName
-            })
+                Type = obj.ClassName,
+                Path = obj:GetFullName()
+            }
+            table.insert(allRemotes, remoteData)
         end
     end
     
-    print("Found " .. #events .. " events to try")
+    print("Found " .. #allRemotes .. " remote objects")
     
-    -- Try to duplicate EACH of your cars
-    local totalAttempts = 0
-    local successfulEvents = {}
+    -- Show top 20 remotes
+    print("\nTop 20 Remote Objects:")
+    for i = 1, math.min(20, #allRemotes) do
+        print(string.format("%d. %s (%s)", i, allRemotes[i].Name, allRemotes[i].Type))
+    end
     
-    for _, carName in pairs(YOUR_CARS) do
-        print("\n🎯 Targeting: " .. carName)
+    return allRemotes
+end
+
+-- ===== STEP 3: TEST WITH REAL PURCHASE DATA =====
+local function testWithPurchaseData(remotes)
+    print("\n🧪 TESTING WITH REAL PURCHASE DATA")
+    
+    -- Based on your car names, create test data
+    local testCars = {
+        "Bontlay Bontaga",
+        "Jegar Model F", 
+        "Sportler Tecan",
+        "Lavish Ventoge",
+        "Corsaro T8"
+    }
+    
+    local purchaseAttempts = 0
+    local successfulCalls = {}
+    
+    for _, remoteData in pairs(remotes) do
+        local remote = remoteData.Object
         
-        for _, eventData in pairs(events) do
-            local event = eventData.Object
+        -- Skip if not in ReplicatedStorage (might be internal)
+        if not remote:IsDescendantOf(ReplicatedStorage) then
+            -- But still try if it's in ServerStorage or similar
+            local parentChain = {}
+            local current = remote.Parent
+            while current and current ~= game do
+                table.insert(parentChain, 1, current.Name)
+                current = current.Parent
+            end
             
-            -- Try different formats for THIS specific game
-            local patterns = {
-                -- Basic format
+            if #parentChain > 0 then
+                print("Remote in: " .. table.concat(parentChain, " → "))
+            end
+        end
+        
+        -- Test with car purchase data
+        for _, carName in pairs(testCars) do
+            -- Create realistic purchase data
+            local purchaseData = {
+                -- Format 1: Simple table
                 {carName},
-                
-                -- With price
                 {carName, 0},
-                {carName, 1},
-                {carName, 100},
+                {carName, 1000},
                 
-                -- With player
+                -- Format 2: With timestamp
+                {carName, os.time()},
+                
+                -- Format 3: With player data
                 {player, carName},
+                {player.UserId, carName},
                 
-                -- Purchase format
+                -- Format 4: JSON-like
+                {Car = carName, Price = 0, Timestamp = os.time()},
+                {Vehicle = carName, Purchase = true},
+                
+                -- Format 5: Command format
                 {"buy", carName},
-                {"purchase", carName},
-                {"add", carName},
+                {"purchase", carName, player},
                 
-                -- For multi-word names like "Bontlay Bontaga"
-                {carName:gsub(" ", "")},  -- Remove spaces: "BontlayBontaga"
-                {carName:split(" ")[1]},  -- First word: "Bontlay"
-                {carName:split(" ")[2]},  -- Second word: "Bontaga"
+                -- Format 6: For specific car types
+                {carName:gsub(" ", "_")},  -- Bontlay_Bontaga
+                {carName:gsub(" ", "")},   -- BontlayBontaga
+                {string.lower(carName:gsub(" ", "_"))},  -- bontlay_bontaga
                 
-                -- Special formats
-                {Vehicle = carName},
-                {CarName = carName},
-                {Model = carName}
+                -- Format 7: With car ID
+                {carName, 1},  -- ID 1
+                {carName, math.random(100, 999)},  -- Random ID
+                
+                -- Format 8: Complete purchase object
+                {
+                    CarName = carName,
+                    Player = player.Name,
+                    PlayerId = player.UserId,
+                    Price = 0,
+                    Currency = "Cash",
+                    TransactionId = "TXN_" .. os.time(),
+                    Location = "Dealership",
+                    Time = os.time()
+                }
             }
             
-            for patternIndex, args in pairs(patterns) do
-                totalAttempts = totalAttempts + 1
+            for _, data in pairs(purchaseData) do
+                purchaseAttempts = purchaseAttempts + 1
                 
-                local success, errorMsg = pcall(function()
-                    if eventData.Type == "RemoteEvent" then
-                        event:FireServer(unpack(args))
-                        return "sent"
+                local success, result = pcall(function()
+                    if remoteData.Type == "RemoteEvent" then
+                        remote:FireServer(unpack(data))
+                        return "FireServer sent"
                     else
-                        event:InvokeServer(unpack(args))
-                        return "invoked"
+                        remote:InvokeServer(unpack(data))
+                        return "InvokeServer sent"
                     end
                 end)
                 
                 if success then
-                    print("✅ Attempt via " .. eventData.Name .. " (pattern " .. patternIndex .. ")")
-                    
-                    if not successfulEvents[eventData.Name] then
-                        successfulEvents[eventData.Name] = true
+                    if not successfulCalls[remoteData.Name] then
+                        successfulCalls[remoteData.Name] = {}
                     end
+                    table.insert(successfulCalls[remoteData.Name], data)
                     
-                    -- Rapid fire if successful
-                    for i = 1, 5 do
-                        pcall(function()
-                            if eventData.Type == "RemoteEvent" then
-                                event:FireServer(unpack(args))
-                            end
-                        end)
-                        task.wait(0.01)
-                    end
+                    print("✅ " .. remoteData.Name .. " accepted: " .. tostring(data[1]))
                 end
                 
-                task.wait(0.05)
+                if purchaseAttempts % 50 == 0 then
+                    print("Attempt " .. purchaseAttempts .. "...")
+                end
+                
+                task.wait(0.02)
             end
         end
     end
     
-    print("\n📊 STATISTICS:")
-    print("Total attempts: " .. totalAttempts)
-    print("Successful events: " .. #(successfulEvents))
+    print("\n📊 PURCHASE TEST RESULTS:")
+    print("Total attempts: " .. purchaseAttempts)
+    print("Successful remote calls: " .. #(successfulCalls))
     
-    if next(successfulEvents) then
-        print("Events that accepted calls:")
-        for eventName in pairs(successfulEvents) do
-            print("  - " .. eventName)
-        end
-    end
-    
-    return totalAttempts
-end
-
--- ===== STEP 3: CHECK ACTUAL CAR COUNT =====
-local function checkActualCarCount()
-    print("\n📦 CHECKING ACTUAL CAR COUNT...")
-    
-    local foundCars = {}
-    
-    -- Look for your cars in ANY format
-    for _, carName in pairs(YOUR_CARS) do
-        -- Check if car exists in player data
-        local found = false
-        
-        for _, obj in pairs(player:GetDescendants()) do
-            if obj:IsA("StringValue") and obj.Value == carName then
-                found = true
-                break
-            elseif obj.Name == carName then
-                found = true
-                break
+    if next(successfulCalls) then
+        print("\nRemotes that accepted calls:")
+        for remoteName, calls in pairs(successfulCalls) do
+            print("  " .. remoteName .. " (" .. #calls .. " calls)")
+            for i, call in ipairs(calls) do
+                if i <= 3 then  -- Show first 3 successful calls
+                    print("    - " .. tostring(call[1]))
+                end
             end
         end
-        
-        if found then
-            table.insert(foundCars, carName)
-        end
+    else
+        print("\n❌ NO remote accepted any call!")
+        print("Game has strong validation or wrong format.")
     end
     
-    print("Found " .. #foundCars .. "/" .. #YOUR_CARS .. " of your cars")
-    
-    if #foundCars > 0 then
-        print("Your cars:")
-        for i, car in ipairs(foundCars) do
-            print(i .. ". " .. car)
-        end
-    end
-    
-    return #foundCars
+    return successfulCalls
 end
 
--- ===== STEP 4: CREATE TARGETED UI =====
-local function createTargetedUI()
-    local gui = Instance.new("ScreenGui")
-    gui.Parent = player:WaitForChild("PlayerGui")
+-- ===== STEP 4: ANALYZE GAME STRUCTURE =====
+local function analyzeGameStructure()
+    print("\n🏗️ ANALYZING GAME STRUCTURE")
     
-    local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(0, 350, 0, 300)
-    frame.Position = UDim2.new(0.5, -175, 0.5, -150)
-    frame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-    frame.BorderSizePixel = 0
-    frame.Parent = gui
+    -- Look for car spawners, dealerships, etc.
+    print("\nLooking for car-related objects in Workspace:")
     
-    local title = Instance.new("TextLabel")
-    title.Text = "🎯 TARGETED CAR DUPLICATOR"
-    title.Size = UDim2.new(1, 0, 0, 40)
-    title.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
-    title.TextColor3 = Color3.new(1, 1, 1)
-    title.Font = Enum.Font.GothamBold
-    title.TextSize = 16
-    title.Parent = frame
+    local carObjects = {}
     
-    local status = Instance.new("TextLabel")
-    status.Text = "Targeting YOUR cars:\n\n• Bontlay Bontaga\n• Jegar Model F\n• Sportler Tecan\n• Lavish Ventoge\n• Corsaro T8"
-    status.Size = UDim2.new(1, -20, 0, 130)
-    status.Position = UDim2.new(0, 10, 0, 50)
-    status.BackgroundTransparency = 1
-    status.TextColor3 = Color3.new(1, 1, 1)
-    status.Font = Enum.Font.Gotham
-    status.TextSize = 14
-    status.TextWrapped = true
-    status.TextXAlignment = Enum.TextXAlignment.Left
-    status.Parent = frame
+    -- Check Workspace
+    if Workspace:FindFirstChild("Cars") then
+        print("Found Cars folder in Workspace")
+        for _, car in pairs(Workspace.Cars:GetChildren()) do
+            if car:IsA("Model") then
+                table.insert(carObjects, {
+                    Name = car.Name,
+                    Type = "Workspace Car",
+                    Location = "Workspace.Cars"
+                })
+            end
+        end
+    end
     
-    -- Button 1: Check Storage
-    local btn1 = Instance.new("TextButton")
-    btn1.Text = "🔍 FIND STORAGE"
-    btn1.Size = UDim2.new(1, -40, 0, 35)
-    btn1.Position = UDim2.new(0, 20, 0, 190)
-    btn1.BackgroundColor3 = Color3.fromRGB(50, 120, 220)
-    btn1.TextColor3 = Color3.new(1, 1, 1)
-    btn1.Font = Enum.Font.GothamBold
-    btn1.TextSize = 14
-    btn1.Parent = frame
+    -- Check for dealership
+    for _, obj in pairs(Workspace:GetChildren()) do
+        if obj:IsA("Model") and obj.Name:find("Dealership") then
+            print("Found Dealership: " .. obj.Name)
+        end
+    end
     
-    btn1.MouseButton1Click:Connect(function()
-        status.Text = "Finding car storage..."
-        task.spawn(function()
-            findCarStorage()
-            local count = checkActualCarCount()
-            status.Text = "Found " .. count .. " cars in storage.\nCheck console for details."
-        end)
-    end)
+    -- Check for spawn points
+    local spawnPoints = {}
+    for _, obj in pairs(Workspace:GetDescendants()) do
+        if obj.Name:find("Spawn") and obj:IsA("BasePart") then
+            table.insert(spawnPoints, obj.Name)
+        end
+    end
     
-    -- Button 2: Duplicate All
-    local btn2 = Instance.new("TextButton")
-    btn2.Text = "⚡ DUPLICATE ALL"
-    btn2.Size = UDim2.new(1, -40, 0, 35)
-    btn2.Position = UDim2.new(0, 20, 0, 235)
-    btn2.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-    btn2.TextColor3 = Color3.new(1, 1, 1)
-    btn2.Font = Enum.Font.GothamBold
-    btn2.TextSize = 14
-    btn2.Parent = frame
+    if #spawnPoints > 0 then
+        print("Spawn points found: " .. table.concat(spawnPoints, ", "))
+    end
+end
+
+-- ===== STEP 5: CREATE DIAGNOSTIC REPORT =====
+local function createDiagnosticReport()
+    print("\n📋 CREATING DIAGNOSTIC REPORT")
+    print(string.rep("=", 60))
     
-    btn2.MouseButton1Click:Connect(function()
-        status.Text = "Duplicating ALL your cars...\nThis may take 10-15 seconds.\nCheck console!"
-        btn2.Text = "WORKING..."
-        btn2.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
-        
-        task.spawn(function()
-            local beforeCount = checkActualCarCount()
-            local attempts = duplicateYourActualCars()
-            
-            task.wait(3)
-            
-            local afterCount = checkActualCarCount()
-            status.Text = "Complete!\n\nBefore: " .. beforeCount .. " cars\nAfter: " .. afterCount .. " cars\n\nAttempts: " .. attempts
-            
-            btn2.Text = "DUPLICATE ALL"
-            btn2.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-        end)
-    end)
+    -- Player info
+    print("\n👤 PLAYER INFO:")
+    print("Name: " .. player.Name)
+    print("UserId: " .. player.UserId)
     
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 10)
-    corner.Parent = frame
+    -- Inventory check
+    print("\n📦 INVENTORY CHECK:")
+    local hasInventory = false
+    for _, folder in pairs(player:GetChildren()) do
+        if folder:IsA("Folder") then
+            print("Folder: " .. folder.Name .. " (" .. #folder:GetChildren() .. " items)")
+            hasInventory = true
+        end
+    end
     
-    return gui, status
+    if not hasInventory then
+        print("❌ No inventory folders found!")
+    end
+    
+    -- Leaderstats check
+    print("\n🏆 LEADERSTATS:")
+    if player:FindFirstChild("leaderstats") then
+        for _, stat in pairs(player.leaderstats:GetChildren()) do
+            print("  " .. stat.Name .. ": " .. tostring(stat.Value))
+        end
+    else
+        print("❌ No leaderstats found!")
+    end
+    
+    -- Remote events check
+    print("\n📡 REMOTE EVENTS IN REPLICATEDSTORAGE:")
+    local remoteCount = 0
+    for _, obj in pairs(ReplicatedStorage:GetChildren()) do
+        if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
+            remoteCount = remoteCount + 1
+            if remoteCount <= 10 then  -- Show first 10
+                print("  " .. obj.Name .. " (" .. obj.ClassName .. ")")
+            end
+        end
+    end
+    print("Total remotes: " .. remoteCount)
+    
+    -- Module scripts
+    print("\n📦 MODULE SCRIPTS:")
+    local moduleCount = 0
+    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+        if obj:IsA("ModuleScript") then
+            moduleCount = moduleCount + 1
+        end
+    end
+    print("Module scripts: " .. moduleCount)
+    
+    print(string.rep("=", 60))
+end
+
+-- ===== STEP 6: MANUAL CAR LOCATION FINDER =====
+local function manualCarFinder()
+    print("\n🔍 MANUAL CAR LOCATION FINDER")
+    print("Follow these steps:")
+    print("\n1. Open the Developer Console (F9)")
+    print("2. Type these commands one by one:")
+    print("\n   Commands to try:")
+    print("   print(game.Players.LocalPlayer:GetChildren())")
+    print("   for i,v in pairs(game.Players.LocalPlayer:GetChildren()) do print(v.Name, v.ClassName) end")
+    print("   for i,v in pairs(game.Players.LocalPlayer:GetDescendants()) do if v:IsA('StringValue') then print(v.Name, v.Value) end end")
+    print("\n3. Look for your car names in the output")
+    print("4. Note the exact path where cars are stored")
+    
+    -- Auto-run some diagnostics
+    task.wait(2)
+    
+    print("\n🔧 AUTO-DIAGNOSTICS:")
+    
+    -- Check for StringValues with car names
+    local carNames = {"Bontlay", "Jegar", "Sportler", "Lavish", "Corsaro", "T8", "Model", "Bontaga"}
+    
+    for _, obj in pairs(player:GetDescendants()) do
+        if obj:IsA("StringValue") then
+            local value = tostring(obj.Value)
+            for _, carWord in pairs(carNames) do
+                if value:find(carWord) then
+                    print("Found: " .. obj:GetFullName() .. " = " .. value)
+                end
+            end
+        end
+    end
 end
 
 -- ===== MAIN EXECUTION =====
 print("\n" .. string.rep("=", 70))
-print("🎯 TARGETING YOUR ACTUAL CARS")
+print("🔍 DEEP CAR STORAGE ANALYSIS")
 print(string.rep("=", 70))
-print("\nYOUR CARS IDENTIFIED:")
-print("1. Bontlay Bontaga")
-print("2. Jegar Model F")
-print("3. Sportler Tecan")
-print("4. Lavish Ventoge")
-print("5. Corsaro T8")
 
--- Create UI
+-- Run all diagnostics
 task.wait(1)
-local gui, status = createTargetedUI()
+createDiagnosticReport()
 
--- Auto-start after 3 seconds
-task.wait(3)
-status.Text = "Auto-starting duplication...\n\nTargeting your 5 cars.\nCheck console!"
+task.wait(1)
+deepScanPlayerData()
 
--- Initial check
-local initialCount = checkActualCarCount()
-print("\nInitial car count: " .. initialCount)
+task.wait(1)
+local allRemotes = findRealPurchaseEvents()
 
--- Run duplication
-task.wait(2)
-local attempts = duplicateYourActualCars()
+task.wait(1)
+analyzeGameStructure()
 
--- Check results
-task.wait(3)
-local finalCount = checkActualCarCount()
+task.wait(1)
+local successfulCalls = testWithPurchaseData(allRemotes)
 
+task.wait(1)
+manualCarFinder()
+
+-- Final analysis
 print("\n" .. string.rep("=", 70))
-print("🎯 RESULTS")
+print("📊 ANALYSIS COMPLETE")
 print(string.rep("=", 70))
-print("Cars before: " .. initialCount)
-print("Cars after: " .. finalCount)
-print("Duplication attempts: " .. attempts)
 
-if finalCount > initialCount then
-    print("\n🎉 SUCCESS! Gained " .. (finalCount - initialCount) .. " new cars!")
-    status.Text = "🎉 SUCCESS!\n\nGained " .. (finalCount - initialCount) .. " cars!\nCheck your garage!"
+if next(successfulCalls) then
+    print("\n🎯 NEXT STEPS:")
+    print("1. Remote events ARE accepting calls")
+    print("2. The issue is CAR STORAGE FORMAT")
+    print("3. We need to find WHERE cars are saved")
+    print("\n💡 Try this:")
+    print("• Buy a NEW car and watch where it saves")
+    print("• Check F9 console while buying")
+    print("• Look for new objects appearing in player")
 else
-    print("\n⚠️ No new cars gained.")
-    print("\nPossible issues:")
-    print("1. Server rejecting all requests")
-    print("2. Cars stored in different format")
-    print("3. Need specific event arguments")
-    
-    status.Text = "⚠️ No new cars.\n\nServer is rejecting requests.\nTry buying/selling a car first."
+    print("\n❌ CRITICAL ISSUE:")
+    print("NO remote events are accepting ANY calls!")
+    print("\nThis means:")
+    print("1. Game has server-side validation")
+    print("2. All client requests are rejected")
+    print("3. Car duplication is NOT possible")
+    print("\n💡 Last resort:")
+    print("Try to find SAVE/LOAD system instead")
 end
 
--- Final tip
-print("\n💡 TIP: Try this:")
-print("1. Sell one of your cars")
-print("2. Buy it back")
-print("3. Run script again")
-print("4. Game might sync differently")
+-- Create simple monitor
+task.spawn(function()
+    while true do
+        task.wait(10)
+        print("\n🔍 Quick check - looking for car data...")
+        
+        local foundAny = false
+        for _, obj in pairs(player:GetDescendants()) do
+            if obj:IsA("StringValue") then
+                local value = tostring(obj.Value)
+                if value:find("Bontlay") or value:find("Jegar") or value:find("Corsaro") then
+                    print("Still found: " .. obj.Name .. " = " .. value)
+                    foundAny = true
+                end
+            end
+        end
+        
+        if not foundAny then
+            print("No car data found in current scan")
+        end
+    end
+end)
