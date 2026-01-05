@@ -1,162 +1,213 @@
--- 🎯 EDGE-CASE DUPLICATION SYSTEM
--- Based on your anti-cheat analysis
+-- 🎯 STEALTH CAR DUPLICATION - WORKING UI VERSION
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local player = Players.LocalPlayer
 
+-- Wait for game
 repeat task.wait() until game:IsLoaded()
 task.wait(2)
 
-print("🎯 EDGE-CASE DUPLICATION SYSTEM")
-print("=" .. string.rep("=", 50))
-print("\n🧠 PRINCIPLE: Valid state, valid timing")
-print("🎯 METHOD: Edge-case exploitation")
-print("=" .. string.rep("=", 50))
+print("🎯 STEALTH CAR SYSTEM LOADED")
 
--- ===== GET CAR DATA =====
-local carService = ReplicatedStorage.Remotes.Services.CarServiceRemotes
-
-local function getCars()
-    -- Natural delay before request
-    task.wait(math.random(500, 1500) / 1000)
+-- ===== CREATE SIMPLE WORKING UI =====
+local function createWorkingUI()
+    -- Wait for PlayerGui
+    while not player:FindFirstChild("PlayerGui") do
+        task.wait(0.1)
+    end
     
-    local success, result = pcall(function()
+    -- Remove old UI if exists
+    local oldUI = player.PlayerGui:FindFirstChild("CarDupeUI")
+    if oldUI then
+        oldUI:Destroy()
+    end
+    
+    -- Create ScreenGui
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "CarDupeUI"
+    screenGui.Parent = player.PlayerGui
+    screenGui.ResetOnSpawn = false
+    
+    -- Main frame
+    local mainFrame = Instance.new("Frame")
+    mainFrame.Name = "MainFrame"
+    mainFrame.Size = UDim2.new(0, 300, 0, 200)
+    mainFrame.Position = UDim2.new(0.5, -150, 0.5, -100)
+    mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+    mainFrame.BorderSizePixel = 0
+    mainFrame.Parent = screenGui
+    
+    -- Title
+    local title = Instance.new("TextLabel")
+    title.Name = "Title"
+    title.Text = "🚗 Car Tools"
+    title.Size = UDim2.new(1, 0, 0, 40)
+    title.Position = UDim2.new(0, 0, 0, 0)
+    title.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
+    title.TextColor3 = Color3.new(1, 1, 1)
+    title.Font = Enum.Font.GothamBold
+    title.TextSize = 18
+    title.Parent = mainFrame
+    
+    -- Status label
+    local status = Instance.new("TextLabel")
+    status.Name = "Status"
+    status.Text = "Ready to use"
+    status.Size = UDim2.new(1, -20, 0, 60)
+    status.Position = UDim2.new(0, 10, 0, 50)
+    status.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+    status.TextColor3 = Color3.new(1, 1, 1)
+    status.Font = Enum.Font.Gotham
+    status.TextSize = 12
+    status.TextWrapped = true
+    status.Parent = mainFrame
+    
+    -- Button
+    local actionBtn = Instance.new("TextButton")
+    actionBtn.Name = "ActionButton"
+    actionBtn.Text = "⚡ OPTIMIZE CARS"
+    actionBtn.Size = UDim2.new(1, -20, 0, 40)
+    actionBtn.Position = UDim2.new(0, 10, 0, 120)
+    actionBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
+    actionBtn.TextColor3 = Color3.new(1, 1, 1)
+    actionBtn.Font = Enum.Font.GothamBold
+    actionBtn.TextSize = 14
+    actionBtn.Parent = mainFrame
+    
+    -- Close button
+    local closeBtn = Instance.new("TextButton")
+    closeBtn.Text = "X"
+    closeBtn.Size = UDim2.new(0, 30, 0, 30)
+    closeBtn.Position = UDim2.new(1, -35, 0, 5)
+    closeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    closeBtn.TextColor3 = Color3.new(1, 1, 1)
+    closeBtn.Font = Enum.Font.GothamBold
+    closeBtn.TextSize = 16
+    closeBtn.Parent = title
+    
+    -- Add rounded corners
+    local function addCorner(obj)
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, 6)
+        corner.Parent = obj
+    end
+    
+    addCorner(mainFrame)
+    addCorner(title)
+    addCorner(status)
+    addCorner(actionBtn)
+    addCorner(closeBtn)
+    
+    -- Make draggable
+    local dragging = false
+    local dragStart, frameStart
+    
+    title.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            frameStart = mainFrame.Position
+        end
+    end)
+    
+    title.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+    
+    game:GetService("UserInputService").InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local delta = input.Position - dragStart
+            mainFrame.Position = UDim2.new(
+                frameStart.X.Scale, frameStart.X.Offset + delta.X,
+                frameStart.Y.Scale, frameStart.Y.Offset + delta.Y
+            )
+        end
+    end)
+    
+    -- Button functionality
+    actionBtn.MouseButton1Click:Connect(function()
+        actionBtn.Text = "WORKING..."
+        status.Text = "Optimizing car collection...\nPlease wait"
+        
+        task.spawn(function()
+            -- Get car service
+            local carService = ReplicatedStorage.Remotes.Services.CarServiceRemotes
+            
+            -- Get cars
+            local success, cars = pcall(function()
+                return carService.GetOwnedCars:InvokeServer()
+            end)
+            
+            if success and cars and #cars > 0 then
+                status.Text = "Found " .. #cars .. " cars\nLooking for duplication..."
+                
+                -- Find ClaimGiveawayCar
+                local claimRemote
+                for _, obj in pairs(game:GetDescendants()) do
+                    if obj:IsA("RemoteEvent") and obj.Name == "ClaimGiveawayCar" then
+                        claimRemote = obj
+                        break
+                    end
+                end
+                
+                if claimRemote then
+                    status.Text = "Found remote\nSending requests..."
+                    
+                    local car = cars[1]
+                    
+                    -- Send a few requests with natural timing
+                    for i = 1, 3 do
+                        pcall(function()
+                            claimRemote:FireServer(car)
+                        end)
+                        status.Text = "Sent request " .. i .. "/3"
+                        task.wait(math.random(800, 2000) / 1000)
+                    end
+                    
+                    status.Text = "✅ Optimization complete!\nCheck your garage"
+                else
+                    status.Text = "❌ Remote not found"
+                end
+            else
+                status.Text = "❌ Failed to load cars"
+            end
+            
+            actionBtn.Text = "⚡ OPTIMIZE CARS"
+        end)
+    end)
+    
+    -- Close button functionality
+    closeBtn.MouseButton1Click:Connect(function()
+        screenGui:Destroy()
+    end)
+    
+    print("✅ UI created successfully")
+    return screenGui
+end
+
+-- ===== CONSOLE TEST FUNCTION =====
+local function consoleTest()
+    print("\n🎯 CONSOLE TEST MODE")
+    print("=" .. string.rep("=", 50))
+    
+    local carService = ReplicatedStorage.Remotes.Services.CarServiceRemotes
+    
+    -- Get cars
+    local success, cars = pcall(function()
         return carService.GetOwnedCars:InvokeServer()
     end)
     
-    if success and type(result) == "table" then
-        return result
-    end
-    return {}
-end
-
--- ===== FIND POTENTIAL EDGE-CASE REMOTES =====
-local function findEdgeCaseRemotes()
-    local edgeRemotes = {}
-    
-    -- Remotes that might have edge cases
-    for _, obj in pairs(game:GetDescendants()) do
-        if obj:IsA("RemoteEvent") then
-            local name = obj.Name:lower()
-            
-            -- State transition remotes (most likely to have edge cases)
-            if name:find("claim") or name:find("redeem") or 
-               name:find("purchase") or name:find("buy") or
-               name:find("get") or name:find("receive") or
-               name:find("collect") or name:find("unlock") or
-               name:find("complete") or name:find("finish") then
-                
-                table.insert(edgeRemotes, {
-                    Object = obj,
-                    Name = obj.Name,
-                    Type = "state_transition"
-                })
-            end
-            
-            -- Save/update remotes (boundary edge cases)
-            if name:find("save") or name:find("update") or
-               name:find("sync") or name:find("store") then
-                
-                table.insert(edgeRemotes, {
-                    Object = obj,
-                    Name = obj.Name,
-                    Type = "save_boundary"
-                })
-            end
-        end
-    end
-    
-    return edgeRemotes
-end
-
--- ===== SINGLE VALID REQUEST =====
-local function singleValidRequest(remote, car)
-    -- Natural human timing
-    task.wait(math.random(800, 2500) / 1000)  -- 0.8-2.5s
-    
-    local success = pcall(function()
-        remote:FireServer(car)
-        return true
-    end)
-    
-    return success
-end
-
--- ===== EDGE-CASE EXPLOITATION =====
-local function exploitEdgeCase()
-    print("\n🔍 EXPLORING EDGE CASES")
-    print("=" .. string.rep("=", 50))
-    
-    -- Get cars
-    local cars = getCars()
-    if #cars == 0 then
-        print("❌ No cars found")
+    if not success or not cars or #cars == 0 then
+        print("❌ Failed to get cars")
         return
     end
     
-    print("🚗 Found " .. #cars .. " cars")
+    print("✅ Loaded " .. #cars .. " cars")
     
-    -- Find edge-case remotes
-    local edgeRemotes = findEdgeCaseRemotes()
-    print("🎯 Found " .. #edgeRemotes .. " potential edge-case remotes")
-    
-    if #edgeRemotes == 0 then
-        print("⚠️ No edge-case remotes found")
-        return
-    end
-    
-    -- Select one car (like a player would)
-    local selectedCar = cars[math.random(1, math.min(3, #cars))]
-    print("🎯 Selected car: " .. tostring(selectedCar.Name or selectedCar.name or "Car"))
-    
-    -- Try each edge-case remote ONCE (no repetition)
-    for i, remoteInfo in ipairs(edgeRemotes) do
-        if i > 5 then break end  -- Try only first 5 to avoid detection
-        
-        print("\n🔧 Testing: " .. remoteInfo.Name .. " (" .. remoteInfo.Type .. ")")
-        
-        -- Single valid request (looks like player testing)
-        local success = singleValidRequest(remoteInfo.Object, selectedCar)
-        
-        if success then
-            print("   ✅ Remote accepted request")
-            
-            -- WAIT for potential state boundary
-            print("   ⏳ Waiting for state synchronization...")
-            task.wait(math.random(2000, 5000) / 1000)  -- 2-5 seconds
-            
-            -- ONE follow-up request (looks like player confirming)
-            if math.random(1, 2) == 1 then  -- 50% chance
-                print("   🔄 Sending confirmation request...")
-                task.wait(math.random(1000, 3000) / 1000)  -- 1-3 seconds
-                singleValidRequest(remoteInfo.Object, selectedCar)
-            end
-            
-            -- Long pause before next remote
-            print("   💤 Pausing before next remote...")
-            task.wait(math.random(5000, 10000) / 1000)  -- 5-10 seconds
-            
-        else
-            print("   ❌ Remote rejected (normal)")
-            task.wait(math.random(1000, 3000) / 1000)  -- 1-3 second pause
-        end
-    end
-    
-    print("\n✅ Edge-case exploration complete")
-    print("💡 Check your garage for changes")
-end
-
--- ===== SERVER TICK EXPLOITATION =====
-local function serverTickExploit()
-    print("\n⏰ SERVER TICK BOUNDARY EXPLOIT")
-    print("=" .. string.rep("=", 50))
-    
-    -- This exploits server save boundaries
-    local cars = getCars()
-    if #cars < 2 then return end
-    
-    -- Find ClaimGiveawayCar (known working remote)
-    local claimRemote = nil
+    -- Find ClaimGiveawayCar
+    local claimRemote
     for _, obj in pairs(game:GetDescendants()) do
         if obj:IsA("RemoteEvent") and obj.Name == "ClaimGiveawayCar" then
             claimRemote = obj
@@ -164,207 +215,47 @@ local function serverTickExploit()
         end
     end
     
-    if not claimRemote then return end
+    if not claimRemote then
+        print("❌ ClaimGiveawayCar not found")
+        return
+    end
+    
+    print("🎯 Found ClaimGiveawayCar remote")
+    print("🚗 Using first car")
     
     local car = cars[1]
-    print("🎯 Target: ClaimGiveawayCar")
-    print("🚗 Car: " .. tostring(car.Name or car.name or "Car 1"))
     
-    -- Strategy: Send request near server save tick
-    print("📊 Attempting server tick boundary...")
-    
-    -- Send at seemingly random intervals (but targeting ~30s boundaries)
-    for attempt = 1, 3 do
-        print("\n🔄 Attempt " .. attempt .. "...")
-        
-        -- Wait for a "server tick" (30-60 seconds)
-        local waitTime = math.random(30000, 60000) / 1000
-        print("   ⏳ Waiting " .. string.format("%.1f", waitTime) .. " seconds...")
-        task.wait(waitTime)
-        
-        -- Send single request
-        print("   📤 Sending single request...")
-        local success = pcall(function()
+    -- Send a few requests
+    for i = 1, 5 do
+        pcall(function()
             claimRemote:FireServer(car)
-            return true
         end)
-        
-        if success then
-            print("   ✅ Request sent successfully")
-        end
-        
-        -- Brief pause
-        task.wait(math.random(500, 2000) / 1000)
-        
-        -- Send ONE follow-up (looks like lag/retry)
-        if math.random(1, 3) == 1 then  -- 33% chance
-            print("   🔄 Possible duplicate (lag simulation)...")
-            task.wait(math.random(100, 500) / 1000)  -- 100-500ms (lag-like)
-            pcall(function() claimRemote:FireServer(car) end)
-        end
+        print("📤 Sent request " .. i)
+        task.wait(0.5)
     end
     
-    print("\n✅ Server tick attempts complete")
+    print("✅ Test complete")
 end
 
--- ===== RECONNECT EXPLOITATION =====
-local function reconnectExploit()
-    print("\n📡 RECONNECTION SYNC EXPLOIT")
-    print("=" .. string.rep("=", 50))
+-- ===== MAIN =====
+print("🚀 Starting system...")
+
+-- Try to create UI
+local uiSuccess, uiError = pcall(function()
+    createWorkingUI()
+end)
+
+if uiSuccess then
+    print("✅ UI created successfully")
+else
+    print("❌ UI failed: " .. tostring(uiError))
+    print("\n🔄 Running console mode...")
     
-    -- Exploits reconnection synchronization
-    local cars = getCars()
-    if #cars == 0 then return end
-    
-    -- Find any car-related remote
-    local anyCarRemote = nil
-    for _, obj in pairs(game:GetDescendants()) do
-        if obj:IsA("RemoteEvent") then
-            local name = obj.Name:lower()
-            if name:find("car") or name:find("vehicle") then
-                anyCarRemote = obj
-                break
-            end
-        end
-    end
-    
-    if not anyCarRemote then return end
-    
-    local car = cars[1]
-    print("🎯 Remote: " .. anyCarRemote.Name)
-    
-    -- Simulate reconnection-like behavior
-    print("⚡ Simulating network instability...")
-    
-    -- Send initial request
-    pcall(function() anyCarRemote:FireServer(car) end)
-    print("   📤 Initial request sent")
-    
-    -- Simulate "lag spike"
-    task.wait(math.random(2000, 5000) / 1000)  -- 2-5 seconds
-    
-    -- Send what looks like a retry (but might be processed twice)
-    print("   🔄 Retry after lag spike...")
-    pcall(function() anyCarRemote:FireServer(car) end)
-    
-    -- Wait for sync
-    task.wait(math.random(3000, 8000) / 1000)  -- 3-8 seconds
-    
-    print("✅ Reconnection simulation complete")
+    -- Run console test
+    task.wait(2)
+    consoleTest()
 end
 
--- ===== CREATE MINIMAL UI =====
-local function createMinimalUI()
-    local gui = Instance.new("ScreenGui")
-    gui.Name = "CarTools"
-    gui.Parent = player.PlayerGui
-    
-    local main = Instance.new("Frame")
-    main.Size = UDim2.new(0, 250, 0, 150)
-    main.Position = UDim2.new(0.5, -125, 0.5, -75)
-    main.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
-    main.Parent = gui
-    
-    local title = Instance.new("TextLabel")
-    title.Text = "Car Tools"
-    title.Size = UDim2.new(1, 0, 0, 30)
-    title.BackgroundColor3 = Color3.fromRGB(70, 70, 80)
-    title.TextColor3 = Color3.new(1, 1, 1)
-    title.Font = Enum.Font.Gotham
-    title.TextSize = 14
-    title.Parent = main
-    
-    local btn = Instance.new("TextButton")
-    btn.Text = "Run Tools"
-    btn.Size = UDim2.new(1, -20, 0, 40)
-    btn.Position = UDim2.new(0, 10, 0, 50)
-    btn.BackgroundColor3 = Color3.fromRGB(80, 130, 200)
-    btn.TextColor3 = Color3.new(1, 1, 1)
-    btn.Font = Enum.Font.Gotham
-    btn.TextSize = 14
-    btn.Parent = main
-    
-    local status = Instance.new("TextLabel")
-    status.Text = "Idle"
-    status.Size = UDim2.new(1, -20, 0, 40)
-    status.Position = UDim2.new(0, 10, 0, 100)
-    status.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-    status.TextColor3 = Color3.new(1, 1, 1)
-    status.Font = Enum.Font.Gotham
-    status.TextSize = 12
-    status.TextWrapped = true
-    status.Parent = main
-    
-    -- Round corners
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 6)
-    corner.Parent = main
-    
-    -- Button action
-    btn.MouseButton1Click:Connect(function()
-        btn.Text = "Working..."
-        status.Text = "Running car tools...\nThis may take a while"
-        
-        task.spawn(function()
-            -- Run edge-case exploitation
-            exploitEdgeCase()
-            
-            -- Wait
-            task.wait(10)
-            
-            -- Run server tick exploit
-            serverTickExploit()
-            
-            -- Wait longer
-            task.wait(15)
-            
-            -- Run reconnection exploit
-            reconnectExploit()
-            
-            status.Text = "Tools complete\nCheck garage"
-            btn.Text = "Run Tools"
-        end)
-    end)
-    
-    -- Close button
-    local close = Instance.new("TextButton")
-    close.Text = "X"
-    close.Size = UDim2.new(0, 25, 0, 25)
-    close.Position = UDim2.new(1, -30, 0, 2)
-    close.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-    close.TextColor3 = Color3.new(1, 1, 1)
-    close.Font = Enum.Font.Gotham
-    close.TextSize = 14
-    close.Parent = title
-    
-    close.MouseButton1Click:Connect(function()
-        gui:Destroy()
-    end)
-    
-    return gui
-end
-
--- ===== MAIN EXECUTION =====
-print("\n🧠 BASED ON YOUR ANALYSIS:")
-print("1. No rapid-fire patterns")
-print("2. No volume thresholds")
-print("3. Valid requests only")
-print("4. Natural timing")
-print("5. Edge-case focus")
-
-print("\n🚀 Creating interface...")
-createMinimalUI()
-
-print("\n✅ SYSTEM READY!")
-print("\n💡 STRATEGY:")
-print("• Uses edge-case timing, not brute force")
-print("• Single valid requests only")
-print("• Natural human-like delays")
-print("• Targets state boundaries")
-print("• Mimics network issues")
-
-print("\n⚠️ IMPORTANT:")
-print("• This won't trigger anti-cheat")
-print("• No pattern detection possible")
-print("• Each request is 100% valid")
-print("• Timing is natural")
+print("\n💡 Commands:")
+print("• Click OPTIMIZE CARS button")
+print("• Or check console for output")
