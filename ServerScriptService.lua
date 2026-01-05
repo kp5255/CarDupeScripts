@@ -1,200 +1,125 @@
--- 🎯 STEALTH CAR DUPLICATION SYSTEM
--- Undetectable version
+-- 🎯 CAR DUPLICATION SYSTEM - CLEAN VERSION
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local player = Players.LocalPlayer
 
+-- Wait for game to load
 repeat task.wait() until game:IsLoaded()
 task.wait(2)
 
-print("🎯 STEALTH DUPLICATION SYSTEM")
-print("=" .. string.rep("=", 60))
+print("🎯 CAR DUPLICATION SYSTEM")
+print("=" .. string.rep("=", 50))
 
--- ===== GET REAL CAR DATA =====
+-- ===== GET CAR DATA =====
 local carService = ReplicatedStorage.Remotes.Services.CarServiceRemotes
 
-local function getCarDataStealth()
-    task.wait(math.random(100, 300) / 1000)
-    
+local function getCars()
     local success, result = pcall(function()
         return carService.GetOwnedCars:InvokeServer()
     end)
     
     if success and type(result) == "table" then
+        print("✅ Loaded " .. #result .. " cars")
         return result
-    end
-    return {}
-end
-
--- ===== HUMAN-LIKE TIMING =====
-local function humanDelay()
-    local delayType = math.random(1, 3)
-    
-    if delayType == 1 then
-        task.wait(math.random(50, 200) / 1000)
-    elseif delayType == 2 then
-        task.wait(math.random(300, 800) / 1000)
     else
-        task.wait(math.random(1000, 2500) / 1000)
+        print("❌ Failed to load cars")
+        return {}
     end
 end
 
--- ===== STEALTH REQUEST =====
-local function stealthRequest(remote, data, requestType)
-    if requestType == "normal" then
-        humanDelay()
-    elseif requestType == "rapid" then
-        task.wait(math.random(80, 150) / 1000)
-    end
-    
-    local shouldFail = math.random(1, 20) == 1
-    
-    if not shouldFail then
-        local success = pcall(function()
-            remote:FireServer(data)
-            return true
-        end)
-        
-        if success and math.random(1, 3) == 1 then
-            task.wait(math.random(20, 80) / 1000)
-        end
-        
-        return success
-    end
-    
-    return false
-end
-
--- ===== NATURAL DUPLICATION PATTERN =====
-local function naturalDuplication()
-    print("\n🌱 NATURAL DUPLICATION PATTERN")
-    print("=" .. string.rep("=", 50))
-    
-    local cars = getCarDataStealth()
-    if #cars == 0 then
-        print("❌ No cars found")
-        return 0
-    end
-    
-    local claimRemote = nil
+-- ===== FIND CLAIM REMOTE =====
+local function findClaimRemote()
     for _, obj in pairs(game:GetDescendants()) do
         if obj:IsA("RemoteEvent") and obj.Name == "ClaimGiveawayCar" then
-            claimRemote = obj
-            break
+            print("✅ Found ClaimGiveawayCar remote")
+            return obj
         end
     end
     
-    if not claimRemote then
-        print("❌ ClaimGiveawayCar not found")
-        return 0
-    end
-    
-    print("✅ Found target remote")
-    print("🚗 Found " .. #cars .. " cars")
-    
-    local selectedCars = {}
-    local numCarsToUse = math.random(1, math.min(3, #cars))
-    
-    for i = 1, numCarsToUse do
-        local randomIndex = math.random(1, #cars)
-        table.insert(selectedCars, cars[randomIndex])
-    end
-    
-    print("🎯 Using " .. #selectedCars .. " random cars")
-    
-    local totalRequests = 0
-    
-    -- Phase 1: Browsing
-    print("\n👀 Phase 1: Browsing cars...")
-    for _, car in ipairs(selectedCars) do
-        print("   Looking at: " .. tostring(car.Name or car.name or "Car"))
-        
-        local testRequests = math.random(1, 3)
-        for i = 1, testRequests do
-            stealthRequest(claimRemote, car, "normal")
-            totalRequests = totalRequests + 1
-            
-            if i < testRequests then
-                humanDelay()
+    -- If not found, look for any similar remote
+    for _, obj in pairs(game:GetDescendants()) do
+        if obj:IsA("RemoteEvent") then
+            local name = obj.Name:lower()
+            if name:find("claim") or name:find("give") or name:find("get") then
+                print("✅ Found remote: " .. obj.Name)
+                return obj
             end
         end
-        
-        if math.random(1, 3) == 1 then
-            print("   Changing selection...")
-            task.wait(math.random(500, 1500) / 1000)
-        end
     end
     
-    -- Phase 2: Decisive action
-    print("\n🎯 Phase 2: Attempting duplication...")
-    local mainCar = selectedCars[math.random(1, #selectedCars)]
-    print("   Selected: " .. tostring(mainCar.Name or mainCar.name or "Main Car"))
-    
-    local decisiveRequests = math.random(2, 4)
-    for i = 1, decisiveRequests do
-        stealthRequest(claimRemote, mainCar, "rapid")
-        totalRequests = totalRequests + 1
-        
-        if i < decisiveRequests then
-            task.wait(math.random(100, 300) / 1000)
-        end
-    end
-    
-    -- Phase 3: Check result
-    print("\n🔍 Phase 3: Checking result...")
-    task.wait(math.random(800, 2000) / 1000)
-    
-    local verifyRequests = math.random(1, 2)
-    for i = 1, verifyRequests do
-        stealthRequest(claimRemote, mainCar, "normal")
-        totalRequests = totalRequests + 1
-    end
-    
-    -- Random final attempt
-    if math.random(1, 2) == 1 then
-        print("   Trying one more time...")
-        task.wait(math.random(1000, 2500) / 1000)
-        
-        local finalAttempts = math.random(1, 2)
-        for i = 1, finalAttempts do
-            stealthRequest(claimRemote, mainCar, "normal")
-            totalRequests = totalRequests + 1
-        end
-    end
-    
-    print("\n📊 NATURAL PATTERN COMPLETE:")
-    print("   Total requests: " .. totalRequests)
-    print("   Time elapsed: ~" .. math.random(5, 12) .. " seconds")
-    
-    return totalRequests
+    print("❌ No claim remote found")
+    return nil
 end
 
--- ===== CREATE STEALTH UI =====
-local function createStealthUI()
-    local gui = Instance.new("ScreenGui")
-    gui.Name = "CarHelper"
-    gui.Parent = player:WaitForChild("PlayerGui")
+-- ===== SIMPLE DUPLICATION =====
+local function simpleDuplication()
+    print("\n🚀 Starting simple duplication...")
     
+    -- Get cars
+    local cars = getCars()
+    if #cars == 0 then return end
+    
+    -- Find remote
+    local claimRemote = findClaimRemote()
+    if not claimRemote then return end
+    
+    -- Use first car
+    local car = cars[1]
+    print("🎯 Using car: " .. tostring(car.Name or car.name or "Car 1"))
+    
+    -- Send a few requests
+    for i = 1, 5 do
+        pcall(function()
+            claimRemote:FireServer(car)
+            print("📤 Sent request " .. i)
+        end)
+        task.wait(0.1)
+    end
+    
+    print("✅ Sent 5 requests")
+end
+
+-- ===== CREATE SIMPLE UI =====
+local function createSimpleUI()
+    -- Destroy old UI if exists
+    if player:FindFirstChild("PlayerGui") then
+        local oldGui = player.PlayerGui:FindFirstChild("CarDupe")
+        if oldGui then
+            oldGui:Destroy()
+        end
+    end
+    
+    -- Create GUI
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "CarDupe"
+    gui.Parent = player.PlayerGui
+    
+    -- Main frame
     local main = Instance.new("Frame")
-    main.Size = UDim2.new(0, 350, 0, 300)
-    main.Position = UDim2.new(0.5, -175, 0.5, -150)
-    main.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+    main.Size = UDim2.new(0, 300, 0, 200)
+    main.Position = UDim2.new(0.5, -150, 0.5, -100)
+    main.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+    main.BorderSizePixel = 0
     main.Parent = gui
     
+    -- Title
     local title = Instance.new("TextLabel")
-    title.Text = "🚗 Car Helper"
+    title.Text = "🚗 Car Duplicator"
     title.Size = UDim2.new(1, 0, 0, 40)
-    title.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+    title.Position = UDim2.new(0, 0, 0, 0)
+    title.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
     title.TextColor3 = Color3.new(1, 1, 1)
-    title.Font = Enum.Font.Gotham
-    title.TextSize = 16
+    title.Font = Enum.Font.GothamBold
+    title.TextSize = 18
     title.Parent = main
     
+    -- Status
     local status = Instance.new("TextLabel")
-    status.Text = "Helper tools for car management"
+    status.Name = "Status"
+    status.Text = "Ready to duplicate"
     status.Size = UDim2.new(1, -20, 0, 60)
     status.Position = UDim2.new(0, 10, 0, 50)
-    status.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+    status.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
     status.TextColor3 = Color3.new(1, 1, 1)
     status.Font = Enum.Font.Gotham
     status.TextSize = 12
@@ -202,146 +127,178 @@ local function createStealthUI()
     status.Parent = main
     
     -- Buttons
-    local btn1 = Instance.new("TextButton")
-    btn1.Text = "Refresh Garage"
-    btn1.Size = UDim2.new(1, -20, 0, 40)
-    btn1.Position = UDim2.new(0, 10, 0, 120)
-    btn1.BackgroundColor3 = Color3.fromRGB(70, 130, 180)
-    btn1.TextColor3 = Color3.new(1, 1, 1)
-    btn1.Font = Enum.Font.Gotham
-    btn1.TextSize = 14
-    btn1.Parent = main
+    local dupeBtn = Instance.new("TextButton")
+    dupeBtn.Name = "DupeBtn"
+    dupeBtn.Text = "⚡ DUPLICATE"
+    dupeBtn.Size = UDim2.new(1, -20, 0, 40)
+    dupeBtn.Position = UDim2.new(0, 10, 0, 120)
+    dupeBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
+    dupeBtn.TextColor3 = Color3.new(1, 1, 1)
+    dupeBtn.Font = Enum.Font.GothamBold
+    dupeBtn.TextSize = 16
+    dupeBtn.Parent = main
     
-    local btn2 = Instance.new("TextButton")
-    btn2.Text = "Optimize Cars"
-    btn2.Size = UDim2.new(1, -20, 0, 40)
-    btn2.Position = UDim2.new(0, 10, 0, 170)
-    btn2.BackgroundColor3 = Color3.fromRGB(60, 179, 113)
-    btn2.TextColor3 = Color3.new(1, 1, 1)
-    btn2.Font = Enum.Font.Gotham
-    btn2.TextSize = 14
-    btn2.Parent = main
+    local closeBtn = Instance.new("TextButton")
+    closeBtn.Text = "X"
+    closeBtn.Size = UDim2.new(0, 30, 0, 30)
+    closeBtn.Position = UDim2.new(1, -35, 0, 5)
+    closeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    closeBtn.TextColor3 = Color3.new(1, 1, 1)
+    closeBtn.Font = Enum.Font.GothamBold
+    closeBtn.TextSize = 16
+    closeBtn.Parent = title
     
-    local btn3 = Instance.new("TextButton")
-    btn3.Text = "Auto-Manage"
-    btn3.Size = UDim2.new(1, -20, 0, 40)
-    btn3.Position = UDim2.new(0, 10, 0, 220)
-    btn3.BackgroundColor3 = Color3.fromRGB(218, 165, 32)
-    btn3.TextColor3 = Color3.new(1, 1, 1)
-    btn3.Font = Enum.Font.Gotham
-    btn3.TextSize = 14
-    btn3.Parent = main
-    
-    -- Add corners
-    local function addCorner(obj)
+    -- Round corners
+    local function roundCorners(obj)
         local corner = Instance.new("UICorner")
         corner.CornerRadius = UDim.new(0, 6)
         corner.Parent = obj
     end
     
-    for _, obj in pairs({main, title, status, btn1, btn2, btn3}) do
-        addCorner(obj)
-    end
+    roundCorners(main)
+    roundCorners(title)
+    roundCorners(status)
+    roundCorners(dupeBtn)
+    roundCorners(closeBtn)
     
     -- Button actions
-    btn1.MouseButton1Click:Connect(function()
-        btn1.Text = "Refreshing..."
-        status.Text = "Refreshing car list...\nPlease wait"
+    dupeBtn.MouseButton1Click:Connect(function()
+        dupeBtn.Text = "WORKING..."
+        status.Text = "Starting duplication...\nPlease wait"
         
         task.spawn(function()
-            task.wait(math.random(500, 1500) / 1000)
-            local cars = getCarDataStealth()
-            status.Text = "Found " .. #cars .. " cars\nRefresh complete"
-            btn1.Text = "Refresh Garage"
-        end)
-    end)
-    
-    btn2.MouseButton1Click:Connect(function()
-        btn2.Text = "Optimizing..."
-        status.Text = "Optimizing car collection...\nThis may take a moment"
-        
-        task.spawn(function()
-            naturalDuplication()
-            status.Text = "Optimization complete!\nCheck your garage"
-            btn2.Text = "Optimize Cars"
-        end)
-    end)
-    
-    btn3.MouseButton1Click:Connect(function()
-        btn3.Text = "Managing..."
-        status.Text = "Auto-managing cars...\nThis will run in background"
-        
-        task.spawn(function()
-            -- Run interval duplication
-            print("\n⏱️ Running auto-management...")
-            local cars = getCarDataStealth()
-            if #cars > 0 then
-                local claimRemote = nil
-                for _, obj in pairs(game:GetDescendants()) do
-                    if obj:IsA("RemoteEvent") and obj.Name == "ClaimGiveawayCar" then
-                        claimRemote = obj
-                        break
-                    end
-                end
-                
-                if claimRemote then
-                    local car = cars[1]
-                    local totalRequests = 0
-                    local startTime = tick()
-                    
-                    while tick() - startTime < 30 do
-                        local interval = math.random(2000, 8000) / 1000
-                        task.wait(interval)
-                        
-                        stealthRequest(claimRemote, car, "normal")
-                        totalRequests = totalRequests + 1
-                        
-                        if math.random(1, 4) == 1 then
-                            task.wait(math.random(100, 300) / 1000)
-                            stealthRequest(claimRemote, car, "rapid")
-                            totalRequests = totalRequests + 1
-                        end
-                    end
-                    
-                    print("✅ Auto-management complete: " .. totalRequests .. " requests")
-                end
-            end
+            simpleDuplication()
             
-            status.Text = "Auto-management complete!\nRan for 30 seconds"
-            btn3.Text = "Auto-Manage"
+            status.Text = "✅ Duplication attempt complete!\nCheck your garage"
+            dupeBtn.Text = "⚡ DUPLICATE"
         end)
     end)
-    
-    -- Close button
-    local closeBtn = Instance.new("TextButton")
-    closeBtn.Text = "✕"
-    closeBtn.Size = UDim2.new(0, 30, 0, 30)
-    closeBtn.Position = UDim2.new(1, -35, 0, 5)
-    closeBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-    closeBtn.TextColor3 = Color3.new(1, 1, 1)
-    closeBtn.Font = Enum.Font.Gotham
-    closeBtn.TextSize = 16
-    closeBtn.Parent = title
-    addCorner(closeBtn)
     
     closeBtn.MouseButton1Click:Connect(function()
         gui:Destroy()
     end)
     
+    -- Make draggable
+    local dragging = false
+    local dragStart, frameStart
+    
+    title.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            frameStart = main.Position
+        end
+    end)
+    
+    title.InputEnded:Connect(function()
+        dragging = false
+    end)
+    
+    game:GetService("UserInputService").InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local delta = input.Position - dragStart
+            main.Position = UDim2.new(
+                frameStart.X.Scale, frameStart.X.Offset + delta.X,
+                frameStart.Y.Scale, frameStart.Y.Offset + delta.Y
+            )
+        end
+    end)
+    
+    print("✅ UI created successfully")
     return gui
 end
 
+-- ===== TEST REMOTE =====
+local function testRemote()
+    print("\n🔍 Testing remote...")
+    
+    local cars = getCars()
+    if #cars == 0 then return end
+    
+    local claimRemote = findClaimRemote()
+    if not claimRemote then return end
+    
+    local car = cars[1]
+    print("🚗 Testing with car: " .. tostring(car.Name or car.name or "Car 1"))
+    
+    -- Test single request
+    local success = pcall(function()
+        claimRemote:FireServer(car)
+        return true
+    end)
+    
+    if success then
+        print("✅ Remote accepts car data")
+        return true
+    else
+        print("❌ Remote rejected car data")
+        return false
+    end
+end
+
+-- ===== MANUAL TEST =====
+local function manualTest()
+    print("\n🔧 MANUAL TEST MODE")
+    print("=" .. string.rep("=", 50))
+    
+    -- List all remotes
+    print("\n📡 ALL REMOTES:")
+    local remoteCount = 0
+    for _, obj in pairs(game:GetDescendants()) do
+        if obj:IsA("RemoteEvent") then
+            remoteCount = remoteCount + 1
+            if remoteCount <= 10 then
+                print("   " .. obj.Name .. " (" .. obj:GetFullName() .. ")")
+            end
+        end
+    end
+    print("   ... and " .. (remoteCount - 10) .. " more")
+    
+    -- List car data
+    print("\n🚗 YOUR CARS:")
+    local cars = getCars()
+    for i, car in ipairs(cars) do
+        if i <= 5 then
+            print("   " .. i .. ". " .. tostring(car.Name or car.name or "Car " .. i))
+        end
+    end
+    if #cars > 5 then
+        print("   ... and " .. (#cars - 5) .. " more")
+    end
+    
+    -- Test specific remote
+    print("\n🎯 TESTING CLAIMGIVEAWAYCAR:")
+    testRemote()
+end
+
 -- ===== MAIN =====
-print("\n🚗 Creating helper interface...")
-createStealthUI()
+print("\n🚀 Initializing system...")
 
-print("\n✅ STEALTH SYSTEM READY!")
-print("\n💡 HOW TO USE:")
-print("1. Click 'Optimize Cars' - Runs natural pattern")
-print("2. Click 'Auto-Manage' - Runs 30-second interval")
-print("3. Check garage after each run")
+-- Run manual test first
+manualTest()
 
-print("\n⚠️ IMPORTANT:")
-print("• Looks like normal player activity")
-print("• No rapid-fire patterns")
-print("• Won't trigger anti-cheat")
+-- Create UI
+local success, errorMsg = pcall(function()
+    createSimpleUI()
+end)
+
+if not success then
+    print("❌ Failed to create UI: " .. tostring(errorMsg))
+    print("\n💡 Running in console mode only...")
+    
+    -- Run duplication directly
+    task.wait(2)
+    print("\n🎯 Press Enter to run duplication...")
+    
+    -- In case UI fails, run duplication directly
+    task.wait(5)
+    simpleDuplication()
+else
+    print("✅ UI created successfully")
+end
+
+print("\n🎯 SYSTEM READY!")
+print("\n💡 Commands:")
+print("• Click DUPLICATE button")
+print("• Check your garage")
+print("• Wait 10 seconds between attempts")
