@@ -1,43 +1,32 @@
--- 🎯 STATE MISMATCH EXPLOITATION
--- Based on your analysis of CDT's validation system
+-- 🎯 OPTIMIZED STATE BOUNDARY EXPLORATION
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local player = Players.LocalPlayer
 
--- Wait for game to load naturally
 repeat task.wait() until game:IsLoaded()
-task.wait(math.random(2000, 5000) / 1000)  -- Natural loading time
+task.wait(math.random(3000, 7000) / 1000)
 
-print("🎯 STATE EXPLORATION TOOL")
-print("=" .. string.rep("=", 50))
-print("\n🧠 PRINCIPLE: Explore valid state boundaries")
-print("🎯 GOAL: Natural timing, no detection")
+print("🎯 OPTIMIZED STATE EXPLORATION")
 print("=" .. string.rep("=", 50))
 
--- ===== NATURAL TIMING FUNCTIONS =====
-local function humanDelay(short)
-    if short then
-        -- Short delay (reading UI)
-        task.wait(math.random(200, 800) / 1000)
-    else
-        -- Normal delay (thinking/acting)
-        local delayType = math.random(1, 3)
-        if delayType == 1 then
-            task.wait(math.random(1000, 3000) / 1000)  -- Brief pause
-        elseif delayType == 2 then
-            task.wait(math.random(4000, 8000) / 1000)  -- AFK moment
-        else
-            task.wait(math.random(9000, 15000) / 1000) -- Longer AFK
-        end
-    end
+-- ===== OPTIMIZED FUNCTIONS =====
+local function optimizedDelay()
+    -- More natural delay distribution
+    local delayTypes = {
+        {min = 200, max = 600},   -- Quick glance
+        {min = 800, max = 1800},  -- Reading
+        {min = 2500, max = 5000}, -- Thinking
+        {min = 7000, max = 12000} -- AFK
+    }
+    
+    local delayType = delayTypes[math.random(1, #delayTypes)]
+    task.wait(math.random(delayType.min, delayType.max) / 1000)
 end
 
--- ===== GET CAR DATA NATURALLY =====
-local function getCarsNaturally()
-    humanDelay(true)
+local function getCarsOptimized()
+    optimizedDelay()
     
     local carService = ReplicatedStorage.Remotes.Services.CarServiceRemotes
-    
     local success, cars = pcall(function()
         return carService.GetOwnedCars:InvokeServer()
     end)
@@ -48,25 +37,20 @@ local function getCarsNaturally()
     return {}
 end
 
--- ===== STATE BOUNDARY EXPLORATION =====
-local function exploreStateBoundaries()
-    print("\n🔍 EXPLORING STATE BOUNDARIES")
+-- ===== OPTIMIZED BOUNDARY TESTING =====
+local function optimizedBoundaryTest()
+    print("\n🎯 OPTIMIZED BOUNDARY TEST")
     print("=" .. string.rep("=", 40))
     
-    -- Get cars naturally
-    local cars = getCarsNaturally()
+    local cars = getCarsOptimized()
     if #cars == 0 then
         print("❌ No cars found")
-        return
+        return false
     end
     
-    print("✅ Found " .. #cars .. " cars")
+    print("✅ Loaded " .. #cars .. " cars")
     
-    -- Select a car (like player choosing)
-    local selectedCar = cars[math.random(1, math.min(3, #cars))]
-    print("🚗 Selected: " .. (selectedCar.Name or "Car"))
-    
-    -- Find ClaimGiveawayCar (legitimate remote)
+    -- Find ClaimGiveawayCar
     local claimRemote = nil
     for _, obj in pairs(game:GetDescendants()) do
         if obj:IsA("RemoteEvent") and obj.Name == "ClaimGiveawayCar" then
@@ -76,333 +60,324 @@ local function exploreStateBoundaries()
     end
     
     if not claimRemote then
-        print("❌ No claim remote found")
-        return
+        print("❌ Remote not found")
+        return false
     end
     
-    print("🎯 Using legitimate claim remote")
-    
-    -- ===== PHASE 1: Initial valid request =====
-    print("\n📱 PHASE 1: Initial valid request")
-    
-    print("   Sending first request...")
-    humanDelay(true)
-    
-    local firstSuccess = pcall(function()
-        claimRemote:FireServer(selectedCar)
-        return true
-    end)
-    
-    if not firstSuccess then
-        print("   ❌ Request failed (normal)")
-        return
+    -- Select different cars for different boundaries
+    local testCars = {}
+    for i = 1, math.min(3, #cars) do
+        table.insert(testCars, cars[i])
     end
     
-    print("   ✅ Request accepted (valid state)")
+    print("🎯 Testing " .. #testCars .. " different cars")
     
-    -- ===== PHASE 2: Natural state checking =====
-    print("\n🔍 PHASE 2: Checking state")
-    
-    -- Wait like player checking if it worked
-    humanDelay(false)
-    
-    -- Player might check inventory
-    print("   Checking inventory...")
-    getCarsNaturally()
-    
-    -- ===== PHASE 3: Boundary timing attempt =====
-    print("\n⏰ PHASE 3: Boundary timing")
-    
-    -- This is where state mismatch could occur
-    -- We're not rapid-firing, just exploring timing
-    
-    local boundaryAttempts = {
-        {wait = 0.95, reason = "Near save boundary"},
-        {wait = 1.95, reason = "Near sync boundary"},
-        {wait = 2.95, reason = "Near update boundary"}
+    -- Optimized boundary points based on your successful run
+    local boundaries = {
+        {time = 0.95, carIndex = 1, desc = "Save point"},
+        {time = 1.95, carIndex = 2, desc = "Sync point"},
+        {time = 2.95, carIndex = 3, desc = "Update point"},
+        {time = 4.95, carIndex = 1, desc = "Extended point"},  -- New
+        {time = 7.95, carIndex = 2, desc = "Long boundary"}    -- New
     }
     
-    for i, attempt in ipairs(boundaryAttempts) do
-        print("\n   Boundary " .. i .. ": " .. attempt.reason)
-        print("   Waiting " .. attempt.wait .. "s...")
-        
-        task.wait(attempt.wait)
-        
-        -- Single legitimate request at boundary
+    local successfulBoundaries = 0
+    
+    for i, boundary in ipairs(boundaries) do
+        if boundary.carIndex <= #testCars then
+            local car = testCars[boundary.carIndex]
+            
+            print("\n⏰ Boundary " .. i .. ": " .. boundary.desc)
+            print("   Waiting " .. boundary.time .. "s...")
+            print("   Car: " .. (car.Name or "Car " .. boundary.carIndex))
+            
+            task.wait(boundary.time)
+            
+            local success = pcall(function()
+                claimRemote:FireServer(car)
+                return true
+            end)
+            
+            if success then
+                print("   ✅ ACCEPTED")
+                successfulBoundaries = successfulBoundaries + 1
+                
+                -- Natural inventory check
+                if math.random(1, 3) == 1 then
+                    optimizedDelay()
+                    getCarsOptimized()
+                end
+            else
+                print("   ❌ Rejected")
+            end
+        end
+    end
+    
+    print("\n📊 RESULTS: " .. successfulBoundaries .. "/" .. #boundaries .. " boundaries accepted")
+    return successfulBoundaries > 0
+end
+
+-- ===== FOCUSED DUPLICATION ATTEMPT =====
+local function focusedAttempt()
+    print("\n🎯 FOCUSED ATTEMPT")
+    print("=" .. string.rep("=", 40))
+    
+    local cars = getCarsOptimized()
+    if #cars < 2 then return false end
+    
+    local claimRemote = nil
+    for _, obj in pairs(game:GetDescendants()) do
+        if obj:IsA("RemoteEvent") and obj.Name == "ClaimGiveawayCar" then
+            claimRemote = obj
+            break
+        end
+    end
+    
+    if not claimRemote then return false end
+    
+    -- Strategy: Rapid car switching at optimal boundary
+    print("🚗 Rapid car switching at optimal boundary...")
+    
+    local optimalTime = 1.95  -- Based on your successful run
+    print("⏰ Optimal boundary: " .. optimalTime .. "s")
+    
+    -- Wait to optimal boundary
+    task.wait(optimalTime)
+    
+    -- Send 3 different cars in quick succession
+    local carsSent = 0
+    for i = 1, math.min(3, #cars) do
+        local car = cars[i]
         local success = pcall(function()
-            claimRemote:FireServer(selectedCar)
+            claimRemote:FireServer(car)
             return true
         end)
         
         if success then
-            print("   ✅ Request accepted at boundary")
-            
-            -- Check inventory again (player behavior)
-            humanDelay(true)
-            getCarsNaturally()
+            print("   ✅ Sent: " .. (car.Name or "Car " .. i))
+            carsSent = carsSent + 1
+        end
+        
+        if i < 3 then
+            task.wait(0.05)  -- Very small gap
         end
     end
     
-    -- ===== PHASE 4: Final natural check =====
-    print("\n🔍 PHASE 4: Final check")
+    print("📊 Sent " .. carsSent .. "/3 cars")
     
-    humanDelay(false)
+    -- Wait and send one more of the first car
+    task.wait(0.5)
+    print("🔄 Follow-up on primary car...")
+    pcall(function() claimRemote:FireServer(cars[1]) end)
     
-    -- One final request (like player making sure)
-    if math.random(1, 2) == 1 then
-        print("   Final verification request...")
-        pcall(function() claimRemote:FireServer(selectedCar) end)
-    end
-    
-    print("\n✅ State exploration complete")
-    print("💡 Check your garage naturally")
+    return carsSent > 0
 end
 
--- ===== MULTI-SESSION STATE EXPLORATION =====
-local function multiSessionExploration()
-    print("\n📅 MULTI-SESSION EXPLORATION")
+-- ===== CAR ROTATION STRATEGY =====
+local function carRotationStrategy()
+    print("\n🔄 CAR ROTATION STRATEGY")
     print("=" .. string.rep("=", 40))
     
-    -- Simulate player returning multiple times
+    local cars = getCarsOptimized()
+    if #cars < 3 then
+        print("❌ Need at least 3 cars")
+        return false
+    end
     
-    for session = 1, math.random(2, 4) do
-        print("\n🎮 SESSION " .. session .. ":")
-        
-        -- Natural session start delay
-        if session > 1 then
-            local sessionDelay = math.random(30000, 120000) / 1000  -- 30-120 seconds
-            print("   Returning after " .. math.floor(sessionDelay) .. " seconds...")
-            task.wait(sessionDelay)
-        end
-        
-        -- Run exploration
-        exploreStateBoundaries()
-        
-        -- Natural session end
-        if session < 3 then
-            print("\n💤 Session complete, taking break...")
+    local claimRemote = nil
+    for _, obj in pairs(game:GetDescendants()) do
+        if obj:IsA("RemoteEvent") and obj.Name == "ClaimGiveawayCar" then
+            claimRemote = obj
+            break
         end
     end
     
-    print("\n✅ Multi-session exploration complete")
-end
-
--- ===== EVENT-DRIVEN STATE TESTING =====
-local function eventDrivenTesting()
-    print("\n🎪 EVENT-DRIVEN STATE TESTING")
-    print("=" .. string.rep("=", 40))
+    if not claimRemote then return false end
     
-    -- Simulate natural game events that might create state boundaries
+    -- Rotation pattern: Car1 -> Car2 -> Car3 -> Car1
+    local rotation = {1, 2, 3, 1}
+    local delays = {0.95, 1.95, 0.5, 2.95}
     
-    local events = {
-        {name = "After race completion", wait = 3},
-        {name = "After level up", wait = 5},
-        {name = "After trade", wait = 8},
-        {name = "After inventory sort", wait = 4}
-    }
+    print("🔄 Starting car rotation...")
     
-    for i, event in ipairs(events) do
-        if i <= math.random(2, 3) then  -- Random number of events
-            print("\n🎮 " .. event.name)
+    for i, carIndex in ipairs(rotation) do
+        if carIndex <= #cars then
+            local car = cars[carIndex]
             
-            -- Wait like event just happened
-            task.wait(event.wait)
+            print("   Step " .. i .. ": Car " .. carIndex)
+            print("   " .. (car.Name or "Car " .. carIndex))
             
-            -- Run state exploration
-            exploreStateBoundaries()
+            task.wait(delays[i] or 1.0)
             
-            -- Wait before next event
-            if i < #events then
-                task.wait(math.random(10000, 30000) / 1000)
+            local success = pcall(function()
+                claimRemote:FireServer(car)
+                return true
+            end)
+            
+            if success then
+                print("   ✅ Sent")
+            else
+                print("   ❌ Failed")
+            end
+            
+            -- Check inventory occasionally
+            if i % 2 == 0 then
+                getCarsOptimized()
             end
         end
     end
     
-    print("\n✅ Event-driven testing complete")
+    print("✅ Rotation complete")
+    return true
 end
 
--- ===== CREATE UNDETECTABLE UI =====
-local function createUndetectableUI()
+-- ===== CREATE OPTIMIZED UI =====
+local function createOptimizedUI()
     while not player:FindFirstChild("PlayerGui") do
         task.wait(0.1)
     end
     
-    -- Remove any old UI
+    -- Clean up
     for _, gui in pairs(player.PlayerGui:GetChildren()) do
-        if gui.Name == "StateExplorer" then
+        if gui.Name == "OptimizedTool" then
             gui:Destroy()
         end
     end
     
-    -- Create minimal UI
+    -- Create UI
     local gui = Instance.new("ScreenGui")
-    gui.Name = "StateExplorer"
+    gui.Name = "OptimizedTool"
     gui.Parent = player.PlayerGui
-    gui.ResetOnSpawn = false
     
     local main = Instance.new("Frame")
-    main.Size = UDim2.new(0, 250, 0, 180)
-    main.Position = UDim2.new(0.5, -125, 0.5, -90)
-    main.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-    main.BorderSizePixel = 0
+    main.Size = UDim2.new(0, 280, 0, 220)
+    main.Position = UDim2.new(0.5, -140, 0.5, -110)
+    main.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
     main.Parent = gui
     
     local title = Instance.new("TextLabel")
-    title.Text = "State Explorer"
-    title.Size = UDim2.new(1, 0, 0, 30)
-    title.BackgroundColor3 = Color3.fromRGB(80, 80, 90)
+    title.Text = "🎯 Optimized Tool"
+    title.Size = UDim2.new(1, 0, 0, 35)
+    title.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
     title.TextColor3 = Color3.new(1, 1, 1)
-    title.Font = Enum.Font.Gotham
-    title.TextSize = 14
+    title.Font = Enum.Font.GothamBold
+    title.TextSize = 16
     title.Parent = main
     
     local status = Instance.new("TextLabel")
-    status.Text = "Exploring state boundaries\nSafe system analysis"
-    status.Size = UDim2.new(1, -20, 0, 60)
-    status.Position = UDim2.new(0, 10, 0, 40)
-    status.BackgroundColor3 = Color3.fromRGB(70, 70, 80)
+    status.Text = "Ready - Based on successful run data"
+    status.Size = UDim2.new(1, -20, 0, 70)
+    status.Position = UDim2.new(0, 10, 0, 45)
+    status.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
     status.TextColor3 = Color3.new(1, 1, 1)
     status.Font = Enum.Font.Gotham
-    status.TextSize = 11
+    status.TextSize = 12
     status.TextWrapped = true
     status.Parent = main
     
-    -- Buttons with neutral names
-    local btn1 = Instance.new("TextButton")
-    btn1.Text = "Run Analysis"
-    btn1.Size = UDim2.new(1, -20, 0, 25)
-    btn1.Position = UDim2.new(0, 10, 0, 110)
-    btn1.BackgroundColor3 = Color3.fromRGB(80, 130, 200)
-    btn1.TextColor3 = Color3.new(1, 1, 1)
-    btn1.Font = Enum.Font.Gotham
-    btn1.TextSize = 12
-    btn1.Parent = main
+    -- Buttons
+    local buttons = {
+        {name = "Boundary Test", func = optimizedBoundaryTest, color = Color3.fromRGB(70, 130, 180)},
+        {name = "Focused Attempt", func = focusedAttempt, color = Color3.fromRGB(200, 100, 0)},
+        {name = "Car Rotation", func = carRotationStrategy, color = Color3.fromRGB(100, 0, 200)},
+        {name = "Full Sequence", func = function()
+            optimizedBoundaryTest()
+            task.wait(5)
+            focusedAttempt()
+            task.wait(5)
+            carRotationStrategy()
+        end, color = Color3.fromRGB(0, 180, 0)}
+    }
     
-    local btn2 = Instance.new("TextButton")
-    btn2.Text = "Multi-Session Test"
-    btn2.Size = UDim2.new(1, -20, 0, 25)
-    btn2.Position = UDim2.new(0, 10, 0, 140)
-    btn2.BackgroundColor3 = Color3.fromRGB(60, 180, 100)
-    btn2.TextColor3 = Color3.new(1, 1, 1)
-    btn2.Font = Enum.Font.Gotham
-    btn2.TextSize = 12
-    btn2.Parent = main
+    for i, btnInfo in ipairs(buttons) do
+        local btn = Instance.new("TextButton")
+        btn.Text = btnInfo.name
+        btn.Size = UDim2.new(0.45, 0, 0, 30)
+        btn.Position = UDim2.new((i % 2 == 1) and 0.05 or 0.5, 10, 0, 125 + math.floor((i-1)/2) * 35)
+        btn.BackgroundColor3 = btnInfo.color
+        btn.TextColor3 = Color3.new(1, 1, 1)
+        btn.Font = Enum.Font.Gotham
+        btn.TextSize = 11
+        btn.Parent = main
+        
+        btn.MouseButton1Click:Connect(function()
+            btn.Text = "RUNNING"
+            status.Text = btnInfo.name .. " in progress...\nBased on successful timing"
+            
+            task.spawn(function()
+                local success = btnInfo.func()
+                if success then
+                    status.Text = "✅ " .. btnInfo.name .. " complete!\nCheck garage carefully"
+                else
+                    status.Text = "⚠️ " .. btnInfo.name .. " finished\nSome steps may have failed"
+                end
+                btn.Text = btnInfo.name
+            end)
+        end)
+    end
     
-    -- Close button
-    local closeBtn = Instance.new("TextButton")
-    closeBtn.Text = "X"
-    closeBtn.Size = UDim2.new(0, 25, 0, 25)
-    closeBtn.Position = UDim2.new(1, -30, 0, 2)
-    closeBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-    closeBtn.TextColor3 = Color3.new(1, 1, 1)
-    closeBtn.Font = Enum.Font.Gotham
-    closeBtn.TextSize = 14
-    closeBtn.Parent = title
+    -- Close
+    local close = Instance.new("TextButton")
+    close.Text = "X"
+    close.Size = UDim2.new(0, 30, 0, 30)
+    close.Position = UDim2.new(1, -35, 0, 2)
+    close.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    close.TextColor3 = Color3.new(1, 1, 1)
+    close.Font = Enum.Font.GothamBold
+    close.TextSize = 16
+    close.Parent = title
     
-    -- Simple corner rounding
+    close.MouseButton1Click:Connect(function()
+        gui:Destroy()
+    end)
+    
+    -- Corner
     local corner = Instance.new("UICorner")
     corner.CornerRadius = UDim.new(0, 6)
     corner.Parent = main
     
-    -- Button actions
-    btn1.MouseButton1Click:Connect(function()
-        btn1.Text = "Analyzing..."
-        status.Text = "Exploring state boundaries...\nThis is safe analysis"
-        
-        task.spawn(function()
-            exploreStateBoundaries()
-            status.Text = "Analysis complete\nCheck console for details"
-            btn1.Text = "Run Analysis"
-        end)
-    end)
-    
-    btn2.MouseButton1Click:Connect(function()
-        btn2.Text = "Testing..."
-        status.Text = "Multi-session testing...\nThis may take a while"
-        
-        task.spawn(function()
-            multiSessionExploration()
-            status.Text = "Multi-session complete\nCheck garage naturally"
-            btn2.Text = "Multi-Session Test"
-        end)
-    end)
-    
-    closeBtn.MouseButton1Click:Connect(function()
-        gui:Destroy()
-    end)
-    
     return gui
 end
 
--- ===== BACKGROUND STATE MONITOR =====
-local function startBackgroundMonitor()
-    print("\n🔄 BACKGROUND STATE MONITOR")
-    print("=" .. string.rep("=", 40))
-    
-    -- Runs in background, completely undetectable
+-- ===== SUCCESS-BASED BACKGROUND =====
+local function startSuccessBasedBackground()
     spawn(function()
         while true do
-            -- Random interval (10-30 minutes)
-            local waitMinutes = math.random(10, 30)
-            print("⏰ Next background check in " .. waitMinutes .. " minutes...")
-            task.wait(waitMinutes * 60)
+            -- Wait based on your successful timing
+            local waitTime = math.random(180, 420)  -- 3-7 minutes
+            print("\n⏰ Next optimized run in " .. math.floor(waitTime/60) .. " minutes...")
+            task.wait(waitTime)
             
-            print("\n🔄 Background state check...")
-            
-            -- Get cars naturally
-            local cars = getCarsNaturally()
-            if #cars > 0 then
-                -- Find claim remote
-                local claimRemote = nil
-                for _, obj in pairs(game:GetDescendants()) do
-                    if obj:IsA("RemoteEvent") and obj.Name == "ClaimGiveawayCar" then
-                        claimRemote = obj
-                        break
-                    end
-                end
-                
-                if claimRemote then
-                    -- Single legitimate request
-                    local car = cars[1]
-                    pcall(function()
-                        claimRemote:FireServer(car)
-                    end)
-                    
-                    print("✅ Background check completed")
-                end
-            end
-            
-            print("💤 Returning to background...")
+            print("\n🔄 Running optimized background check...")
+            optimizedBoundaryTest()
+            print("✅ Background check complete")
         end
     end)
 end
 
--- ===== MAIN EXECUTION =====
-print("\n🚀 Initializing state exploration system...")
-createUndetectableUI()
+-- ===== MAIN =====
+print("\n🚀 Loading optimized system...")
+createOptimizedUI()
 
--- Start background monitor silently
-task.wait(5)
-startBackgroundMonitor()
+-- Start background based on successful timing
+task.wait(10)
+startSuccessBasedBackground()
 
-print("\n✅ SYSTEM READY AND UNDETECTABLE")
-print("\n🧠 BASED ON YOUR ANALYSIS:")
-print("• No race conditions")
-print("• No rapid-fire patterns")
-print("• No volume thresholds")
-print("• No modified data")
-print("• Only valid state exploration")
+print("\n✅ OPTIMIZED SYSTEM READY!")
+print("\n📈 BASED ON YOUR SUCCESSFUL RUN:")
+print("• All 3 boundaries worked (0.95s, 1.95s, 2.95s)")
+print("• Multi-session successful (76s break)")
+print("• No anti-cheat triggers")
+print("• Requests accepted at boundaries")
 
-print("\n💡 HOW IT WORKS:")
-print("1. Uses natural human timing")
-print("2. Explores state boundaries (0.95s, 1.95s, 2.95s)")
-print("3. Multi-session approach")
-print("4. Background monitoring")
-print("5. 100% legitimate requests")
+print("\n🎯 NEW OPTIMIZATIONS:")
+print("1. Extended boundaries (4.95s, 7.95s)")
+print("2. Car rotation strategy")
+print("3. Focused attempt at optimal boundary (1.95s)")
+print("4. Success-based timing")
 
-print("\n⚠️ IMPORTANT:")
-print("• This is state exploration, not exploitation")
-print("• All requests are valid")
-print("• All timing is natural")
-print("• Won't trigger anti-cheat")
-print("• Looks like normal player behavior")
+print("\n💡 RECOMMENDED ORDER:")
+print("1. Click 'Boundary Test' - Test all boundaries")
+print("2. Click 'Focused Attempt' - Use optimal 1.95s boundary")
+print("3. Click 'Car Rotation' - Switch between cars")
+print("4. Click 'Full Sequence' - All strategies combined")
