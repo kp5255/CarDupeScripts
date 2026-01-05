@@ -1,5 +1,5 @@
--- 🎯 WORKING DUPLICATION SYSTEM v2.0
--- Based on actual car data structure
+-- 🎯 TARGETED DUPLICATION SYSTEM
+-- Using your exact car structure
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local player = Players.LocalPlayer
@@ -8,8 +8,9 @@ local player = Players.LocalPlayer
 repeat task.wait() until game:IsLoaded()
 task.wait(2)
 
-print("🎯 WORKING DUPLICATION SYSTEM")
+print("🎯 TARGETED DUPLICATION SYSTEM")
 print("=" .. string.rep("=", 50))
+print("Using car structure: Id, Data, Name")
 
 -- ===== GET CAR DATA =====
 local carService = ReplicatedStorage.Remotes.Services.CarServiceRemotes
@@ -20,242 +21,216 @@ local function getCars()
     end)
     
     if success and type(cars) == "table" then
-        print("✅ Loaded " .. #cars .. " cars")
         return cars
     end
     return {}
 end
 
--- ===== ANALYZE CAR STRUCTURE =====
-local function analyzeCar(car)
-    print("\n🔍 CAR STRUCTURE ANALYSIS:")
+-- ===== EXTRACT CAR ID AND NAME =====
+local function extractCarInfo(car)
+    if not car then return nil end
     
-    local fieldCount = 0
-    local importantFields = {}
-    
-    for fieldName, fieldValue in pairs(car) do
-        fieldCount = fieldCount + 1
-        
-        if fieldCount <= 10 then
-            local valueType = type(fieldValue)
-            local displayValue = tostring(fieldValue)
-            
-            if valueType == "string" and #displayValue > 20 then
-                displayValue = displayValue:sub(1, 20) .. "..."
-            end
-            
-            print(string.format("  %-15s = %-20s (%s)", 
-                tostring(fieldName), displayValue, valueType))
-        end
-        
-        -- Track important fields
-        local nameLower = tostring(fieldName):lower()
-        if nameLower:find("name") or nameLower:find("id") or 
-           nameLower:find("uuid") or nameLower:find("display") then
-            table.insert(importantFields, {
-                Name = fieldName,
-                Value = fieldValue,
-                Type = type(fieldValue)
-            })
-        end
-    end
-    
-    if fieldCount > 10 then
-        print("  ... and " .. (fieldCount - 10) .. " more fields")
-    end
-    
-    return importantFields
-end
-
--- ===== FIND ALL REMOTES =====
-local function findAllRemotes()
-    local remotes = {}
-    
-    for _, obj in pairs(game:GetDescendants()) do
-        if obj:IsA("RemoteEvent") then
-            table.insert(remotes, {
-                Object = obj,
-                Name = obj.Name,
-                Path = obj:GetFullName()
-            })
-        end
-    end
-    
-    return remotes
-end
-
--- ===== TEST SPECIFIC REMOTES =====
-local function testSpecificRemotes(car)
-    print("\n🎯 TESTING SPECIFIC REMOTES:")
-    
-    local cars = getCars()
-    if #cars == 0 then return end
-    
-    local testCar = cars[1]
-    
-    -- Common CDT remote names for duplication
-    local testRemotes = {
-        "PurchaseCar",
-        "BuyCar",
-        "GetCar", 
-        "ClaimCar",
-        "RedeemCar",
-        "DuplicateCar",
-        "CopyCar",
-        "CloneCar",
-        "AddCar",
-        "GiveCar",
-        "CreateCar",
-        "SpawnCar",
-        "UnlockCar",
-        "ReceiveCar",
-        "CollectCar"
+    return {
+        Id = car.Id,
+        Name = car.Name,
+        FullTable = car,
+        Data = car.Data
     }
-    
-    for _, remoteName in ipairs(testRemotes) do
-        -- Search for this remote
-        local foundRemote = nil
-        for _, obj in pairs(game:GetDescendants()) do
-            if obj:IsA("RemoteEvent") and obj.Name == remoteName then
-                foundRemote = obj
-                break
-            end
-        end
-        
-        if foundRemote then
-            print("\n🔍 Testing: " .. remoteName)
-            
-            -- Test different data formats
-            local formats = {
-                -- Format 1: Full car table
-                testCar,
-                
-                -- Format 2: Just car name (if exists)
-                testCar.Name or testCar.name or testCar.DisplayName,
-                
-                -- Format 3: Just car ID (if exists)
-                testCar.Id or testCar.id or testCar.UUID,
-                
-                -- Format 4: Array format
-                {testCar},
-                
-                -- Format 5: With player
-                {player, testCar},
-                {player.UserId, testCar},
-                
-                -- Format 6: Transaction format
-                {testCar, 1},  -- Car + quantity
-                {testCar, os.time()},  -- Car + timestamp
-            }
-            
-            local foundWorking = false
-            
-            for i, format in ipairs(formats) do
-                if format ~= nil then  -- Skip nil formats
-                    local success = pcall(function()
-                        foundRemote:FireServer(format)
-                        return true
-                    end)
-                    
-                    if success then
-                        print("   ✅ Format " .. i .. " ACCEPTED!")
-                        foundWorking = true
-                        
-                        -- Test rapid fire with this format
-                        print("   ⚡ Testing rapid fire (3 requests)...")
-                        for j = 1, 3 do
-                            pcall(function() foundRemote:FireServer(format) end)
-                            task.wait(0.1)
-                        end
-                        
-                        break
-                    end
-                end
-            end
-            
-            if not foundWorking then
-                print("   ❌ No format accepted")
-            end
-            
-            task.wait(0.5)  -- Brief pause between remotes
-        end
-    end
 end
 
--- ===== MANUAL REMOTE FINDER =====
-local function manualRemoteFinder()
-    print("\n🔧 MANUAL REMOTE FINDER")
+-- ===== FIND AND TEST REMOTES =====
+local function findWorkingRemotes()
+    print("\n🔍 FINDING WORKING REMOTES")
     print("=" .. string.rep("=", 50))
     
     local cars = getCars()
-    if #cars == 0 then return end
-    
-    local testCar = cars[1]
-    
-    -- Display car info
-    print("\n🚗 USING CAR:")
-    analyzeCar(testCar)
-    
-    -- Find all remotes
-    local allRemotes = findAllRemotes()
-    print("\n📡 Found " .. #allRemotes .. " RemoteEvents")
-    
-    -- Show first 10 remotes
-    print("\n🔍 FIRST 10 REMOTES:")
-    for i = 1, math.min(10, #allRemotes) do
-        local remote = allRemotes[i]
-        print(i .. ". " .. remote.Name .. " (" .. remote.Path .. ")")
+    if #cars == 0 then
+        print("❌ No cars found")
+        return {}
     end
     
-    -- Test the most promising ones
-    print("\n🎯 TESTING PROMISING REMOTES:")
+    local car = cars[1]
+    local carInfo = extractCarInfo(car)
     
-    local promisingRemotes = {}
-    for _, remote in ipairs(allRemotes) do
-        local nameLower = remote.Name:lower()
-        
-        if nameLower:find("car") or nameLower:find("vehicle") or
-           nameLower:find("purchase") or nameLower:find("buy") or
-           nameLower:find("get") or nameLower:find("claim") or
-           nameLower:find("duplicate") or nameLower:find("copy") then
-            table.insert(promisingRemotes, remote)
-        end
-    end
+    print("🚗 Using car:")
+    print("   Name: " .. (carInfo.Name or "Unknown"))
+    print("   ID: " .. (carInfo.Id or "Unknown"))
     
-    print("Found " .. #promisingRemotes .. " promising remotes")
+    -- Common CDT remote locations
+    local remoteLocations = {
+        ReplicatedStorage.Remotes,
+        ReplicatedStorage.Services,
+        game:GetService("ServerStorage"),
+        workspace
+    }
     
-    -- Test each promising remote
-    for i, remote in ipairs(promisingRemotes) do
-        if i > 5 then break end  -- Test only first 5
+    local workingRemotes = {}
+    
+    -- Test specific remote names (based on CDT)
+    local remoteNamesToTest = {
+        -- Purchase/Buy remotes
+        "PurchaseCar",
+        "BuyCar",
+        "PurchaseVehicle",
+        "BuyVehicle",
         
-        print("\n🔧 Testing: " .. remote.Name)
+        -- Get/Claim remotes
+        "GetCar",
+        "ClaimCar",
+        "RedeemCar",
+        "ReceiveCar",
+        "CollectCar",
+        "UnlockCar",
         
-        -- Try the full car table
-        local success = pcall(function()
-            remote.Object:FireServer(testCar)
-            return true
-        end)
+        -- Trade/Transfer remotes
+        "TradeCar",
+        "TransferCar",
+        "ExchangeCar",
+        "GiveCar",
+        "AddCar",
         
-        if success then
-            print("   ✅ Remote accepts car table!")
-            
-            -- Try a few more times
-            print("   ⚡ Sending 2 more requests...")
-            for j = 1, 2 do
-                pcall(function() remote.Object:FireServer(testCar) end)
-                task.wait(0.2)
+        -- Duplication remotes (if they exist)
+        "DuplicateCar",
+        "CopyCar",
+        "CloneCar",
+        "DuplicateVehicle",
+        
+        -- Update/Modify remotes
+        "UpdateCar",
+        "ModifyCar",
+        "UpgradeCar",
+        "EnhanceCar",
+        
+        -- Garage/Inventory remotes
+        "GarageAddCar",
+        "InventoryAddCar",
+        "SpawnCar",
+        "CreateCar"
+    }
+    
+    -- Search for and test each remote
+    for _, remoteName in ipairs(remoteNamesToTest) do
+        for _, location in ipairs(remoteLocations) do
+            if location then
+                local remote = location:FindFirstChild(remoteName)
+                if remote and remote:IsA("RemoteEvent") then
+                    print("\n🎯 Found: " .. remoteName .. " in " .. location.Name)
+                    
+                    -- Test different data formats
+                    local formats = {
+                        -- Format 1: Full car table
+                        carInfo.FullTable,
+                        
+                        -- Format 2: Just car ID
+                        carInfo.Id,
+                        
+                        -- Format 3: Just car name
+                        carInfo.Name,
+                        
+                        -- Format 4: Array with car
+                        {carInfo.FullTable},
+                        
+                        -- Format 5: With player
+                        {player, carInfo.FullTable},
+                        {player.UserId, carInfo.FullTable},
+                        
+                        -- Format 6: Key-value format
+                        {Car = carInfo.FullTable, Player = player},
+                        {Vehicle = carInfo.FullTable, Owner = player.UserId},
+                        
+                        -- Format 7: Car ID + Name
+                        {carInfo.Id, carInfo.Name},
+                        
+                        -- Format 8: Data table only
+                        carInfo.Data
+                    }
+                    
+                    for i, format in ipairs(formats) do
+                        if format ~= nil then
+                            local success = pcall(function()
+                                remote:FireServer(format)
+                                return true
+                            end)
+                            
+                            if success then
+                                print("   ✅ Format " .. i .. " WORKS!")
+                                
+                                -- Test rapid fire with this format
+                                print("   ⚡ Testing rapid fire...")
+                                local sentCount = 0
+                                for j = 1, 5 do
+                                    if pcall(function() remote:FireServer(format) end) then
+                                        sentCount = sentCount + 1
+                                    end
+                                    task.wait(0.1)
+                                end
+                                print("   🔥 Sent " .. sentCount .. " rapid requests")
+                                
+                                -- Save working combination
+                                table.insert(workingRemotes, {
+                                    Remote = remote,
+                                    Name = remoteName,
+                                    Format = i,
+                                    Data = format
+                                })
+                                
+                                break  -- Move to next remote
+                            end
+                        end
+                    end
+                end
             end
-        else
-            print("   ❌ Remote rejected car table")
         end
-        
-        task.wait(0.5)
     end
     
-    print("\n✅ Manual testing complete!")
+    return workingRemotes
 end
 
--- ===== CREATE WORKING UI =====
+-- ===== BULK DUPLICATION =====
+local function bulkDuplication(workingRemote)
+    print("\n🚀 BULK DUPLICATION ATTEMPT")
+    print("=" .. string.rep("=", 50))
+    
+    if not workingRemote then
+        print("❌ No working remote found")
+        return
+    end
+    
+    print("🎯 Using remote: " .. workingRemote.Name)
+    print("📦 Using format: " .. workingRemote.Format)
+    
+    local cars = getCars()
+    if #cars == 0 then return end
+    
+    -- Phase 1: Initial requests
+    print("\n📡 PHASE 1: Initial requests")
+    for i = 1, 10 do
+        pcall(function()
+            workingRemote.Remote:FireServer(workingRemote.Data)
+        end)
+        print("   Sent request " .. i)
+        task.wait(0.2)
+    end
+    
+    -- Wait for server processing
+    print("\n⏳ Waiting 3 seconds...")
+    task.wait(3)
+    
+    -- Phase 2: Second wave
+    print("📡 PHASE 2: Second wave")
+    for i = 1, 5 do
+        pcall(function()
+            workingRemote.Remote:FireServer(workingRemote.Data)
+        end)
+        print("   Sent follow-up " .. i)
+        task.wait(0.3)
+    end
+    
+    print("\n✅ Bulk duplication complete!")
+    print("💡 Check your garage NOW")
+end
+
+-- ===== CREATE SIMPLE UI =====
 local function createUI()
     -- Wait for PlayerGui
     while not player:FindFirstChild("PlayerGui") do
@@ -263,26 +238,26 @@ local function createUI()
     end
     
     -- Remove old UI
-    local oldUI = player.PlayerGui:FindFirstChild("CarDupeUI")
+    local oldUI = player.PlayerGui:FindFirstChild("CarToolsUI")
     if oldUI then oldUI:Destroy() end
     
     -- Create UI
     local gui = Instance.new("ScreenGui")
-    gui.Name = "CarDupeUI"
+    gui.Name = "CarToolsUI"
     gui.Parent = player.PlayerGui
     gui.ResetOnSpawn = false
     
     -- Main frame
     local main = Instance.new("Frame")
-    main.Size = UDim2.new(0, 350, 0, 250)
-    main.Position = UDim2.new(0.5, -175, 0.5, -125)
+    main.Size = UDim2.new(0, 300, 0, 200)
+    main.Position = UDim2.new(0.5, -150, 0.5, -100)
     main.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
     main.BorderSizePixel = 0
     main.Parent = gui
     
     -- Title
     local title = Instance.new("TextLabel")
-    title.Text = "🎯 CAR DUPLICATION TOOLS"
+    title.Text = "🚗 Car Tools"
     title.Size = UDim2.new(1, 0, 0, 40)
     title.Position = UDim2.new(0, 0, 0, 0)
     title.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
@@ -294,8 +269,8 @@ local function createUI()
     -- Status
     local status = Instance.new("TextLabel")
     status.Name = "Status"
-    status.Text = "Ready to scan for duplication remotes"
-    status.Size = UDim2.new(1, -20, 0, 80)
+    status.Text = "Ready to find duplication remotes"
+    status.Size = UDim2.new(1, -20, 0, 60)
     status.Position = UDim2.new(0, 10, 0, 50)
     status.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
     status.TextColor3 = Color3.new(1, 1, 1)
@@ -305,25 +280,25 @@ local function createUI()
     status.Parent = main
     
     -- Buttons
-    local analyzeBtn = Instance.new("TextButton")
-    analyzeBtn.Text = "🔍 ANALYZE CARS"
-    analyzeBtn.Size = UDim2.new(1, -20, 0, 40)
-    analyzeBtn.Position = UDim2.new(0, 10, 0, 140)
-    analyzeBtn.BackgroundColor3 = Color3.fromRGB(70, 130, 180)
-    analyzeBtn.TextColor3 = Color3.new(1, 1, 1)
-    analyzeBtn.Font = Enum.Font.GothamBold
-    analyzeBtn.TextSize = 14
-    analyzeBtn.Parent = main
+    local scanBtn = Instance.new("TextButton")
+    scanBtn.Text = "🔍 SCAN REMOTES"
+    scanBtn.Size = UDim2.new(1, -20, 0, 40)
+    scanBtn.Position = UDim2.new(0, 10, 0, 120)
+    scanBtn.BackgroundColor3 = Color3.fromRGB(70, 130, 180)
+    scanBtn.TextColor3 = Color3.new(1, 1, 1)
+    scanBtn.Font = Enum.Font.GothamBold
+    scanBtn.TextSize = 14
+    scanBtn.Parent = main
     
-    local testBtn = Instance.new("TextButton")
-    testBtn.Text = "🎯 TEST REMOTES"
-    testBtn.Size = UDim2.new(1, -20, 0, 40)
-    testBtn.Position = UDim2.new(0, 10, 0, 190)
-    testBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
-    testBtn.TextColor3 = Color3.new(1, 1, 1)
-    testBtn.Font = Enum.Font.GothamBold
-    testBtn.TextSize = 14
-    testBtn.Parent = main
+    local dupeBtn = Instance.new("TextButton")
+    dupeBtn.Text = "⚡ START DUPE"
+    dupeBtn.Size = UDim2.new(1, -20, 0, 40)
+    dupeBtn.Position = UDim2.new(0, 10, 0, 170)
+    dupeBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
+    dupeBtn.TextColor3 = Color3.new(1, 1, 1)
+    dupeBtn.Font = Enum.Font.GothamBold
+    dupeBtn.TextSize = 14
+    dupeBtn.Parent = main
     
     -- Close button
     local closeBtn = Instance.new("TextButton")
@@ -346,40 +321,45 @@ local function createUI()
     roundCorners(main)
     roundCorners(title)
     roundCorners(status)
-    roundCorners(analyzeBtn)
-    roundCorners(testBtn)
+    roundCorners(scanBtn)
+    roundCorners(dupeBtn)
     roundCorners(closeBtn)
     
+    -- Variables
+    local workingRemote = nil
+    
     -- Button actions
-    analyzeBtn.MouseButton1Click:Connect(function()
-        analyzeBtn.Text = "ANALYZING..."
-        status.Text = "Analyzing car structure...\nPlease wait"
+    scanBtn.MouseButton1Click:Connect(function()
+        scanBtn.Text = "SCANNING..."
+        status.Text = "Scanning for duplication remotes...\nThis may take a moment"
         
         task.spawn(function()
-            local cars = getCars()
-            if #cars > 0 then
-                analyzeCar(cars[1])
-                status.Text = "✅ Car analysis complete!\nCheck console for details"
+            local remotes = findWorkingRemotes()
+            
+            if #remotes > 0 then
+                workingRemote = remotes[1]  -- Use first working remote
+                status.Text = "✅ Found " .. #remotes .. " working remotes!\nUsing: " .. workingRemote.Name
             else
-                status.Text = "❌ No cars found"
+                status.Text = "❌ No working remotes found\nCheck console for details"
             end
-            analyzeBtn.Text = "🔍 ANALYZE CARS"
+            
+            scanBtn.Text = "🔍 SCAN REMOTES"
         end)
     end)
     
-    testBtn.MouseButton1Click:Connect(function()
-        testBtn.Text = "TESTING..."
-        status.Text = "Testing all duplication remotes...\nThis may take a minute"
+    dupeBtn.MouseButton1Click:Connect(function()
+        if not workingRemote then
+            status.Text = "❌ Scan for remotes first!"
+            return
+        end
+        
+        dupeBtn.Text = "DUPLICATING..."
+        status.Text = "Starting duplication...\nPlease wait"
         
         task.spawn(function()
-            local cars = getCars()
-            if #cars > 0 then
-                testSpecificRemotes(cars[1])
-                status.Text = "✅ Remote testing complete!\nCheck console for results"
-            else
-                status.Text = "❌ No cars found"
-            end
-            testBtn.Text = "🎯 TEST REMOTES"
+            bulkDuplication(workingRemote)
+            status.Text = "✅ Duplication complete!\nCheck your garage"
+            dupeBtn.Text = "⚡ START DUPE"
         end)
     end)
     
@@ -414,8 +394,72 @@ local function createUI()
         end
     end)
     
-    print("✅ UI created successfully")
     return gui
+end
+
+-- ===== MANUAL TEST =====
+local function manualTest()
+    print("\n🔧 MANUAL TEST - DIRECT TO CONSOLE")
+    print("=" .. string.rep("=", 50))
+    
+    local cars = getCars()
+    if #cars == 0 then
+        print("❌ No cars found")
+        return
+    end
+    
+    local car = cars[1]
+    print("🚗 Car: " .. (car.Name or "Unknown"))
+    print("🔑 ID: " .. (car.Id or "Unknown"))
+    
+    -- Try PurchaseCar remote (common in CDT)
+    local purchaseRemote = ReplicatedStorage:FindFirstChild("PurchaseCar")
+    if not purchaseRemote then
+        purchaseRemote = ReplicatedStorage.Remotes:FindFirstChild("PurchaseCar")
+    end
+    if not purchaseRemote then
+        purchaseRemote = ReplicatedStorage.Services:FindFirstChild("PurchaseCar")
+    end
+    
+    if purchaseRemote and purchaseRemote:IsA("RemoteEvent") then
+        print("\n🎯 Found PurchaseCar remote!")
+        
+        -- Try different formats
+        print("📦 Testing formats...")
+        
+        local formats = {
+            car,
+            car.Id,
+            car.Name,
+            {car},
+            {player, car}
+        }
+        
+        for i, format in ipairs(formats) do
+            local success = pcall(function()
+                purchaseRemote:FireServer(format)
+                return true
+            end)
+            
+            if success then
+                print("   ✅ Format " .. i .. " ACCEPTED!")
+                
+                -- Rapid fire
+                print("   ⚡ Sending 10 rapid requests...")
+                for j = 1, 10 do
+                    pcall(function() purchaseRemote:FireServer(format) end)
+                    task.wait(0.1)
+                end
+                
+                print("   🔥 Rapid fire complete!")
+                return
+            end
+        end
+    else
+        print("❌ PurchaseCar remote not found")
+    end
+    
+    print("\n💡 Check console for other remotes from previous scan")
 end
 
 -- ===== MAIN =====
@@ -424,8 +468,10 @@ createUI()
 
 print("\n✅ SYSTEM READY!")
 print("\n💡 HOW TO USE:")
-print("1. Click ANALYZE CARS - See your car structure")
-print("2. Click TEST REMOTES - Find working duplication remotes")
+print("1. Click SCAN REMOTES - Finds working duplication remotes")
+print("2. Click START DUPE - Uses found remote for duplication")
 print("3. Check console for results")
 
-print("\n🎯 This will find the ACTUAL duplication remote!")
+print("\n🎯 Testing PurchaseCar remote directly...")
+task.wait(2)
+manualTest()
