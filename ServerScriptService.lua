@@ -1,379 +1,255 @@
--- CAR CUSTOMIZATION PREVIEW SYSTEM
--- Allows previewing all customizations (including locked ones) for planning
--- DOES NOT unlock or give paid items - VISUAL ONLY
+-- CAR CUSTOMIZATION DATA ANALYZER
+-- Finds where customization data is stored in your car objects
 
-local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
 local player = Players.LocalPlayer
 
-local PreviewMode = false
-local CurrentCar = nil
-local OriginalProperties = {}
+print("🔍 CAR CUSTOMIZATION STRUCTURE ANALYZER")
+print("=" .. string.rep("=", 60))
 
--- Wait for game to load
-repeat task.wait() until game:IsLoaded()
-task.wait(2)
-
--- ===== GET ALL CUSTOMIZATION DATA =====
-local function getAllCustomizations()
-    local customizations = {}
+-- ===== GET CAR DATA =====
+local carService = ReplicatedStorage.Remotes.Services.CarServiceRemotes
+local function getCars()
+    local success, cars = pcall(function()
+        return carService.GetOwnedCars:InvokeServer()
+    end)
     
-    -- Try to find customization database
-    local success, data = pcall(function()
-        -- Look for customization data in common locations
-        local possiblePaths = {
-            "Databases.CarCustomization",
-            "Data.Customizations", 
-            "GameData.Customizations",
-            "Config.Customizations",
-            "Settings.Customizations"
-        }
+    if success and type(cars) == "table" then
+        print("✅ Loaded " .. #cars .. " cars")
+        return cars
+    end
+    return {}
+end
+
+-- ===== DEEP ANALYZE CAR STRUCTURE =====
+local function deepAnalyzeCar(car, depth)
+    if depth > 3 then return end -- Limit recursion depth
+    
+    print("\n" .. string.rep("  ", depth) .. "📦 Analyzing level " .. depth .. "...")
+    
+    local customizationFields = {}
+    local nestedTables = {}
+    
+    for key, value in pairs(car) do
+        local valueType = type(value)
+        local keyStr = tostring(key)
+        local valueStr = tostring(value)
         
-        for _, path in ipairs(possiblePaths) do
-            local obj = ReplicatedStorage
-            for part in string.gmatch(path, "[^%.]+") do
-                obj = obj:FindFirstChild(part)
-                if not obj then break end
+        -- Check if this might be customization-related
+        if valueType == "table" then
+            table.insert(nestedTables, {key = key, value = value})
+        
+        elseif valueType == "string" then
+            -- Look for customization-related field names
+            local keyLower = keyStr:lower()
+            if keyLower:find("wrap") or keyLower:find("skin") or keyLower:find("paint") or
+               keyLower:find("color") or keyLower:find("wheel") or keyLower:find("rim") or
+               keyLower:find("underglow") or keyLower:find("neon") or keyLower:find("light") or
+               keyLower:find("engine") or keyLower:find("horn") or keyLower:find("exhaust") or
+               keyLower:find("spoiler") or keyLower:find("kit") or keyLower:find("custom") then
+                
+                table.insert(customizationFields, {
+                    key = keyStr,
+                    value = valueStr,
+                    type = valueType
+                })
             end
-            if obj then
-                -- Extract customization data
-                for _, item in ipairs(obj:GetDescendants()) do
-                    if item:IsA("ModuleScript") or item:IsA("Folder") then
-                        table.insert(customizations, {
-                            Name = item.Name,
-                            Path = item:GetFullName(),
-                            Type = item.ClassName
+        end
+    end
+    
+    -- Display customization fields found at this level
+    if #customizationFields > 0 then
+        print(string.rep("  ", depth) .. "🎨 CUSTOMIZATION FOUND at level " .. depth .. ":")
+        for _, field in ipairs(customizationFields) do
+            print(string.rep("  ", depth) .. "  • " .. field.key .. " = " .. field.value .. " (" .. field.type .. ")")
+        end
+    end
+    
+    -- Recursively analyze nested tables
+    for _, nested in ipairs(nestedTables) do
+        print(string.rep("  ", depth) .. "📁 Entering table: " .. nested.key)
+        deepAnalyzeCar(nested.value, depth + 1)
+    end
+end
+
+-- ===== FIND CUSTOMIZATION DATABASE =====
+local function findCustomizationDatabase()
+    print("\n🔎 SEARCHING FOR CUSTOMIZATION DATABASE...")
+    
+    local databases = {}
+    
+    -- Search common database locations
+    local searchPaths = {
+        "Databases",
+        "Data",
+        "GameData",
+        "Configuration",
+        "Config",
+        "Settings",
+        "Storage"
+    }
+    
+    for _, path in ipairs(searchPaths) do
+        local db = ReplicatedStorage:FindFirstChild(path)
+        if db then
+            -- Look for customization-related folders
+            for _, child in ipairs(db:GetDescendants()) do
+                if child:IsA("Folder") or child:IsA("ModuleScript") then
+                    local name = child.Name:lower()
+                    if name:find("custom") or name:find("wrap") or name:find("skin") or
+                       name:find("paint") or name:find("wheel") or name:find("engine") or
+                       name:find("horn") or name:find("underglow") or name:find("upgrade") then
+                        
+                        table.insert(databases, {
+                            Name = child.Name,
+                            Path = child:GetFullName(),
+                            Type = child.ClassName
                         })
                     end
                 end
-                break
             end
         end
-        
-        return customizations
-    end)
+    end
     
-    if success then
-        print("📦 Found " .. #data .. " customization items")
-        return data
+    if #databases > 0 then
+        print("📁 Found " .. #databases .. " customization databases:")
+        for i, db in ipairs(databases) do
+            print(i .. ". " .. db.Name .. " (" .. db.Type .. ")")
+            print("   Path: " .. db.Path)
+        end
     else
-        print("⚠️ Could not load customization data")
+        print("❌ No customization database found")
+    end
+    
+    return databases
+end
+
+-- ===== GET EQUIPPED CUSTOMIZATIONS =====
+local function getEquippedCustomizations()
+    print("\n🔧 SEARCHING FOR EQUIPPED CUSTOMIZATIONS...")
+    
+    -- Try to find customization controller
+    local controllers = ReplicatedStorage:FindFirstChild("Controllers")
+    if not controllers then
+        print("❌ Controllers folder not found")
         return {}
     end
-end
-
--- ===== BACKUP ORIGINAL PROPERTIES =====
-local function backupOriginalProperties(car)
-    OriginalProperties = {}
     
-    for _, part in ipairs(car:GetDescendants()) do
-        if part:IsA("BasePart") then
-            OriginalProperties[part] = {
-                Color = part.Color,
-                Material = part.Material,
-                Transparency = part.Transparency,
-                CanCollide = part.CanCollide
-            }
-        end
-    end
-end
-
--- ===== RESTORE ORIGINAL PROPERTIES =====
-local function restoreOriginalProperties(car)
-    for part, properties in pairs(OriginalProperties) do
-        if part and part.Parent then
-            part.Color = properties.Color
-            part.Material = properties.Material
-            part.Transparency = properties.Transparency
-            part.CanCollide = properties.CanCollide
-        end
-    end
-    OriginalProperties = {}
-end
-
--- ===== PREVIEW CUSTOMIZATION TYPE =====
-local function previewCustomization(customizationType, color, material)
-    if not CurrentCar then return end
-    
-    local partsToModify = {}
-    
-    -- Determine which parts to modify based on customization type
-    for _, part in ipairs(CurrentCar:GetDescendants()) do
-        if part:IsA("BasePart") then
-            local partName = part.Name:lower()
-            local shouldModify = false
-            
-            if customizationType == "Paint" then
-                -- Modify body parts (not wheels, windows, etc.)
-                if not partName:find("wheel") and 
-                   not partName:find("glass") and 
-                   not partName:find("light") and
-                   not partName:find("seat") then
-                    shouldModify = true
-                end
-                
-            elseif customizationType == "Rims" then
-                -- Only modify wheels
-                if partName:find("wheel") or partName:find("rim") then
-                    shouldModify = true
-                end
-                
-            elseif customizationType == "Spoiler" then
-                -- Only spoiler parts
-                if partName:find("spoiler") then
-                    shouldModify = true
-                end
-                
-            elseif customizationType == "Windows" then
-                -- Only glass/transparent parts
-                if partName:find("glass") or partName:find("window") then
-                    shouldModify = true
-                end
-                
-            elseif customizationType == "Lights" then
-                -- Only light parts
-                if partName:find("light") or partName:find("lamp") then
-                    shouldModify = true
-                end
-            end
-            
-            if shouldModify then
-                table.insert(partsToModify, part)
-            end
-        end
+    -- Look for customization controller
+    local customizationController = controllers:FindFirstChild("CustomizationController")
+    if not customizationController then
+        print("❌ CustomizationController not found")
+        return {}
     end
     
-    -- Apply preview
-    for _, part in ipairs(partsToModify) do
-        if customizationType == "Paint" then
-            part.Color = color or Color3.fromRGB(math.random(0, 255), math.random(0, 255), math.random(0, 255))
-            part.Material = material or Enum.Material.Metal
-            
-        elseif customizationType == "Rims" then
-            part.Color = color or Color3.fromRGB(20, 20, 20)
-            part.Material = material or Enum.Material.Metal
-            
-        elseif customizationType == "Spoiler" then
-            part.Transparency = 0
-            part.CanCollide = true
-            part.Color = color or Color3.fromRGB(255, 255, 255)
-            
-        elseif customizationType == "Windows" then
-            part.Transparency = 0.5
-            part.Color = Color3.fromRGB(100, 100, 100)
-            
-        elseif customizationType == "Lights" then
-            part.Color = color or Color3.fromRGB(255, 255, 200)
-            part.Material = Enum.Material.Neon
-        end
-    end
-end
-
--- ===== CREATE PREVIEW UI =====
-local function createPreviewUI()
-    -- Remove old UI
-    local playerGui = player:WaitForChild("PlayerGui")
-    local oldUI = playerGui:FindFirstChild("CustomizationPreviewUI")
-    if oldUI then oldUI:Destroy() end
+    print("✅ Found CustomizationController")
     
-    -- Create UI
-    local gui = Instance.new("ScreenGui")
-    gui.Name = "CustomizationPreviewUI"
-    gui.Parent = playerGui
-    gui.ResetOnSpawn = false
-    
-    -- Main Frame
-    local main = Instance.new("Frame")
-    main.Size = UDim2.new(0, 300, 0, 400)
-    main.Position = UDim2.new(0, 20, 0.5, -200)
-    main.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-    main.BorderSizePixel = 0
-    main.Parent = gui
-    
-    -- Title
-    local title = Instance.new("TextLabel")
-    title.Text = "🎨 CUSTOMIZATION PREVIEW"
-    title.Size = UDim2.new(1, 0, 0, 40)
-    title.Position = UDim2.new(0, 0, 0, 0)
-    title.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
-    title.TextColor3 = Color3.new(1, 1, 1)
-    title.Font = Enum.Font.GothamBold
-    title.TextSize = 16
-    title.Parent = main
-    
-    -- Status
-    local status = Instance.new("TextLabel")
-    status.Name = "Status"
-    status.Text = "Select a customization type to preview"
-    status.Size = UDim2.new(1, -20, 0, 60)
-    status.Position = UDim2.new(0, 10, 0, 50)
-    status.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-    status.TextColor3 = Color3.new(1, 1, 1)
-    status.Font = Enum.Font.Gotham
-    status.TextSize = 12
-    status.TextWrapped = true
-    status.Parent = main
-    
-    -- Customization Types
-    local customizations = {
-        {Name = "🎨 Paint Job", Type = "Paint"},
-        {Name = "🛞 Rims", Type = "Rims"},
-        {Name = "✈️ Spoiler", Type = "Spoiler"},
-        {Name = "🔲 Windows", Type = "Windows"},
-        {Name = "💡 Lights", Type = "Lights"},
-        {Name = "🔄 Random", Type = "Random"}
+    -- Try to get equipped customizations via remotes
+    local remotes = {
+        "GetEquippedCustomizations",
+        "GetEquippedItems",
+        "GetCurrentCustomizations",
+        "LoadCustomizations",
+        "GetPlayerCustomizations"
     }
     
-    -- Create buttons
-    local buttonY = 120
-    for i, item in ipairs(customizations) do
-        local btn = Instance.new("TextButton")
-        btn.Name = item.Type
-        btn.Text = item.Name
-        btn.Size = UDim2.new(1, -20, 0, 35)
-        btn.Position = UDim2.new(0, 10, 0, buttonY)
-        btn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-        btn.TextColor3 = Color3.new(1, 1, 1)
-        btn.Font = Enum.Font.Gotham
-        btn.TextSize = 14
-        btn.Parent = main
-        
-        btn.MouseButton1Click:Connect(function()
-            if CurrentCar then
-                status.Text = "Previewing: " .. item.Name
+    for _, remoteName in ipairs(remotes) do
+        local remote = ReplicatedStorage:FindFirstChild(remoteName, true)
+        if remote and remote:IsA("RemoteFunction") then
+            print("🎯 Testing remote: " .. remote.Name)
+            
+            local success, result = pcall(function()
+                return remote:InvokeServer()
+            end)
+            
+            if success then
+                print("✅ Remote returned data: " .. type(result))
                 
-                if item.Type == "Random" then
-                    -- Randomize all customizations
-                    for _, customType in ipairs({"Paint", "Rims", "Spoiler", "Windows", "Lights"}) do
-                        previewCustomization(customType)
+                if type(result) == "table" then
+                    print("\n📋 EQUIPPED CUSTOMIZATIONS:")
+                    for key, value in pairs(result) do
+                        print("  " .. tostring(key) .. " = " .. tostring(value))
                     end
-                else
-                    previewCustomization(item.Type)
+                    return result
                 end
             else
-                status.Text = "⚠️ Please enter a vehicle first"
+                print("❌ Remote failed: " .. tostring(result))
             end
-        end)
+        end
+    end
+    
+    return {}
+end
+
+-- ===== ANALYZE SPECIFIC CAR CUSTOMIZATIONS =====
+local function analyzeCarCustomizations(car)
+    print("\n🚗 ANALYZING CAR: " .. tostring(car.Name or "Unknown"))
+    print(string.rep("-", 50))
+    
+    -- First, check if car has a customization table directly
+    for key, value in pairs(car) do
+        local keyStr = tostring(key):lower()
         
-        buttonY = buttonY + 40
-    end
-    
-    -- Reset Button
-    local resetBtn = Instance.new("TextButton")
-    resetBtn.Text = "🔄 Reset to Original"
-    resetBtn.Size = UDim2.new(1, -20, 0, 40)
-    resetBtn.Position = UDim2.new(0, 10, 0, 350)
-    resetBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-    resetBtn.TextColor3 = Color3.new(1, 1, 1)
-    resetBtn.Font = Enum.Font.GothamBold
-    resetBtn.TextSize = 14
-    resetBtn.Parent = main
-    
-    resetBtn.MouseButton1Click:Connect(function()
-        if CurrentCar then
-            restoreOriginalProperties(CurrentCar)
-            status.Text = "✅ Reset to original appearance"
-        end
-    end)
-    
-    -- Close Button
-    local closeBtn = Instance.new("TextButton")
-    closeBtn.Text = "X"
-    closeBtn.Size = UDim2.new(0, 30, 0, 30)
-    closeBtn.Position = UDim2.new(1, -35, 0, 5)
-    closeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-    closeBtn.TextColor3 = Color3.new(1, 1, 1)
-    closeBtn.Font = Enum.Font.GothamBold
-    closeBtn.TextSize = 16
-    closeBtn.Parent = title
-    
-    -- Round corners
-    local function roundCorners(obj)
-        local corner = Instance.new("UICorner")
-        corner.CornerRadius = UDim.new(0, 6)
-        corner.Parent = obj
-    end
-    
-    roundCorners(main)
-    roundCorners(title)
-    roundCorners(status)
-    
-    for _, child in ipairs(main:GetChildren()) do
-        if child:IsA("TextButton") then
-            roundCorners(child)
-        end
-    end
-    
-    -- Button actions
-    closeBtn.MouseButton1Click:Connect(function()
-        if CurrentCar then
-            restoreOriginalProperties(CurrentCar)
-        end
-        gui:Destroy()
-    end)
-    
-    print("✅ Preview UI Created")
-    return gui
-end
-
--- ===== DETECT CURRENT CAR =====
-local function monitorCurrentCar()
-    while task.wait(1) do
-        local char = player.Character
-        if char then
-            local humanoid = char:FindFirstChild("Humanoid")
-            if humanoid and humanoid.SeatPart then
-                local seat = humanoid.SeatPart
-                if seat:IsA("VehicleSeat") then
-                    local car = seat:FindFirstAncestorWhichIsA("Model")
-                    if car and car ~= CurrentCar then
-                        print("🚗 Entered vehicle:", car.Name)
-                        
-                        -- Backup original properties
-                        if CurrentCar then
-                            restoreOriginalProperties(CurrentCar)
-                        end
-                        
-                        CurrentCar = car
-                        backupOriginalProperties(car)
-                        
-                        -- Update UI status
-                        local ui = player.PlayerGui:FindFirstChild("CustomizationPreviewUI")
-                        if ui then
-                            local status = ui:FindFirstChild("Status", true)
-                            if status then
-                                status.Text = "Vehicle detected: " .. car.Name .. "\nSelect a customization to preview"
-                            end
-                        end
-                    end
-                else
-                    if CurrentCar then
-                        restoreOriginalProperties(CurrentCar)
-                        CurrentCar = nil
-                    end
+        if keyStr == "customizations" or keyStr == "upgrades" or 
+           keyStr == "mods" or keyStr == "tuning" then
+            
+            if type(value) == "table" then
+                print("🎯 Found customization table: " .. key)
+                print("\n📋 Customization items:")
+                
+                for custKey, custValue in pairs(value) do
+                    local valueType = type(custValue)
+                    print("  • " .. tostring(custKey) .. " = " .. 
+                          tostring(custValue) .. " (" .. valueType .. ")")
                 end
+                return value
             end
         end
     end
+    
+    -- If no direct customization table, check all tables
+    print("🔍 Searching for nested customization data...")
+    deepAnalyzeCar(car, 0)
+    
+    return nil
 end
 
--- ===== MAIN =====
-print("\n🎨 CAR CUSTOMIZATION PREVIEW SYSTEM")
-print("This allows you to VISUALLY PREVIEW customizations")
-print("All changes are TEMPORARY and CLIENT-SIDE ONLY")
-print("=" .. string.rep("=", 50))
+-- ===== MAIN ANALYSIS =====
+local cars = getCars()
+if #cars > 0 then
+    -- Analyze first car
+    local firstCar = cars[1]
+    
+    -- First, show basic car info
+    print("\n📊 BASIC CAR INFO:")
+    for key, value in pairs(firstCar) do
+        local valueType = type(value)
+        if valueType ~= "table" then
+            print("  " .. tostring(key) .. " = " .. tostring(value) .. " (" .. valueType .. ")")
+        else
+            print("  " .. tostring(key) .. " = [TABLE]")
+        end
+    end
+    
+    -- Try to analyze customizations
+    analyzeCarCustomizations(firstCar)
+    
+    -- Look for customization database
+    findCustomizationDatabase()
+    
+    -- Try to get equipped customizations
+    getEquippedCustomizations()
+    
+    print("\n" .. string.rep("=", 60))
+    print("🎯 NEXT STEPS:")
+    print("1. Look for 'Customizations', 'Upgrades', or 'Mods' table in your car data")
+    print("2. Check if there's a separate database with customization items")
+    print("3. Look for remote events that handle customization changes")
+    print("4. The 'update' button likely calls a remote to open customization UI")
+    
+else
+    print("❌ No cars found")
+end
 
--- Load all available customizations
-local allCustomizations = getAllCustomizations()
-
--- Create UI
-createPreviewUI()
-
--- Start car monitoring
-task.spawn(monitorCurrentCar)
-
-print("\n✅ SYSTEM READY!")
-print("1. Enter any vehicle")
-print("2. Use the preview UI to test different looks")
-print("3. All changes reset when you exit the vehicle")
-print("4. No permanent changes are made")
+print("\n✅ Analysis complete!")
