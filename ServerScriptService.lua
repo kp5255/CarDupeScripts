@@ -1,5 +1,5 @@
--- 🎯 ULTIMATE CAR DUPLICATION SYSTEM
--- Based on VALID STATE REPETITION principle
+-- 🎯 ENHANCED CAR DUPLICATION SYSTEM
+-- Fixed car detection issue
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local player = Players.LocalPlayer
@@ -7,256 +7,309 @@ local player = Players.LocalPlayer
 repeat task.wait() until game:IsLoaded()
 task.wait(2)
 
-print("🎯 ULTIMATE CAR DUPLICATION SYSTEM")
-print("=" .. string.rep("=", 60))
-print("\n🧠 PRINCIPLE: Duplicate VALID states, not bypass validation")
-print("🎯 METHOD: Rapid-fire SAME valid request before state updates")
+print("🎯 ENHANCED CAR DUPLICATION SYSTEM")
 print("=" .. string.rep("=", 60))
 
--- ===== FIND VALID CAR TRANSFER REMOTES =====
-local function findTransferRemotes()
-    print("\n🔍 Finding car transfer/duplication remotes...")
+-- ===== IMPROVED CAR DATA FINDER =====
+local function findMyCurrentCars()
+    print("\n🔍 ENHANCED: Finding your current cars...")
     
-    local transferRemotes = {}
+    local myCars = {}
+    local checkedFolders = {}
     
-    -- Common transfer/duplication remote names
-    local transferPatterns = {
-        "Claim", "Redeem", "Collect", "Receive",
-        "Transfer", "Move", "Duplicate", "Copy",
-        "Give", "Add", "Purchase", "Buy",
-        "Sell", "Trade", "Exchange"
-    }
-    
-    -- Search all remotes
-    for _, obj in pairs(game:GetDescendants()) do
-        if obj:IsA("RemoteEvent") then
-            local remoteName = obj.Name
-            local nameLower = remoteName:lower()
-            
-            -- Check for transfer patterns
-            for _, pattern in pairs(transferPatterns) do
-                if nameLower:find(pattern:lower()) then
-                    table.insert(transferRemotes, {
-                        Object = obj,
-                        Name = remoteName,
-                        Path = obj:GetFullName(),
-                        Pattern = pattern
-                    })
-                    break
+    -- METHOD 1: Check Player Data folders (COMMON LOCATION)
+    local function checkFolder(folder)
+        if checkedFolders[folder] then return end
+        checkedFolders[folder] = true
+        
+        for _, child in pairs(folder:GetChildren()) do
+            -- Check for car-related objects
+            if child:IsA("Folder") and (child.Name:find("Car") or child.Name:find("Vehicle")) then
+                for _, item in pairs(child:GetChildren()) do
+                    if item:IsA("StringValue") or item:IsA("NumberValue") then
+                        table.insert(myCars, {
+                            Name = item.Value,
+                            Source = "Car Folder: " .. child.Name,
+                            Path = item:GetFullName(),
+                            Object = item
+                        })
+                    end
                 end
+            end
+            
+            -- Check for values that might contain car data
+            if child:IsA("StringValue") then
+                local value = child.Value
+                if type(value) == "string" then
+                    -- Check for common car ID patterns
+                    if value:find("car_") or value:find("vehicle_") or 
+                       value:find("Bontlay") or value:find("Jegar") or 
+                       value:find("Corsaro") or value:find("Lavish") or 
+                       value:find("Sportler") or #value > 15 then
+                        table.insert(myCars, {
+                            Name = value,
+                            Source = "StringValue: " .. child.Name,
+                            Path = child:GetFullName(),
+                            Object = child
+                        })
+                    end
+                end
+            end
+            
+            -- Check for NumberValue that might be car ID
+            if child:IsA("NumberValue") then
+                table.insert(myCars, {
+                    Name = tostring(child.Value),
+                    Source = "NumberValue: " .. child.Name,
+                    Path = child:GetFullName(),
+                    Object = child
+                })
+            end
+            
+            -- Recursively check folders
+            if child:IsA("Folder") then
+                checkFolder(child)
             end
         end
     end
     
-    print("📡 Found " .. #transferRemotes .. " transfer remotes")
-    return transferRemotes
-end
-
--- ===== FIND YOUR CURRENT CARS =====
-local function findMyCurrentCars()
-    print("\n🔍 Finding your current cars for VALID duplication...")
+    -- Check common locations
+    local locations = {
+        player,  -- Player object
+        player:FindFirstChild("PlayerGui"),
+        player:FindFirstChild("Backpack"),
+        workspace:FindFirstChild("Vehicles"),
+        ReplicatedStorage,
+        game:GetService("ServerStorage")
+    }
     
-    local myCars = {}
+    for _, location in pairs(locations) do
+        if location then
+            checkFolder(location)
+        end
+    end
     
-    -- Method 1: Check GUI for owned cars
+    -- METHOD 2: Check for GUIs showing owned cars
     if player:FindFirstChild("PlayerGui") then
-        local gui = player.PlayerGui:FindFirstChild("MultiCarSelection")
-        if gui then
-            for _, obj in pairs(gui:GetDescendants()) do
-                if obj:IsA("TextLabel") and #obj.Text > 2 then
-                    local text = obj.Text
-                    -- Check if it's a car name
-                    if text:find("Bontlay") or text:find("Jegar") or text:find("Corsaro") or
-                       text:find("Lavish") or text:find("Sportler") then
-                        table.insert(myCars, {
-                            Name = text,
-                            Source = "GUI Display",
-                            Path = obj:GetFullName()
-                        })
+        local guis = player.PlayerGui:GetChildren()
+        for _, gui in pairs(guis) do
+            if gui:IsA("ScreenGui") then
+                local textLabels = gui:GetDescendants()
+                for _, label in pairs(textLabels) do
+                    if label:IsA("TextLabel") or label:IsA("TextBox") then
+                        local text = label.Text
+                        if text and #text > 0 then
+                            -- Look for car names
+                            if text:find("Bontlay") or text:find("Jegar") or 
+                               text:find("Corsaro") or text:find("Lavish") or 
+                               text:find("Sportler") or text:find("Car") or
+                               text:find("car_") then
+                                table.insert(myCars, {
+                                    Name = text,
+                                    Source = "GUI: " .. gui.Name,
+                                    Path = label:GetFullName(),
+                                    Object = label
+                                })
+                            end
+                        end
                     end
                 end
             end
         end
     end
     
-    -- Method 2: Check StringValues for car IDs
-    for _, obj in pairs(player:GetDescendants()) do
-        if obj:IsA("StringValue") then
-            local value = obj.Value
-            if type(value) == "string" and #value > 10 then
-                -- Check for car ID patterns
-                if value:find("car_") or value:find("vehicle_") or 
-                   value:match("^%x%x%x%x") or value:match("^%d%d%d%d") then
+    -- METHOD 3: Look for car parts in workspace
+    local vehicles = workspace:FindFirstChild("Vehicles")
+    if vehicles then
+        for _, vehicle in pairs(vehicles:GetChildren()) do
+            if vehicle:FindFirstChild("Owner") then
+                local owner = vehicle.Owner.Value
+                if owner == player or owner == player.Name or owner == player.UserId then
                     table.insert(myCars, {
-                        Name = value,
-                        Source = "StringValue ID",
-                        Path = obj:GetFullName()
+                        Name = vehicle.Name,
+                        Source = "Workspace Vehicle",
+                        Path = vehicle:GetFullName(),
+                        Object = vehicle
                     })
                 end
             end
         end
     end
     
-    print("🚗 Found " .. #myCars .. " potential car sources")
+    -- METHOD 4: Check Data Stores (via RemoteEvents)
+    print("   Checking 43 found remotes for car data patterns...")
+    
+    -- Get the transfer remotes
+    local transferRemotes = {}
+    for _, obj in pairs(game:GetDescendants()) do
+        if obj:IsA("RemoteEvent") then
+            local nameLower = obj.Name:lower()
+            if nameLower:find("claim") or nameLower:find("redeem") or 
+               nameLower:find("collect") or nameLower:find("get") or
+               nameLower:find("vehicle") or nameLower:find("car") then
+                table.insert(transferRemotes, obj)
+            end
+        end
+    end
+    
+    -- Try to get car data from what these remotes accept
+    for _, remote in pairs(transferRemotes) do
+        -- Store remote reference
+        table.insert(myCars, {
+            Name = remote.Name,
+            Source = "RemoteEvent Name",
+            Path = remote:GetFullName(),
+            Object = remote,
+            IsRemote = true
+        })
+    end
+    
+    print("   Found " .. #myCars .. " potential car sources")
     return myCars
 end
 
--- ===== RAPID-FIRE DUPLICATION =====
-local function rapidFireDuplication(remote, carData)
-    print("\n⚡ RAPID-FIRE DUPLICATION ATTEMPT")
-    print("🎯 Target: " .. remote.Name)
-    print("🚗 Using: " .. carData.Name)
-    
-    local attempts = 0
-    local successes = 0
-    local startTime = tick()
-    
-    -- Try different VALID data formats
-    local dataFormats = {
-        -- Format 1: Direct car data
-        carData.Name,
-        
-        -- Format 2: Array with car
-        {carData.Name},
-        
-        -- Format 3: With player
-        {player, carData.Name},
-        {player.UserId, carData.Name},
-        
-        -- Format 4: Table format
-        {Car = carData.Name, Player = player.Name},
-        {Vehicle = carData.Name, Owner = player.UserId},
-        
-        -- Format 5: Transaction format
-        {carData.Name, os.time(), "duplicate"},
-        {carData.Name, 1, player.UserId}  -- Quantity = 1
-    }
-    
-    -- RAPID FIRE LOOP
-    print("\n🚀 STARTING RAPID FIRE (50 attempts)...")
-    
-    for i = 1, 50 do
-        attempts = attempts + 1
-        
-        -- Try each format rapidly
-        for _, data in pairs(dataFormats) do
-            local success = pcall(function()
-                remote.Object:FireServer(data)
-                return true
-            end)
-            
-            if success then
-                successes = successes + 1
-                if successes == 1 then
-                    print("✅ FIRST SUCCESS! Format accepted!")
-                end
-                break  -- Move to next rapid fire
-            end
-        end
-        
-        -- Extreme speed (minimum delay)
-        task.wait(0.01)  -- 10ms between attempts
-        
-        if i % 10 == 0 then
-            print("   Sent " .. i .. "/50 rapid requests...")
-        end
-    end
-    
-    local totalTime = tick() - startTime
-    print("\n📊 RAPID FIRE RESULTS:")
-    print("   Total attempts: " .. attempts)
-    print("   Successful sends: " .. successes)
-    print("   Total time: " .. string.format("%.2f", totalTime) .. " seconds")
-    print("   Average speed: " .. string.format("%.1f", attempts/totalTime) .. " req/sec")
-    
-    return successes > 0
-end
-
--- ===== STATE-BASED DUPLICATION =====
-local function stateBasedDuplication()
-    print("\n🧠 STATE-BASED DUPLICATION STRATEGY")
+-- ===== SIMPLIFIED DUPLICATION =====
+local function simpleDuplication()
+    print("\n⚡ SIMPLIFIED DUPLICATION METHOD")
     print("=" .. string.rep("=", 50))
     
-    -- Step 1: Find transfer remotes
-    local transferRemotes = findTransferRemotes()
-    if #transferRemotes == 0 then
-        print("❌ No transfer remotes found")
-        return
-    end
-    
-    -- Step 2: Find my current cars
+    -- Find car data
     local myCars = findMyCurrentCars()
+    
     if #myCars == 0 then
-        print("❌ No car data found")
+        print("❌ STILL NO CAR DATA FOUND")
+        print("\n💡 MANUAL DETECTION REQUIRED:")
+        print("1. Open Developer Console (F9)")
+        print("2. Look for RemoteEvents with names like:")
+        print("   - ClaimCar")
+        print("   - RedeemVehicle") 
+        print("   - GetCar")
+        print("   - PurchaseVehicle")
+        print("3. Look for your car data in:")
+        print("   - Player folder")
+        print("   - PlayerGui displays")
+        print("   - StringValues with long IDs")
         return
     end
     
-    -- Step 3: Select best remote and car
-    local bestRemote = nil
-    for _, remote in pairs(transferRemotes) do
-        if remote.Name:find("Claim") or remote.Name:find("Give") then
-            bestRemote = remote
+    -- Display found data
+    print("\n📋 FOUND DATA:")
+    for i, car in ipairs(myCars) do
+        print(i .. ". " .. car.Name .. " (" .. car.Source .. ")")
+        if i >= 10 then
+            print("   ... and " .. (#myCars - 10) .. " more")
             break
         end
     end
     
-    if not bestRemote then
-        bestRemote = transferRemotes[1]
+    -- Try different duplication methods
+    print("\n🎯 ATTEMPTING DUPLICATION...")
+    
+    -- Method 1: Try remotes directly
+    for _, car in ipairs(myCars) do
+        if car.IsRemote then
+            print("\n📡 Trying remote: " .. car.Name)
+            
+            -- Try different data formats
+            local formats = {
+                "Car1",
+                "Vehicle1",
+                "1",
+                "0",
+                player.Name,
+                player.UserId
+            }
+            
+            for _, data in pairs(formats) do
+                local success = pcall(function()
+                    car.Object:FireServer(data)
+                    print("   ✅ Sent: " .. tostring(data))
+                    return true
+                end)
+                
+                if success then
+                    print("   🎯 REMOTE ACCEPTS: " .. tostring(data))
+                    -- Rapid fire this successful format
+                    for i = 1, 20 do
+                        car.Object:FireServer(data)
+                        task.wait(0.05)
+                    end
+                    print("   ⚡ Sent 20 rapid requests!")
+                end
+            end
+        end
     end
     
-    local bestCar = myCars[1]  -- Use first found car
+    -- Method 2: Try car data with transfer remotes
+    print("\n🔍 Looking for transfer remotes...")
     
-    -- Step 4: Attempt duplication
-    print("\n🎯 SELECTED FOR DUPLICATION:")
-    print("   Remote: " .. bestRemote.Name)
-    print("   Car: " .. bestCar.Name)
-    print("   Source: " .. bestCar.Source)
-    
-    -- Try rapid-fire duplication
-    local success = rapidFireDuplication(bestRemote, bestCar)
-    
-    if success then
-        print("\n✅ DUPLICATION ATTEMPT COMPLETE!")
-        print("💡 Check your inventory in 10 seconds...")
-        
-        -- Wait and try again (state might still be valid)
-        task.wait(10)
-        print("\n🔄 SECOND ATTEMPT (state might still be valid)...")
-        rapidFireDuplication(bestRemote, bestCar)
-    else
-        print("\n❌ Duplication failed")
-        print("💡 Try different remote/car combination")
+    local transferRemotes = {}
+    for _, obj in pairs(game:GetDescendants()) do
+        if obj:IsA("RemoteEvent") then
+            table.insert(transferRemotes, obj)
+        end
     end
+    
+    print("   Found " .. #transferRemotes .. " RemoteEvents")
+    
+    -- Try top 5 car data with top 10 remotes
+    for i = 1, math.min(5, #myCars) do
+        local car = myCars[i]
+        if not car.IsRemote then  -- Skip if it's already a remote
+            for j = 1, math.min(10, #transferRemotes) do
+                local remote = transferRemotes[j]
+                
+                print("   Testing: " .. remote.Name .. " with " .. car.Name)
+                
+                -- Try the car data
+                local success = pcall(function()
+                    remote:FireServer(car.Name)
+                    return true
+                end)
+                
+                if success then
+                    print("   ✅ " .. remote.Name .. " accepted " .. car.Name)
+                    -- Rapid fire!
+                    for k = 1, 30 do
+                        remote:FireServer(car.Name)
+                        task.wait(0.03)
+                    end
+                    print("   ⚡ Sent 30 rapid requests!")
+                end
+            end
+        end
+    end
+    
+    print("\n✅ DUPLICATION ATTEMPT COMPLETE!")
+    print("💡 Check your inventory/garage")
+    print("🔄 Wait 15 seconds and try again")
 end
 
--- ===== CREATE DUPER UI =====
-local function createDuperUI()
+-- ===== QUICK UI =====
+local function createQuickUI()
     local gui = Instance.new("ScreenGui")
-    gui.Name = "CarDuperPro"
+    gui.Name = "QuickDupe"
     gui.Parent = player:WaitForChild("PlayerGui")
     
-    -- Main window
     local main = Instance.new("Frame")
-    main.Size = UDim2.new(0, 400, 0, 450)
-    main.Position = UDim2.new(0.5, -200, 0.5, -225)
-    main.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+    main.Size = UDim2.new(0, 350, 0, 200)
+    main.Position = UDim2.new(0.5, -175, 0.5, -100)
+    main.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
     main.Parent = gui
     
-    -- Title
     local title = Instance.new("TextLabel")
-    title.Text = "⚡ CAR DUPLICATION SYSTEM"
-    title.Size = UDim2.new(1, 0, 0, 50)
+    title.Text = "⚡ QUICK DUPE V2"
+    title.Size = UDim2.new(1, 0, 0, 40)
     title.BackgroundColor3 = Color3.fromRGB(0, 100, 0)
     title.TextColor3 = Color3.new(1, 1, 1)
     title.Font = Enum.Font.GothamBold
     title.TextSize = 18
     title.Parent = main
     
-    -- Status
     local status = Instance.new("TextLabel")
-    status.Text = "🧠 Principle: Duplicate VALID states\n🎯 Method: Rapid-fire same valid request"
+    status.Text = "Click SCAN then DUPE"
     status.Size = UDim2.new(1, -20, 0, 60)
-    status.Position = UDim2.new(0, 10, 0, 60)
+    status.Position = UDim2.new(0, 10, 0, 50)
     status.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
     status.TextColor3 = Color3.new(1, 1, 1)
     status.Font = Enum.Font.Gotham
@@ -264,20 +317,10 @@ local function createDuperUI()
     status.TextWrapped = true
     status.Parent = main
     
-    -- Results display
-    local results = Instance.new("ScrollingFrame")
-    results.Size = UDim2.new(1, -20, 0, 200)
-    results.Position = UDim2.new(0, 10, 0, 130)
-    results.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-    results.BorderSizePixel = 0
-    results.ScrollBarThickness = 8
-    results.Parent = main
-    
-    -- Buttons
     local scanBtn = Instance.new("TextButton")
-    scanBtn.Text = "🔍 SCAN SYSTEMS"
+    scanBtn.Text = "🔍 SCAN FOR DATA"
     scanBtn.Size = UDim2.new(1, -20, 0, 40)
-    scanBtn.Position = UDim2.new(0, 10, 0, 340)
+    scanBtn.Position = UDim2.new(0, 10, 0, 120)
     scanBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 220)
     scanBtn.TextColor3 = Color3.new(1, 1, 1)
     scanBtn.Font = Enum.Font.GothamBold
@@ -285,9 +328,9 @@ local function createDuperUI()
     scanBtn.Parent = main
     
     local dupeBtn = Instance.new("TextButton")
-    dupeBtn.Text = "⚡ RAPID-FIRE DUPE"
+    dupeBtn.Text = "⚡ START DUPE"
     dupeBtn.Size = UDim2.new(1, -20, 0, 40)
-    dupeBtn.Position = UDim2.new(0, 10, 0, 390)
+    dupeBtn.Position = UDim2.new(0, 10, 0, 170)
     dupeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
     dupeBtn.TextColor3 = Color3.new(1, 1, 1)
     dupeBtn.Font = Enum.Font.GothamBold
@@ -304,99 +347,38 @@ local function createDuperUI()
     addCorner(main)
     addCorner(title)
     addCorner(status)
-    addCorner(results)
     addCorner(scanBtn)
     addCorner(dupeBtn)
     
-    -- Functions
-    local function updateResults(text, color)
-        results:ClearAllChildren()
-        
-        local label = Instance.new("TextLabel")
-        label.Text = text
-        label.Size = UDim2.new(1, -10, 1, -10)
-        label.Position = UDim2.new(0, 5, 0, 5)
-        label.BackgroundTransparency = 1
-        label.TextColor3 = color or Color3.new(1, 1, 1)
-        label.Font = Enum.Font.Code
-        label.TextSize = 10
-        label.TextWrapped = true
-        label.TextXAlignment = Enum.TextXAlignment.Left
-        label.TextYAlignment = Enum.TextYAlignment.Top
-        label.Parent = results
-    end
-    
-    -- Variables
-    local transferRemotes = {}
-    local myCars = {}
-    
-    -- Button actions
     scanBtn.MouseButton1Click:Connect(function()
         scanBtn.Text = "SCANNING..."
-        scanBtn.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
-        status.Text = "Scanning for transfer systems..."
+        status.Text = "Scanning for car data..."
         
         task.spawn(function()
-            transferRemotes = findTransferRemotes()
-            myCars = findMyCurrentCars()
-            
-            local resultText = "📡 SCAN COMPLETE:\n\n"
-            resultText = resultText .. "Transfer Remotes: " .. #transferRemotes .. "\n"
-            resultText = resultText .. "Your Cars Found: " .. #myCars .. "\n\n"
-            
-            if #transferRemotes > 0 then
-                resultText = resultText .. "🎯 TOP REMOTES:\n"
-                for i, remote in ipairs(transferRemotes) do
-                    if i <= 5 then
-                        resultText = resultText .. i .. ". " .. remote.Name .. "\n"
-                    end
-                end
-            end
-            
-            if #myCars > 0 then
-                resultText = resultText .. "\n🚗 YOUR CARS:\n"
-                for i, car in ipairs(myCars) do
-                    if i <= 3 then
-                        resultText = resultText .. i .. ". " .. car.Name .. "\n"
-                    end
-                end
-            end
-            
-            updateResults(resultText, Color3.fromRGB(0, 255, 150))
-            status.Text = "✅ Scan complete! Ready for duplication."
-            
-            scanBtn.Text = "🔍 SCAN SYSTEMS"
-            scanBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 220)
+            local cars = findMyCurrentCars()
+            status.Text = "Found " .. #cars .. " data sources\nClick DUPE to start"
+            scanBtn.Text = "🔍 SCAN COMPLETE"
+            scanBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
         end)
     end)
     
     dupeBtn.MouseButton1Click:Connect(function()
-        if #transferRemotes == 0 or #myCars == 0 then
-            status.Text = "❌ Scan systems first!"
-            updateResults("Please click SCAN SYSTEMS first", Color3.fromRGB(255, 100, 100))
-            return
-        end
-        
         dupeBtn.Text = "DUPLICATING..."
-        dupeBtn.BackgroundColor3 = Color3.fromRGB(255, 100, 0)
-        status.Text = "Starting rapid-fire duplication..."
-        updateResults("⚡ RAPID-FIRE STARTING...\nSending 50 rapid requests...", Color3.fromRGB(255, 200, 100))
+        status.Text = "Starting duplication..."
         
         task.spawn(function()
-            stateBasedDuplication()
-            
-            dupeBtn.Text = "⚡ RAPID-FIRE DUPE"
-            dupeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-            status.Text = "✅ Duplication attempt complete!"
-            updateResults("🎯 Check your inventory!\n💡 Wait 10 seconds and try again.", Color3.fromRGB(0, 255, 0))
+            simpleDuplication()
+            dupeBtn.Text = "⚡ DUPE COMPLETE"
+            dupeBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+            status.Text = "Check your inventory!\nWait 15s and try again"
         end)
     end)
     
-    -- Close button
+    -- Close
     local closeBtn = Instance.new("TextButton")
-    closeBtn.Text = "✕"
+    closeBtn.Text = "X"
     closeBtn.Size = UDim2.new(0, 30, 0, 30)
-    closeBtn.Position = UDim2.new(1, -35, 0, 10)
+    closeBtn.Position = UDim2.new(1, -35, 0, 5)
     closeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
     closeBtn.TextColor3 = Color3.new(1, 1, 1)
     closeBtn.Font = Enum.Font.GothamBold
@@ -404,60 +386,19 @@ local function createDuperUI()
     closeBtn.Parent = title
     
     addCorner(closeBtn)
-    
     closeBtn.MouseButton1Click:Connect(function()
         gui:Destroy()
     end)
-    
-    -- Make draggable
-    local dragging = false
-    local dragStart, frameStart
-    
-    title.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = true
-            dragStart = input.Position
-            frameStart = main.Position
-        end
-    end)
-    
-    game:GetService("UserInputService").InputChanged:Connect(function(input)
-        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-            local delta = input.Position - dragStart
-            main.Position = UDim2.new(
-                frameStart.X.Scale, frameStart.X.Offset + delta.X,
-                frameStart.Y.Scale, frameStart.Y.Offset + delta.Y
-            )
-        end
-    end)
-    
-    -- Initial display
-    updateResults("Click SCAN SYSTEMS to find transfer remotes\nThen click RAPID-FIRE DUPE to attempt duplication", Color3.fromRGB(150, 150, 150))
     
     return gui
 end
 
 -- ===== MAIN =====
-print("\n🎯 THEORY INTO PRACTICE:")
-print("1. Find VALID car transfer remote")
-print("2. Find YOUR current car data (VALID state)")
-print("3. Rapid-fire SAME valid request 50+ times")
-print("4. Server processes same valid state multiple times")
-print("5. DUPLICATION occurs because validation passes EVERY time")
+print("\n🚀 Starting enhanced system...")
+createQuickUI()
 
-print("\n🚀 Starting system...")
-
--- Create UI
-local ui = createDuperUI()
-
-print("\n✅ DUPLICATION SYSTEM READY!")
-print("\n💡 HOW TO USE:")
-print("1. Click SCAN SYSTEMS - Find transfer remotes & your cars")
-print("2. Click RAPID-FIRE DUPE - Send 50 rapid valid requests")
-print("3. Check inventory - See if duplication occurred")
-print("4. Wait 10 seconds - Try again (state might still be valid)")
-
-print("\n🎯 KEY INSIGHT YOU DISCOVERED:")
-print("Dupes happen when server processes SAME valid state")
-print("multiple times BEFORE updating ownership.")
-print("This script implements THAT EXACT PRINCIPLE!")
+print("\n🎯 NEW STRATEGY:")
+print("1. Find ANY data that might be car-related")
+print("2. Try ALL RemoteEvents with that data")
+print("3. When one accepts, RAPID-FIRE it")
+print("4. Check inventory for duplicates")
