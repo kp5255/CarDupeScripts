@@ -1,4 +1,4 @@
--- 🎯 FIXED DUPLICATION SYSTEM
+-- 🎯 CDT ANTI-VALIDATION BYPASS
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local player = Players.LocalPlayer
@@ -7,7 +7,12 @@ local player = Players.LocalPlayer
 repeat task.wait() until game:IsLoaded()
 task.wait(2)
 
-print("🎯 FIXED DUPLICATION SYSTEM")
+print("🎯 CDT ANTI-VALIDATION BYPASS")
+print("=" .. string.rep("=", 50))
+print("\n🧠 TARGETING:")
+print("• Car ID validation")
+print("• Ownership verification")
+print("• Data integrity checks")
 print("=" .. string.rep("=", 50))
 
 -- ===== GET CAR DATA =====
@@ -24,291 +29,435 @@ local function getCars()
     return {}
 end
 
--- ===== FIND REMOTES IN ALL LOCATIONS =====
-local function findAllRemotes()
-    local remotes = {}
-    
-    -- Search in common locations
-    local searchLocations = {
-        ReplicatedStorage,
-        workspace,
-        game:GetService("ServerStorage"),
-        game:GetService("ServerScriptService")
-    }
-    
-    -- Also check inside folders
-    local function searchInFolder(folder)
-        for _, obj in pairs(folder:GetDescendants()) do
-            if obj:IsA("RemoteEvent") then
-                table.insert(remotes, {
-                    Object = obj,
-                    Name = obj.Name,
-                    Path = obj:GetFullName()
-                })
-            end
-        end
-    end
-    
-    -- Search all locations
-    for _, location in ipairs(searchLocations) do
-        if location then
-            searchInFolder(location)
-        end
-    end
-    
-    return remotes
-end
-
--- ===== TEST REMOTES WITH CAR =====
-local function testRemotes()
-    print("\n🔍 TESTING ALL REMOTES")
-    print("=" .. string.rep("=", 50))
+-- ===== EXPLOIT 1: RACE CONDITION =====
+local function exploitRaceCondition()
+    print("\n🏁 EXPLOIT 1: RACE CONDITION")
+    print("=" .. string.rep("=", 40))
     
     local cars = getCars()
-    if #cars == 0 then
-        print("❌ No cars found")
-        return nil
-    end
+    if #cars == 0 then return end
     
     local car = cars[1]
-    print("🚗 Using car: " .. (car.Name or "Unknown"))
-    print("🔑 ID: " .. (car.Id or "Unknown"))
+    print("🚗 Target car: " .. (car.Name or "Car"))
     
-    local allRemotes = findAllRemotes()
-    print("📡 Found " .. #allRemotes .. " RemoteEvents")
-    
-    local workingRemotes = {}
-    
-    -- Test only remotes with car-related names
-    for i, remoteInfo in ipairs(allRemotes) do
-        local remoteName = remoteInfo.Name:lower()
-        
-        -- Check if remote name suggests car functionality
-        if remoteName:find("car") or remoteName:find("vehicle") or
-           remoteName:find("purchase") or remoteName:find("buy") or
-           remoteName:find("get") or remoteName:find("claim") or
-           remoteName:find("duplicate") or remoteName:find("copy") or
-           remoteName:find("add") or remoteName:find("give") then
-            
-            print("\n🔧 Testing: " .. remoteInfo.Name)
-            
-            -- Try different formats
-            local formats = {
-                car,                    -- Full car table
-                car.Id,                 -- Just ID
-                car.Name,               -- Just name
-                {car},                  -- Array with car
-                {player, car},          -- With player
-                {car, 1},               -- Car + quantity
-                {Car = car}             -- Key-value
-            }
-            
-            for formatIndex, format in ipairs(formats) do
-                local success = pcall(function()
-                    remoteInfo.Object:FireServer(format)
-                    return true
-                end)
-                
-                if success then
-                    print("   ✅ Format " .. formatIndex .. " ACCEPTED!")
-                    
-                    -- Test rapid fire
-                    print("   ⚡ Testing rapid fire...")
-                    local sent = 0
-                    for j = 1, 5 do
-                        if pcall(function() remoteInfo.Object:FireServer(format) end) then
-                            sent = sent + 1
-                        end
-                        task.wait(0.1)
-                    end
-                    print("   🔥 Sent " .. sent .. " rapid requests")
-                    
-                    table.insert(workingRemotes, {
-                        Remote = remoteInfo.Object,
-                        Name = remoteInfo.Name,
-                        Format = format,
-                        FormatIndex = formatIndex
-                    })
-                    
-                    break  -- Move to next remote
-                end
-            end
-            
-            -- Don't test too many at once
-            if #workingRemotes >= 3 then
-                break
+    -- Find all remotes that might process cars
+    local processingRemotes = {}
+    for _, obj in pairs(game:GetDescendants()) do
+        if obj:IsA("RemoteEvent") then
+            local name = obj.Name:lower()
+            if name:find("process") or name:find("handle") or 
+               name:find("update") or name:find("save") then
+                table.insert(processingRemotes, obj)
             end
         end
     end
     
-    return workingRemotes
+    print("🎯 Found " .. #processingRemotes .. " processing remotes")
+    
+    -- Send same request to multiple remotes simultaneously
+    for i = 1, 3 do
+        print("\n💥 Race attempt " .. i .. "...")
+        
+        for _, remote in ipairs(processingRemotes) do
+            pcall(function()
+                remote:FireServer(car)
+            end)
+        end
+        
+        -- Minimal delay to create overlap
+        task.wait(0.001)
+    end
+    
+    print("✅ Race condition exploit attempted")
 end
 
--- ===== DIRECT TEST =====
-local function directTest()
-    print("\n🎯 DIRECT REMOTE TEST")
-    print("=" .. string.rep("=", 50))
+-- ===== EXPLOIT 2: STATE DESYNC =====
+local function exploitStateDesync()
+    print("\n🔄 EXPLOIT 2: STATE DESYNC")
+    print("=" .. string.rep("=", 40))
+    
+    local cars = getCars()
+    if #cars < 2 then
+        print("❌ Need at least 2 cars")
+        return
+    end
+    
+    print("🚗 Switching between " .. #cars .. " cars rapidly")
+    
+    -- Find ClaimGiveawayCar (or similar)
+    local claimRemote = nil
+    for _, obj in pairs(game:GetDescendants()) do
+        if obj:IsA("RemoteEvent") and obj.Name == "ClaimGiveawayCar" then
+            claimRemote = obj
+            break
+        end
+    end
+    
+    if not claimRemote then
+        print("❌ No claim remote found")
+        return
+    end
+    
+    -- Rapid switching to confuse server state
+    for attempt = 1, 5 do
+        print("\n🔄 Attempt " .. attempt .. "...")
+        
+        for i, car in ipairs(cars) do
+            if i <= 3 then  -- Only first 3 cars
+                pcall(function()
+                    claimRemote:FireServer(car)
+                end)
+                print("   Sent car " .. i .. ": " .. (car.Name or "Car " .. i))
+                task.wait(0.01)  -- Ultra-fast switching
+            end
+        end
+        
+        task.wait(0.5)  -- Brief pause
+    end
+    
+    print("✅ State desync attempted")
+end
+
+-- ===== EXPLOIT 3: TIMING ATTACK =====
+local function exploitTimingAttack()
+    print("\n⏰ EXPLOIT 3: TIMING ATTACK")
+    print("=" .. string.rep("=", 40))
     
     local cars = getCars()
     if #cars == 0 then return end
     
     local car = cars[1]
     
-    -- Test specific remote names directly
-    local testNames = {
-        "PurchaseCar",
-        "BuyCar",
-        "GetCar",
-        "ClaimCar",
-        "DuplicateCar",
-        "CopyCar"
-    }
-    
-    for _, remoteName in ipairs(testNames) do
-        print("\n🔍 Looking for: " .. remoteName)
-        
-        -- Search everywhere
-        local foundRemote = nil
-        for _, obj in pairs(game:GetDescendants()) do
-            if obj:IsA("RemoteEvent") and obj.Name == remoteName then
-                foundRemote = obj
-                break
-            end
-        end
-        
-        if foundRemote then
-            print("   ✅ Found remote!")
-            
-            -- Try the car
+    -- Find any remote that accepts car data
+    local targetRemote = nil
+    for _, obj in pairs(game:GetDescendants()) do
+        if obj:IsA("RemoteEvent") then
             local success = pcall(function()
-                foundRemote:FireServer(car)
+                obj:FireServer(car)
                 return true
             end)
             
             if success then
-                print("   ✅ Remote accepts car!")
-                
-                -- Send multiple requests
-                for i = 1, 10 do
-                    pcall(function() foundRemote:FireServer(car) end)
-                    print("   📤 Sent request " .. i)
-                    task.wait(0.1)
-                end
-                
-                return foundRemote  -- Return the working remote
-            else
-                print("   ❌ Remote rejected car")
+                targetRemote = obj
+                print("🎯 Found accepting remote: " .. obj.Name)
+                break
             end
-        else
-            print("   ❌ Remote not found")
         end
     end
     
-    return nil
+    if not targetRemote then
+        print("❌ No accepting remote found")
+        return
+    end
+    
+    print("🚗 Target: " .. targetRemote.Name)
+    
+    -- Timing attack: Send requests at server tick boundaries
+    local attempts = {
+        {count = 2, delay = 0.95},  -- Near 1 second boundary
+        {count = 3, delay = 1.95},  -- Near 2 second boundary
+        {count = 2, delay = 2.95},  -- Near 3 second boundary
+    }
+    
+    for i, attempt in ipairs(attempts) do
+        print("\n⏰ Timing attack " .. i .. "...")
+        print("   Sending " .. attempt.count .. " requests")
+        print("   Delay: " .. attempt.delay .. "s")
+        
+        task.wait(attempt.delay)
+        
+        for j = 1, attempt.count do
+            pcall(function()
+                targetRemote:FireServer(car)
+            end)
+            task.wait(0.05)  -- Small gap between requests
+        end
+    end
+    
+    print("✅ Timing attack attempted")
 end
 
--- ===== CREATE SIMPLE UI =====
+-- ===== EXPLOIT 4: DATA INTEGRITY BYPASS =====
+local function exploitDataIntegrity()
+    print("\n🔐 EXPLOIT 4: DATA INTEGRITY BYPASS")
+    print("=" .. string.rep("=", 40))
+    
+    local cars = getCars()
+    if #cars == 0 then return end
+    
+    local originalCar = cars[1]
+    
+    print("🔧 Creating modified car data...")
+    
+    -- Create modified versions of the car
+    local modifiedCars = {
+        -- Version 1: Slightly modified
+        function()
+            local modCar = {}
+            for k, v in pairs(originalCar) do
+                modCar[k] = v
+            end
+            modCar["_timestamp"] = os.time()
+            return modCar
+        end,
+        
+        -- Version 2: With extra metadata
+        function()
+            local modCar = {}
+            for k, v in pairs(originalCar) do
+                modCar[k] = v
+            end
+            modCar["PlayerId"] = player.UserId
+            modCar["SessionId"] = math.random(10000, 99999)
+            return modCar
+        end,
+        
+        -- Version 3: As table in table
+        function()
+            return {originalCar}
+        end,
+        
+        -- Version 4: With server-like wrapper
+        function()
+            return {
+                Data = originalCar,
+                Timestamp = os.time(),
+                Valid = true
+            }
+        end
+    }
+    
+    -- Find remotes that might accept modified data
+    for _, obj in pairs(game:GetDescendants()) do
+        if obj:IsA("RemoteEvent") then
+            local name = obj.Name:lower()
+            if name:find("save") or name:find("update") or 
+               name:find("sync") or name:find("data") then
+                
+                print("\n🎯 Testing: " .. obj.Name)
+                
+                for i, createCar in ipairs(modifiedCars) do
+                    local modCar = createCar()
+                    local success = pcall(function()
+                        obj:FireServer(modCar)
+                        return true
+                    end)
+                    
+                    if success then
+                        print("   ✅ Version " .. i .. " ACCEPTED!")
+                        
+                        -- Try rapid fire
+                        for j = 1, 3 do
+                            pcall(function() obj:FireServer(modCar) end)
+                            task.wait(0.1)
+                        end
+                        print("   🔥 Sent 3 requests")
+                    end
+                end
+            end
+        end
+    end
+    
+    print("✅ Data integrity bypass attempted")
+end
+
+-- ===== EXPLOIT 5: OWNERSHIP BYPASS =====
+local function exploitOwnership()
+    print("\n👑 EXPLOIT 5: OWNERSHIP BYPASS")
+    print("=" .. string.rep("=", 40))
+    
+    local cars = getCars()
+    if #cars == 0 then return end
+    
+    local car = cars[1]
+    
+    -- Try to add ownership data to request
+    local ownershipFormats = {
+        -- Format 1: Car with explicit ownership
+        {Car = car, Owner = player, OwnerId = player.UserId},
+        
+        -- Format 2: With verification fields
+        {Vehicle = car, Player = player, Verified = true},
+        
+        -- Format 3: Server-style format
+        {Data = car, UserId = player.UserId, Action = "claim"},
+        
+        -- Format 4: Transaction format
+        {car, player.UserId, os.time(), "duplicate"},
+        
+        -- Format 5: With session token simulation
+        {car, player.UserId, math.random(1000000, 9999999)}
+    }
+    
+    -- Find ClaimGiveawayCar or similar
+    local targetRemote = nil
+    for _, obj in pairs(game:GetDescendants()) do
+        if obj:IsA("RemoteEvent") and obj.Name == "ClaimGiveawayCar" then
+            targetRemote = obj
+            break
+        end
+    end
+    
+    if not targetRemote then
+        -- Try any remote that accepted before
+        for _, obj in pairs(game:GetDescendants()) do
+            if obj:IsA("RemoteEvent") and obj.Name == "setTarget" then
+                targetRemote = obj
+                break
+            end
+        end
+    end
+    
+    if not targetRemote then
+        print("❌ No target remote found")
+        return
+    end
+    
+    print("🎯 Target: " .. targetRemote.Name)
+    
+    -- Test each ownership format
+    for i, format in ipairs(ownershipFormats) do
+        print("\n🔧 Testing format " .. i .. "...")
+        
+        local success = pcall(function()
+            targetRemote:FireServer(format)
+            return true
+        end)
+        
+        if success then
+            print("   ✅ Format accepted!")
+            
+            -- Send multiple with this format
+            for j = 1, 5 do
+                pcall(function() targetRemote:FireServer(format) end)
+                task.wait(0.1)
+            end
+            print("   🔥 Sent 5 requests")
+        end
+    end
+    
+    print("✅ Ownership bypass attempted")
+end
+
+-- ===== RUN ALL EXPLOITS =====
+local function runAllExploits()
+    print("\n🚀 RUNNING ALL EXPLOITS")
+    print("=" .. string.rep("=", 50))
+    
+    -- Get cars first
+    local cars = getCars()
+    if #cars == 0 then
+        print("❌ No cars found")
+        return
+    end
+    
+    print("✅ Loaded " .. #cars .. " cars")
+    
+    -- Run each exploit with delays
+    exploitRaceCondition()
+    task.wait(2)
+    
+    exploitStateDesync()
+    task.wait(2)
+    
+    exploitTimingAttack()
+    task.wait(2)
+    
+    exploitDataIntegrity()
+    task.wait(2)
+    
+    exploitOwnership()
+    
+    print("\n✅ ALL EXPLOITS COMPLETE!")
+    print("💡 Check your garage NOW")
+    print("🔄 If nothing, wait 30s and try again")
+end
+
+-- ===== CREATE UI =====
 local function createUI()
     while not player:FindFirstChild("PlayerGui") do
         task.wait(0.1)
     end
     
     -- Remove old
-    local oldUI = player.PlayerGui:FindFirstChild("CarTool")
-    if oldUI then oldUI:Destroy() end
+    local old = player.PlayerGui:FindFirstChild("ExploitUI")
+    if old then old:Destroy() end
     
     -- Create UI
     local gui = Instance.new("ScreenGui")
-    gui.Name = "CarTool"
+    gui.Name = "ExploitUI"
     gui.Parent = player.PlayerGui
     
     local main = Instance.new("Frame")
-    main.Size = UDim2.new(0, 250, 0, 180)
-    main.Position = UDim2.new(0.5, -125, 0.5, -90)
-    main.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-    main.BorderSizePixel = 0
+    main.Size = UDim2.new(0, 300, 0, 250)
+    main.Position = UDim2.new(0.5, -150, 0.5, -125)
+    main.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
     main.Parent = gui
     
     local title = Instance.new("TextLabel")
-    title.Text = "🚗 Car Tool"
-    title.Size = UDim2.new(1, 0, 0, 30)
-    title.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
+    title.Text = "🎯 CDT EXPLOITS"
+    title.Size = UDim2.new(1, 0, 0, 40)
+    title.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
     title.TextColor3 = Color3.new(1, 1, 1)
     title.Font = Enum.Font.GothamBold
-    title.TextSize = 16
+    title.TextSize = 18
     title.Parent = main
     
     local status = Instance.new("TextLabel")
-    status.Text = "Ready"
-    status.Size = UDim2.new(1, -20, 0, 60)
-    status.Position = UDim2.new(0, 10, 0, 40)
-    status.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+    status.Text = "Anti-validation bypass system"
+    status.Size = UDim2.new(1, -20, 0, 80)
+    status.Position = UDim2.new(0, 10, 0, 50)
+    status.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
     status.TextColor3 = Color3.new(1, 1, 1)
     status.Font = Enum.Font.Gotham
     status.TextSize = 12
     status.TextWrapped = true
     status.Parent = main
     
-    local scanBtn = Instance.new("TextButton")
-    scanBtn.Text = "SCAN REMOTES"
-    scanBtn.Size = UDim2.new(1, -20, 0, 30)
-    scanBtn.Position = UDim2.new(0, 10, 0, 110)
-    scanBtn.BackgroundColor3 = Color3.fromRGB(70, 130, 180)
-    scanBtn.TextColor3 = Color3.new(1, 1, 1)
-    scanBtn.Font = Enum.Font.Gotham
-    scanBtn.TextSize = 12
-    scanBtn.Parent = main
+    -- Buttons
+    local buttons = {
+        {name = "Race Condition", func = exploitRaceCondition, color = Color3.fromRGB(200, 100, 0)},
+        {name = "State Desync", func = exploitStateDesync, color = Color3.fromRGB(100, 0, 200)},
+        {name = "Timing Attack", func = exploitTimingAttack, color = Color3.fromRGB(0, 100, 200)},
+        {name = "Data Bypass", func = exploitDataIntegrity, color = Color3.fromRGB(200, 0, 100)},
+        {name = "RUN ALL", func = runAllExploits, color = Color3.fromRGB(0, 150, 0)}
+    }
     
-    local dupeBtn = Instance.new("TextButton")
-    dupeBtn.Text = "START DUPE"
-    dupeBtn.Size = UDim2.new(1, -20, 0, 30)
-    dupeBtn.Position = UDim2.new(0, 10, 0, 145)
-    dupeBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
-    dupeBtn.TextColor3 = Color3.new(1, 1, 1)
-    dupeBtn.Font = Enum.Font.GothamBold
-    dupeBtn.TextSize = 13
-    dupeBtn.Parent = main
+    for i, btnInfo in ipairs(buttons) do
+        local btn = Instance.new("TextButton")
+        btn.Text = btnInfo.name
+        btn.Size = UDim2.new(0.45, 0, 0, 30)
+        btn.Position = UDim2.new((i % 2 == 1) and 0.05 or 0.5, 10, 0, 140 + math.floor((i-1)/2) * 35)
+        btn.BackgroundColor3 = btnInfo.color
+        btn.TextColor3 = Color3.new(1, 1, 1)
+        btn.Font = Enum.Font.Gotham
+        btn.TextSize = 11
+        btn.Parent = main
+        
+        btn.MouseButton1Click:Connect(function()
+            btn.Text = "RUNNING..."
+            status.Text = "Running " .. btnInfo.name .. "...\nCheck console"
+            
+            task.spawn(function()
+                btnInfo.func()
+                status.Text = btnInfo.name .. " complete!\nCheck garage"
+                btn.Text = btnInfo.name
+            end)
+        end)
+    end
     
     -- Close button
-    local closeBtn = Instance.new("TextButton")
-    closeBtn.Text = "X"
-    closeBtn.Size = UDim2.new(0, 25, 0, 25)
-    closeBtn.Position = UDim2.new(1, -30, 0, 2)
-    closeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-    closeBtn.TextColor3 = Color3.new(1, 1, 1)
-    closeBtn.Font = Enum.Font.Gotham
-    closeBtn.TextSize = 14
-    closeBtn.Parent = title
+    local close = Instance.new("TextButton")
+    close.Text = "X"
+    close.Size = UDim2.new(0, 30, 0, 30)
+    close.Position = UDim2.new(1, -35, 0, 5)
+    close.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    close.TextColor3 = Color3.new(1, 1, 1)
+    close.Font = Enum.Font.GothamBold
+    close.TextSize = 16
+    close.Parent = title
     
-    -- Round corners
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 6)
-    corner.Parent = main
-    
-    -- Button actions
-    scanBtn.MouseButton1Click:Connect(function()
-        scanBtn.Text = "SCANNING..."
-        status.Text = "Scanning for remotes..."
-        
-        task.spawn(function()
-            testRemotes()
-            status.Text = "Scan complete\nCheck console"
-            scanBtn.Text = "SCAN REMOTES"
-        end)
-    end)
-    
-    dupeBtn.MouseButton1Click:Connect(function()
-        dupeBtn.Text = "WORKING..."
-        status.Text = "Testing duplication..."
-        
-        task.spawn(function()
-            directTest()
-            status.Text = "Test complete\nCheck garage"
-            dupeBtn.Text = "START DUPE"
-        end)
-    end)
-    
-    closeBtn.MouseButton1Click:Connect(function()
+    close.MouseButton1Click:Connect(function()
         gui:Destroy()
     end)
     
@@ -316,9 +465,15 @@ local function createUI()
 end
 
 -- ===== MAIN =====
-print("\n🚀 Starting system...")
+print("\n🚀 Loading anti-validation system...")
 createUI()
 
 print("\n✅ SYSTEM READY!")
-print("\n💡 Click SCAN REMOTES to find all car remotes")
-print("💡 Click START DUPE to test duplication directly")
+print("\n💡 STRATEGY:")
+print("1. Race Condition - Multiple simultaneous requests")
+print("2. State Desync - Rapid car switching")
+print("3. Timing Attack - Server tick boundaries")
+print("4. Data Bypass - Modified car data")
+print("5. Ownership Bypass - Added ownership fields")
+
+print("\n🎯 Click RUN ALL for maximum effect!")
