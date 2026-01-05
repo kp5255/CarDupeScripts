@@ -1,5 +1,5 @@
--- 🎨 ADVANCED CAR CUSTOMIZATION VIEWER
--- Shows ALL customizations for each car, including missing ones
+-- 🎨 FIXED ADVANCED CAR CUSTOMIZATION VIEWER
+-- Fixed parenting hierarchy error
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
@@ -113,7 +113,7 @@ local function getCarCustomizationsDetailed(car)
                     Value = value,
                     Type = valueType,
                     Exists = true,
-                    IsUnknown = true  -- Not in our predefined list
+                    IsUnknown = true
                 }
             end
         end
@@ -184,7 +184,7 @@ local function displayCarSummary(car, index)
     return customizations, totalFound
 end
 
--- ===== CREATE ADVANCED UI =====
+-- ===== CREATE ADVANCED UI (FIXED) =====
 local function createAdvancedUI()
     local playerGui = player:WaitForChild("PlayerGui")
     local oldUI = playerGui:FindFirstChild("AdvancedCustomizationViewer")
@@ -232,7 +232,7 @@ local function createAdvancedUI()
     carNameLabel.Font = Enum.Font.GothamBold
     carNameLabel.TextSize = 16
     carNameLabel.TextXAlignment = Enum.TextXAlignment.Left
-    carInfoFrame.Parent = carInfoFrame
+    carNameLabel.Parent = carInfoFrame
     
     local carStatsLabel = Instance.new("TextLabel")
     carStatsLabel.Name = "CarStats"
@@ -245,7 +245,7 @@ local function createAdvancedUI()
     carStatsLabel.TextSize = 12
     carStatsLabel.TextXAlignment = Enum.TextXAlignment.Left
     carStatsLabel.TextWrapped = true
-    carInfoFrame.Parent = carStatsLabel
+    carStatsLabel.Parent = carInfoFrame
     
     -- Filter Buttons
     local filterFrame = Instance.new("Frame")
@@ -272,7 +272,7 @@ local function createAdvancedUI()
         btn.Font = Enum.Font.Gotham
         btn.TextSize = 12
         btn.Name = "Filter" .. filter.Name
-        filterFrame.Parent = btn
+        btn.Parent = filterFrame
         
         buttonX = buttonX + 0.23
     end
@@ -401,7 +401,7 @@ local function createAdvancedUI()
                 typeLabel.Font = Enum.Font.Gotham
                 typeLabel.TextSize = 12
                 typeLabel.TextXAlignment = Enum.TextXAlignment.Left
-                itemFrame.Parent = typeLabel
+                typeLabel.Parent = itemFrame
                 
                 local valueLabel = Instance.new("TextLabel")
                 valueLabel.Text = tostring(data.Value)
@@ -416,7 +416,7 @@ local function createAdvancedUI()
                 valueLabel.Font = Enum.Font.Gotham
                 valueLabel.TextSize = 11
                 valueLabel.TextXAlignment = Enum.TextXAlignment.Right
-                itemFrame.Parent = valueLabel
+                valueLabel.Parent = itemFrame
                 
                 roundCorners(itemFrame)
             end
@@ -558,18 +558,107 @@ local function createAdvancedUI()
     return gui
 end
 
--- ===== MAIN =====
-print("\n🔍 Analyzing ALL your cars...")
-task.wait(1)
+-- ===== SIMPLE VERSION - JUST CONSOLE OUTPUT =====
+local function simpleConsoleViewer()
+    print("\n🔍 Analyzing ALL your cars...")
+    
+    local cars = getCars()
+    if #cars == 0 then
+        print("❌ No cars found")
+        return
+    end
+    
+    print("\n📊 CAR CUSTOMIZATION SUMMARY:")
+    print("=" .. string.rep("=", 60))
+    
+    for i, car in ipairs(cars) do
+        local carName = car.Name or "Car " .. i
+        local carId = car.Id and string.sub(tostring(car.Id), 1, 8) .. "..." or "N/A"
+        
+        print("\n🚗 [" .. i .. "] " .. carName)
+        print("   ID: " .. carId)
+        
+        if car.Data and type(car.Data) == "table" then
+            -- Check for specific customizations
+            local hasBodykit = false
+            local hasWrap = false
+            local hasSpoiler = false
+            local customCount = 0
+            
+            for key, data in pairs(car.Data) do
+                customCount = customCount + 1
+                local keyLower = key:lower()
+                
+                if keyLower:find("bodykit") or keyLower:find("kit") then
+                    hasBodykit = true
+                end
+                if keyLower:find("wrap") or keyLower:find("paint") then
+                    hasWrap = true
+                end
+                if keyLower:find("spoiler") or keyLower:find("wing") then
+                    hasSpoiler = true
+                end
+            end
+            
+            print("   📊 Customizations: " .. customCount)
+            
+            local features = {}
+            if hasBodykit then table.insert(features, "Bodykit") end
+            if hasWrap then table.insert(features, "Wrap") end
+            if hasSpoiler then table.insert(features, "Spoiler") end
+            
+            if #features > 0 then
+                print("   ✅ Has: " .. table.concat(features, ", "))
+            end
+            
+            -- Show a few key customizations
+            local shown = 0
+            for key, data in pairs(car.Data) do
+                if shown < 5 then
+                    local value
+                    if type(data) == "table" then
+                        value = data.Current or data.Value or data.Level or "[Table]"
+                    else
+                        value = data
+                    end
+                    print("   • " .. key .. " = " .. tostring(value))
+                    shown = shown + 1
+                end
+            end
+            if customCount > 5 then
+                print("   ... and " .. (customCount - 5) .. " more")
+            end
+        else
+            print("   ❌ No customization data found")
+        end
+    end
+    
+    print("\n" .. string.rep("=", 60))
+    print("📈 STATS:")
+    print("• Total cars: " .. #cars)
+    print("• Cars with bodykits: [Check above]")
+    print("• Cars with wraps: [Check above]")
+    print("• Cars with spoilers: [Check above]")
+    print("\n💡 Use this to see which cars have what customizations!")
+end
 
--- Create the advanced UI
-createAdvancedUI()
+-- ===== MAIN =====
+-- Try to create UI, if it fails, use console version
+local success, err = pcall(function()
+    createAdvancedUI()
+    print("\n✅ ADVANCED UI CREATED!")
+end)
+
+if not success then
+    print("\n⚠️ UI creation failed, using console version...")
+    print("Error: " .. tostring(err))
+    simpleConsoleViewer()
+end
 
 print("\n" .. string.rep("=", 60))
-print("✅ ADVANCED VIEWER READY!")
-print("\n📱 FEATURES:")
-print("• Shows ALL customizations for each car")
-print("• Clearly marks ❌ missing customizations")
-print("• Filters: All / Has / Missing / Visual")
-print("• Summary shows which cars have bodykits/wraps")
-print("\n📊 Check console for complete car-by-car analysis!")
+print("✅ SYSTEM READY!")
+print("\n🎯 This shows you exactly which cars have:")
+print("   • Bodykits (some cars have them, some don't)")
+print("   • Wraps/Paint (some have custom, some don't)")
+print("   • Spoilers (some have them, some don't)")
+print("   • All other customizations")
