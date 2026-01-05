@@ -1,16 +1,16 @@
--- 🎨 COMPLETE CAR CUSTOMIZATION VIEWER & PREVIEW SYSTEM
--- Shows ALL your owned customizations and lets you preview them
+-- 🎨 ADVANCED CAR CUSTOMIZATION VIEWER
+-- Shows ALL customizations for each car, including missing ones
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local player = Players.LocalPlayer
 
-print("🎨 CAR CUSTOMIZATION VIEWER")
+print("🎨 ADVANCED CAR CUSTOMIZATION VIEWER")
 print("=" .. string.rep("=", 60))
 
--- ===== GET ALL CARS WITH CUSTOMIZATIONS =====
+-- ===== GET ALL CARS =====
 local carService = ReplicatedStorage.Remotes.Services.CarServiceRemotes
-local function getCarsWithCustomizations()
+local function getCars()
     local success, cars = pcall(function()
         return carService.GetOwnedCars:InvokeServer()
     end)
@@ -22,176 +22,283 @@ local function getCarsWithCustomizations()
     return {}
 end
 
--- ===== GET CAR'S CUSTOMIZATION DATA =====
-local function getCarCustomizations(car)
-    if not car or not car.Data then return {} end
+-- ===== ALL POSSIBLE CUSTOMIZATION TYPES =====
+local ALL_CUSTOMIZATION_TYPES = {
+    "Rims", "Wheels", "RimColor",
+    "Engine", "Turbo", "Transmission",
+    "Brakes", "BrakeColor",
+    "Drivetrain", "Suspension", "Springs",
+    "Bodykit", "BodyKit", "Kit",
+    "Spoiler", "Wing",
+    "Wrap", "Paint", "Color", "PrimaryColor", "SecondaryColor",
+    "Underglow", "UnderglowColor", "Neon",
+    "TireSmoke", "TireSmokeColor", "TireSmokeTexture",
+    "Interior", "InteriorColor", "InteriorColor2",
+    "WindowTint", "Windows",
+    "Horn", "Exhaust",
+    "CamberHeightFront", "CamberHeightRear",
+    "CamberAngleFront", "CamberAngleRear",
+    "CamberOffsetRear",
+    "Reflectance", "Material",
+    "Headlights", "Taillights",
+    "LicensePlate", "Plate",
+    "Sticker", "Decal",
+    "Battery", "NOS", "Nitrous"
+}
+
+-- ===== GET CAR CUSTOMIZATION WITH DETAILS =====
+local function getCarCustomizationsDetailed(car)
+    if not car or type(car) ~= "table" then
+        return {}, "Invalid car data"
+    end
     
     local customizations = {}
+    local hasCustomizations = false
+    local carName = car.Name or "Unknown"
     
-    -- Extract all customization categories from car.Data
-    for category, data in pairs(car.Data) do
-        if type(data) == "table" then
-            -- Get the actual value (usually in a field like 'Current', 'Value', or 'Level')
-            local value = data.Current or data.Value or data.Level or data.Selected or data
+    -- Check if car has Data table
+    if car.Data and type(car.Data) == "table" then
+        hasCustomizations = true
+        
+        -- Check for each possible customization type
+        for _, custType in ipairs(ALL_CUSTOMIZATION_TYPES) do
+            local data = car.Data[custType]
             
-            customizations[category] = {
-                Value = value,
-                RawData = data,
-                Category = category
+            if data ~= nil then
+                -- Extract value safely
+                local value, valueType, rawData
+                
+                if type(data) == "table" then
+                    rawData = data
+                    -- Try different value fields
+                    value = data.Current or data.Value or data.Level or 
+                            data.Selected or data.Name or data.Id or 
+                            data.Color or "[Table]"
+                    valueType = "table"
+                else
+                    value = data
+                    valueType = type(data)
+                end
+                
+                customizations[custType] = {
+                    Value = value,
+                    Type = valueType,
+                    RawData = rawData,
+                    Exists = true
+                }
+            else
+                -- Mark as not existing for this car
+                customizations[custType] = {
+                    Value = "❌ NOT FOUND",
+                    Type = "missing",
+                    Exists = false
+                }
+            end
+        end
+        
+        -- Also check for any other customizations not in our list
+        for key, data in pairs(car.Data) do
+            if not customizations[key] then
+                local value, valueType
+                
+                if type(data) == "table" then
+                    value = data.Current or data.Value or data.Level or "[Table]"
+                    valueType = "table"
+                else
+                    value = data
+                    valueType = type(data)
+                end
+                
+                customizations[key] = {
+                    Value = value,
+                    Type = valueType,
+                    Exists = true,
+                    IsUnknown = true  -- Not in our predefined list
+                }
+            end
+        end
+    else
+        -- Car has no Data table at all
+        for _, custType in ipairs(ALL_CUSTOMIZATION_TYPES) do
+            customizations[custType] = {
+                Value = "❌ NO DATA TABLE",
+                Type = "missing",
+                Exists = false
             }
         end
     end
     
-    return customizations
+    return customizations, hasCustomizations and "Has customizations" or "No customizations found"
 end
 
--- ===== GET ALL AVAILABLE UPGRADES FROM DATABASE =====
-local function getAllAvailableUpgrades()
-    local upgrades = {}
+-- ===== DISPLAY CAR SUMMARY =====
+local function displayCarSummary(car, index)
+    local carName = car.Name or "Car " .. index
+    local carId = car.Id and string.sub(tostring(car.Id), 1, 8) .. "..." or "N/A"
     
-    -- Search for upgrade databases
-    local dataFolder = ReplicatedStorage:FindFirstChild("Data")
-    if not dataFolder then return upgrades end
+    print("\n🚗 [" .. index .. "] " .. carName)
+    print("   ID: " .. carId)
     
-    -- Find all upgrade categories
-    for _, category in ipairs(dataFolder:GetChildren()) do
-        if category:IsA("Folder") then
-            upgrades[category.Name] = {}
+    local customizations, status = getCarCustomizationsDetailed(car)
+    
+    -- Count customizations
+    local totalFound = 0
+    local hasBodykit = false
+    local hasWrap = false
+    local hasSpoiler = false
+    local hasUnderglow = false
+    
+    for custType, data in pairs(customizations) do
+        if data.Exists and data.Value ~= "❌ NOT FOUND" and data.Value ~= "❌ NO DATA TABLE" then
+            totalFound = totalFound + 1
             
-            -- Get all upgrades in this category
-            for _, upgrade in ipairs(category:GetChildren()) do
-                if upgrade:IsA("ModuleScript") then
-                    table.insert(upgrades[category.Name], upgrade.Name)
-                end
+            -- Check for specific customizations
+            local lowerType = custType:lower()
+            if lowerType:find("bodykit") or lowerType:find("kit") then
+                hasBodykit = true
+            elseif lowerType:find("wrap") or lowerType:find("paint") or lowerType:find("color") then
+                hasWrap = true
+            elseif lowerType:find("spoiler") or lowerType:find("wing") then
+                hasSpoiler = true
+            elseif lowerType:find("underglow") or lowerType:find("neon") then
+                hasUnderglow = true
             end
         end
     end
     
-    return upgrades
-end
-
--- ===== DISPLAY CAR CUSTOMIZATIONS =====
-local function displayCarCustomizations(carIndex)
-    local cars = getCarsWithCustomizations()
-    if #cars == 0 then return end
+    print("   📊 Customizations: " .. totalFound)
     
-    local carIndex = carIndex or 1
-    local car = cars[carIndex]
+    -- Show what this car has
+    local features = {}
+    if hasBodykit then table.insert(features, "🚗 Bodykit") end
+    if hasWrap then table.insert(features, "🎨 Wrap/Paint") end
+    if hasSpoiler then table.insert(features, "✈️ Spoiler") end
+    if hasUnderglow then table.insert(features, "💡 Underglow") end
     
-    if not car then return end
-    
-    print("\n🚗 CAR: " .. (car.Name or "Unknown"))
-    print("📋 ID: " .. (car.Id or "N/A"))
-    print(string.rep("-", 60))
-    
-    -- Get current customizations
-    local customizations = getCarCustomizations(car)
-    
-    if next(customizations) == nil then
-        print("❌ No customizations found for this car")
-        return
+    if #features > 0 then
+        print("   ✅ Has: " .. table.concat(features, ", "))
+    else
+        print("   ⚠️ No major customizations found")
     end
     
-    -- Display all customizations
-    print("🎨 CURRENT CUSTOMIZATIONS:")
-    for category, data in pairs(customizations) do
-        local valueStr = tostring(data.Value)
-        if type(data.Value) == "table" then
-            valueStr = "[TABLE]"
-            for k, v in pairs(data.Value) do
-                valueStr = valueStr .. "\n      " .. k .. " = " .. tostring(v)
-            end
-        end
-        
-        print(string.format("  %-20s = %s", category, valueStr))
-    end
-    
-    return car, customizations
+    return customizations, totalFound
 end
 
--- ===== CREATE CUSTOMIZATION PREVIEW UI =====
-local function createCustomizationUI()
-    -- Remove old UI
+-- ===== CREATE ADVANCED UI =====
+local function createAdvancedUI()
     local playerGui = player:WaitForChild("PlayerGui")
-    local oldUI = playerGui:FindFirstChild("CustomizationViewer")
+    local oldUI = playerGui:FindFirstChild("AdvancedCustomizationViewer")
     if oldUI then oldUI:Destroy() end
     
     -- Create UI
     local gui = Instance.new("ScreenGui")
-    gui.Name = "CustomizationViewer"
+    gui.Name = "AdvancedCustomizationViewer"
     gui.Parent = playerGui
     gui.ResetOnSpawn = false
     
     -- Main Frame
     local main = Instance.new("Frame")
-    main.Size = UDim2.new(0, 450, 0, 500)
-    main.Position = UDim2.new(0.5, -225, 0.5, -250)
-    main.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+    main.Size = UDim2.new(0, 500, 0, 550)
+    main.Position = UDim2.new(0.5, -250, 0.5, -275)
+    main.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
     main.BorderSizePixel = 0
     main.Parent = gui
     
     -- Title
     local title = Instance.new("TextLabel")
-    title.Text = "🎨 CAR CUSTOMIZATION VIEWER"
+    title.Text = "🚗 ADVANCED CUSTOMIZATION VIEWER"
     title.Size = UDim2.new(1, 0, 0, 50)
     title.Position = UDim2.new(0, 0, 0, 0)
-    title.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
+    title.BackgroundColor3 = Color3.fromRGB(0, 80, 160)
     title.TextColor3 = Color3.new(1, 1, 1)
     title.Font = Enum.Font.GothamBold
     title.TextSize = 18
     title.Parent = main
     
-    -- Car Selector
-    local carSelector = Instance.new("Frame")
-    carSelector.Size = UDim2.new(1, -20, 0, 40)
-    carSelector.Position = UDim2.new(0, 10, 0, 60)
-    carSelector.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-    carSelector.Parent = main
+    -- Car Info Display
+    local carInfoFrame = Instance.new("Frame")
+    carInfoFrame.Size = UDim2.new(1, -20, 0, 80)
+    carInfoFrame.Position = UDim2.new(0, 10, 0, 60)
+    carInfoFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
+    carInfoFrame.Parent = main
     
-    local carLabel = Instance.new("TextLabel")
-    carLabel.Text = "Select Car:"
-    carLabel.Size = UDim2.new(0, 80, 1, 0)
-    carLabel.Position = UDim2.new(0, 10, 0, 0)
-    carLabel.BackgroundTransparency = 1
-    carLabel.TextColor3 = Color3.new(1, 1, 1)
-    carLabel.Font = Enum.Font.Gotham
-    carLabel.TextSize = 14
-    carLabel.TextXAlignment = Enum.TextXAlignment.Left
-    carLabel.Parent = carSelector
+    local carNameLabel = Instance.new("TextLabel")
+    carNameLabel.Name = "CarName"
+    carNameLabel.Text = "Select a car"
+    carNameLabel.Size = UDim2.new(1, -20, 0, 25)
+    carNameLabel.Position = UDim2.new(0, 10, 0, 10)
+    carNameLabel.BackgroundTransparency = 1
+    carNameLabel.TextColor3 = Color3.new(1, 1, 1)
+    carNameLabel.Font = Enum.Font.GothamBold
+    carNameLabel.TextSize = 16
+    carNameLabel.TextXAlignment = Enum.TextXAlignment.Left
+    carInfoFrame.Parent = carInfoFrame
     
-    local carDropdown = Instance.new("TextButton")
-    carDropdown.Name = "CarDropdown"
-    carDropdown.Text = "Loading cars..."
-    carDropdown.Size = UDim2.new(0, 300, 0.8, 0)
-    carDropdown.Position = UDim2.new(0, 100, 0.1, 0)
-    carDropdown.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-    carDropdown.TextColor3 = Color3.new(1, 1, 1)
-    carDropdown.Font = Enum.Font.Gotham
-    carDropdown.TextSize = 14
-    carDropdown.Parent = carSelector
+    local carStatsLabel = Instance.new("TextLabel")
+    carStatsLabel.Name = "CarStats"
+    carStatsLabel.Text = "Customizations: --"
+    carStatsLabel.Size = UDim2.new(1, -20, 0, 40)
+    carStatsLabel.Position = UDim2.new(0, 10, 0, 35)
+    carStatsLabel.BackgroundTransparency = 1
+    carStatsLabel.TextColor3 = Color3.fromRGB(200, 200, 255)
+    carStatsLabel.Font = Enum.Font.Gotham
+    carStatsLabel.TextSize = 12
+    carStatsLabel.TextXAlignment = Enum.TextXAlignment.Left
+    carStatsLabel.TextWrapped = true
+    carInfoFrame.Parent = carStatsLabel
+    
+    -- Filter Buttons
+    local filterFrame = Instance.new("Frame")
+    filterFrame.Size = UDim2.new(1, -20, 0, 40)
+    filterFrame.Position = UDim2.new(0, 10, 0, 150)
+    filterFrame.BackgroundTransparency = 1
+    filterFrame.Parent = main
+    
+    local filterButtons = {
+        {Name = "All", Color = Color3.fromRGB(100, 100, 150)},
+        {Name = "✅ Has", Color = Color3.fromRGB(0, 150, 0)},
+        {Name = "❌ Missing", Color = Color3.fromRGB(150, 0, 0)},
+        {Name = "🎨 Visual", Color = Color3.fromRGB(200, 100, 0)}
+    }
+    
+    local buttonX = 0
+    for i, filter in ipairs(filterButtons) do
+        local btn = Instance.new("TextButton")
+        btn.Text = filter.Name
+        btn.Size = UDim2.new(0.22, -5, 1, 0)
+        btn.Position = UDim2.new(buttonX, 0, 0, 0)
+        btn.BackgroundColor3 = filter.Color
+        btn.TextColor3 = Color3.new(1, 1, 1)
+        btn.Font = Enum.Font.Gotham
+        btn.TextSize = 12
+        btn.Name = "Filter" .. filter.Name
+        filterFrame.Parent = btn
+        
+        buttonX = buttonX + 0.23
+    end
     
     -- Customization List
     local listFrame = Instance.new("ScrollingFrame")
     listFrame.Name = "CustomizationList"
-    listFrame.Size = UDim2.new(1, -20, 0, 350)
-    listFrame.Position = UDim2.new(0, 10, 0, 110)
-    listFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+    listFrame.Size = UDim2.new(1, -20, 0, 320)
+    listFrame.Position = UDim2.new(0, 10, 0, 200)
+    listFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 40)
     listFrame.BorderSizePixel = 0
     listFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-    listFrame.ScrollBarThickness = 6
+    listFrame.ScrollBarThickness = 8
     listFrame.Parent = main
     
     local listLayout = Instance.new("UIListLayout")
-    listLayout.Padding = UDim.new(0, 5)
+    listLayout.Padding = UDim.new(0, 3)
     listLayout.Parent = listFrame
     
     -- Status
     local status = Instance.new("TextLabel")
     status.Name = "Status"
-    status.Text = "Select a car to view its customizations"
+    status.Text = "Select a car from the console first"
     status.Size = UDim2.new(1, -20, 0, 30)
-    status.Position = UDim2.new(0, 10, 0, 470)
-    status.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+    status.Position = UDim2.new(0, 10, 0, 530)
+    status.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
     status.TextColor3 = Color3.new(1, 1, 1)
     status.Font = Enum.Font.Gotham
     status.TextSize = 12
@@ -209,7 +316,7 @@ local function createCustomizationUI()
     closeBtn.TextSize = 16
     closeBtn.Parent = title
     
-    -- Round corners function
+    -- Round corners
     local function roundCorners(obj)
         local corner = Instance.new("UICorner")
         corner.CornerRadius = UDim.new(0, 6)
@@ -218,143 +325,203 @@ local function createCustomizationUI()
     
     roundCorners(main)
     roundCorners(title)
-    roundCorners(carSelector)
+    roundCorners(carInfoFrame)
     roundCorners(listFrame)
-    roundCorners(carDropdown)
     roundCorners(status)
-    roundCorners(closeBtn)
     
-    -- Load cars for dropdown
-    local function loadCarsIntoUI()
-        local cars = getCarsWithCustomizations()
-        if #cars == 0 then
-            carDropdown.Text = "No cars found"
-            return {}
+    for _, child in ipairs(filterFrame:GetChildren()) do
+        if child:IsA("TextButton") then
+            roundCorners(child)
         end
-        
-        -- Create dropdown menu
-        local dropdownMenu = Instance.new("Frame")
-        dropdownMenu.Name = "DropdownMenu"
-        dropdownMenu.Size = UDim2.new(1, 0, 0, math.min(#cars * 30, 150))
-        dropdownMenu.Position = UDim2.new(0, 0, 1, 5)
-        dropdownMenu.BackgroundColor3 = Color3.fromRGB(50, 50, 65)
-        dropdownMenu.Visible = false
-        dropdownMenu.Parent = carDropdown
-        
-        local dropdownLayout = Instance.new("UIListLayout")
-        dropdownLayout.Parent = dropdownMenu
-        
-        -- Add car options
-        for i, car in ipairs(cars) do
-            local carBtn = Instance.new("TextButton")
-            carBtn.Text = (car.Name or "Car " .. i) .. " (ID: " .. string.sub(tostring(car.Id or i), 1, 8) .. "...)"
-            carBtn.Size = UDim2.new(1, 0, 0, 30)
-            carBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-            carBtn.TextColor3 = Color3.new(1, 1, 1)
-            carBtn.Font = Enum.Font.Gotham
-            carBtn.TextSize = 12
-            carBtn.Parent = dropdownMenu
-            
-            carBtn.MouseButton1Click:Connect(function()
-                carDropdown.Text = car.Name or "Car " .. i
-                dropdownMenu.Visible = false
-                displayCarInUI(car, i)
-            end)
-            
-            roundCorners(carBtn)
-        end
-        
-        -- Set first car as default
-        carDropdown.Text = cars[1].Name or "Car 1"
-        displayCarInUI(cars[1], 1)
-        
-        return cars
     end
     
-    -- Display car customizations in UI
-    local function displayCarInUI(car, index)
-        status.Text = "Loading customizations for " .. (car.Name or "car") .. "..."
-        
-        -- Clear previous list
+    -- Data storage
+    local currentCarIndex = 1
+    local currentCarData = nil
+    local currentCustomizations = {}
+    local allCars = {}
+    
+    -- Display customizations in list
+    local function displayCustomizations(filterType)
+        -- Clear list
         for _, child in ipairs(listFrame:GetChildren()) do
             if child:IsA("Frame") then
                 child:Destroy()
             end
         end
         
-        -- Get customizations
-        local customizations = getCarCustomizations(car)
-        
-        if next(customizations) == nil then
+        if not currentCustomizations or next(currentCustomizations) == nil then
             local noData = Instance.new("TextLabel")
-            noData.Text = "No customizations found for this car"
+            noData.Text = "No customizations to display"
             noData.Size = UDim2.new(1, 0, 0, 30)
             noData.BackgroundTransparency = 1
             noData.TextColor3 = Color3.new(1, 1, 1)
             noData.Font = Enum.Font.Gotham
             noData.TextSize = 14
             noData.Parent = listFrame
-            status.Text = "❌ No customizations found"
             return
         end
         
-        -- Display each customization
         local itemCount = 0
-        for category, data in pairs(customizations) do
-            itemCount = itemCount + 1
+        
+        for custType, data in pairs(currentCustomizations) do
+            -- Apply filter
+            local showItem = true
             
-            local itemFrame = Instance.new("Frame")
-            itemFrame.Size = UDim2.new(1, 0, 0, 40)
-            itemFrame.BackgroundColor3 = Color3.fromRGB(45, 45, 60)
-            itemFrame.Parent = listFrame
+            if filterType == "Has" then
+                showItem = data.Exists and data.Value ~= "❌ NOT FOUND" and data.Value ~= "❌ NO DATA TABLE"
+            elseif filterType == "Missing" then
+                showItem = not data.Exists or data.Value == "❌ NOT FOUND" or data.Value == "❌ NO DATA TABLE"
+            elseif filterType == "Visual" then
+                local lowerType = custType:lower()
+                showItem = lowerType:find("color") or lowerType:find("paint") or 
+                          lowerType:find("wrap") or lowerType:find("kit") or 
+                          lowerType:find("spoiler") or lowerType:find("underglow") or
+                          lowerType:find("rim") or lowerType:find("wheel")
+            end
             
-            local categoryLabel = Instance.new("TextLabel")
-            categoryLabel.Text = category
-            categoryLabel.Size = UDim2.new(0.4, -10, 1, 0)
-            categoryLabel.Position = UDim2.new(0, 10, 0, 0)
-            categoryLabel.BackgroundTransparency = 1
-            categoryLabel.TextColor3 = Color3.new(1, 1, 1)
-            categoryLabel.Font = Enum.Font.GothamBold
-            categoryLabel.TextSize = 14
-            categoryLabel.TextXAlignment = Enum.TextXAlignment.Left
-            categoryLabel.Parent = itemFrame
-            
-            local valueLabel = Instance.new("TextLabel")
-            valueLabel.Text = tostring(data.Value)
-            valueLabel.Size = UDim2.new(0.6, -10, 1, 0)
-            valueLabel.Position = UDim2.new(0.4, 0, 0, 0)
-            valueLabel.BackgroundTransparency = 1
-            valueLabel.TextColor3 = Color3.fromRGB(200, 200, 255)
-            valueLabel.Font = Enum.Font.Gotham
-            valueLabel.TextSize = 13
-            valueLabel.TextXAlignment = Enum.TextXAlignment.Right
-            valueLabel.Parent = itemFrame
-            
-            roundCorners(itemFrame)
+            if showItem then
+                itemCount = itemCount + 1
+                
+                local itemFrame = Instance.new("Frame")
+                itemFrame.Size = UDim2.new(1, 0, 0, 30)
+                itemFrame.BackgroundColor3 = data.Exists and 
+                    (data.Value == "❌ NOT FOUND" and Color3.fromRGB(60, 30, 30) or 
+                     data.Value == "❌ NO DATA TABLE" and Color3.fromRGB(60, 30, 30) or 
+                     Color3.fromRGB(40, 40, 60)) or 
+                    Color3.fromRGB(50, 30, 30)
+                itemFrame.Parent = listFrame
+                
+                local typeLabel = Instance.new("TextLabel")
+                typeLabel.Text = custType
+                typeLabel.Size = UDim2.new(0.5, -10, 1, 0)
+                typeLabel.Position = UDim2.new(0, 10, 0, 0)
+                typeLabel.BackgroundTransparency = 1
+                typeLabel.TextColor3 = data.Exists and Color3.new(1, 1, 1) or Color3.fromRGB(200, 150, 150)
+                typeLabel.Font = Enum.Font.Gotham
+                typeLabel.TextSize = 12
+                typeLabel.TextXAlignment = Enum.TextXAlignment.Left
+                itemFrame.Parent = typeLabel
+                
+                local valueLabel = Instance.new("TextLabel")
+                valueLabel.Text = tostring(data.Value)
+                valueLabel.Size = UDim2.new(0.5, -10, 1, 0)
+                valueLabel.Position = UDim2.new(0.5, 0, 0, 0)
+                valueLabel.BackgroundTransparency = 1
+                valueLabel.TextColor3 = data.Exists and 
+                    (data.Value == "❌ NOT FOUND" and Color3.fromRGB(255, 100, 100) or 
+                     data.Value == "❌ NO DATA TABLE" and Color3.fromRGB(255, 100, 100) or 
+                     Color3.fromRGB(150, 200, 255)) or 
+                    Color3.fromRGB(255, 150, 150)
+                valueLabel.Font = Enum.Font.Gotham
+                valueLabel.TextSize = 11
+                valueLabel.TextXAlignment = Enum.TextXAlignment.Right
+                itemFrame.Parent = valueLabel
+                
+                roundCorners(itemFrame)
+            end
         end
         
         -- Update canvas size
-        listFrame.CanvasSize = UDim2.new(0, 0, 0, itemCount * 45)
+        listFrame.CanvasSize = UDim2.new(0, 0, 0, math.max(itemCount * 33, 100))
         
-        status.Text = "✅ Loaded " .. itemCount .. " customizations for " .. (car.Name or "car")
+        status.Text = "Showing " .. itemCount .. " customizations" .. 
+                     (filterType ~= "All" and " (Filter: " .. filterType .. ")" or "")
     end
     
-    -- Toggle dropdown
-    carDropdown.MouseButton1Click:Connect(function()
-        local dropdown = carDropdown:FindFirstChild("DropdownMenu")
-        if dropdown then
-            dropdown.Visible = not dropdown.Visible
+    -- Load a specific car
+    local function loadCarIntoUI(car, index)
+        if not car then return end
+        
+        currentCarIndex = index
+        currentCarData = car
+        
+        local carName = car.Name or "Car " .. index
+        local shortId = car.Id and string.sub(tostring(car.Id), 1, 8) .. "..." or "N/A"
+        
+        -- Update car info
+        carNameLabel.Text = "🚗 " .. carName
+        carStatsLabel.Text = "ID: " .. shortId .. "\nLoading customizations..."
+        
+        -- Get customizations
+        currentCustomizations = getCarCustomizationsDetailed(car)
+        
+        -- Count stats
+        local totalFound = 0
+        local hasBodykit = false
+        local hasWrap = false
+        
+        for _, data in pairs(currentCustomizations) do
+            if data.Exists and data.Value ~= "❌ NOT FOUND" and data.Value ~= "❌ NO DATA TABLE" then
+                totalFound = totalFound + 1
+                
+                local lowerType = data.Category and data.Category:lower() or ""
+                if lowerType:find("bodykit") or lowerType:find("kit") then
+                    hasBodykit = true
+                elseif lowerType:find("wrap") or lowerType:find("paint") then
+                    hasWrap = true
+                end
+            end
         end
-    end)
+        
+        -- Update stats
+        local features = {}
+        if hasBodykit then table.insert(features, "Bodykit") end
+        if hasWrap then table.insert(features, "Wrap") end
+        
+        carStatsLabel.Text = "Customizations: " .. totalFound
+        if #features > 0 then
+            carStatsLabel.Text = carStatsLabel.Text .. "\nHas: " .. table.concat(features, ", ")
+        end
+        
+        -- Display all customizations
+        displayCustomizations("All")
+        
+        status.Text = "✅ Loaded " .. totalFound .. " customizations for " .. carName
+    end
+    
+    -- Load all cars from console
+    local function loadCarsFromConsole()
+        allCars = getCars()
+        
+        if #allCars == 0 then
+            status.Text = "❌ No cars found"
+            return
+        end
+        
+        -- Display summary in console
+        print("\n📊 CAR CUSTOMIZATION SUMMARY:")
+        print("=" .. string.rep("=", 50))
+        
+        for i, car in ipairs(allCars) do
+            local customizations, totalFound = displayCarSummary(car, i)
+            
+            -- Store first car's data
+            if i == 1 then
+                loadCarIntoUI(car, 1)
+            end
+        end
+        
+        print("\n" .. string.rep("=", 50))
+        print("💡 TIP: Cars with ❌ means they don't have that customization")
+        print("       Cars with ✅ means they have it installed")
+        
+        status.Text = "✅ Loaded " .. #allCars .. " cars. Showing first car."
+    end
+    
+    -- Filter button actions
+    for _, btn in ipairs(filterFrame:GetChildren()) do
+        if btn:IsA("TextButton") then
+            btn.MouseButton1Click:Connect(function()
+                local filterName = btn.Text
+                displayCustomizations(filterName)
+            end)
+        end
+    end
     
     -- Close button
     closeBtn.MouseButton1Click:Connect(function()
         gui:Destroy()
-    end)
-    
-    -- Load cars
-    task.spawn(function()
-        loadCarsIntoUI()
     end)
     
     -- Make draggable
@@ -383,30 +550,26 @@ local function createCustomizationUI()
         end
     end)
     
-    print("✅ Customization UI created")
+    -- Initialize
+    task.spawn(function()
+        loadCarsFromConsole()
+    end)
+    
     return gui
 end
 
 -- ===== MAIN =====
-print("\nLoading your car customizations...")
-displayCarCustomizations(1)  -- Show first car's customizations in console
-
--- Get all available upgrades from database
-local allUpgrades = getAllAvailableUpgrades()
-if next(allUpgrades) ~= nil then
-    print("\n📁 AVAILABLE UPGRADE CATEGORIES IN DATABASE:")
-    for category, upgrades in pairs(allUpgrades) do
-        print("  " .. category .. " (" .. #upgrades .. " upgrades)")
-    end
-end
-
--- Create UI
+print("\n🔍 Analyzing ALL your cars...")
 task.wait(1)
-createCustomizationUI()
+
+-- Create the advanced UI
+createAdvancedUI()
 
 print("\n" .. string.rep("=", 60))
-print("✅ SYSTEM READY!")
-print("The UI shows all your car customizations:")
-print("• Rims, Engine, Turbo, BrakeColor, etc.")
-print("• Current values for each customization")
-print("• Select different cars from the dropdown")
+print("✅ ADVANCED VIEWER READY!")
+print("\n📱 FEATURES:")
+print("• Shows ALL customizations for each car")
+print("• Clearly marks ❌ missing customizations")
+print("• Filters: All / Has / Missing / Visual")
+print("• Summary shows which cars have bodykits/wraps")
+print("\n📊 Check console for complete car-by-car analysis!")
