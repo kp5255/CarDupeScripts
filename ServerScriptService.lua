@@ -1,5 +1,5 @@
--- 🎯 ULTIMATE CAR DUPLICATION SYSTEM v2.0
--- Now with REAL car data integration
+-- 🎯 ADVANCED CAR DUPLICATION SYSTEM v3.0
+-- With ANTI-VALIDATION techniques
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local player = Players.LocalPlayer
@@ -7,10 +7,12 @@ local player = Players.LocalPlayer
 repeat task.wait() until game:IsLoaded()
 task.wait(2)
 
-print("🎯 ULTIMATE CAR DUPLICATION SYSTEM v2.0")
+print("🎯 ADVANCED CAR DUPLICATION SYSTEM v3.0")
 print("=" .. string.rep("=", 60))
-print("\n🧠 PRINCIPLE: Use REAL car data for duplication")
-print("🎯 METHOD: Rapid-fire actual car tables to valid remotes")
+print("\n🧠 ANTI-VALIDATION TECHNIQUES:")
+print("• Request flooding")
+print("• Race condition exploitation")
+print("• State manipulation")
 print("=" .. string.rep("=", 60))
 
 -- ===== GET REAL CAR DATA =====
@@ -25,362 +27,381 @@ local function getRealCarData()
     
     if success and type(result) == "table" and #result > 0 then
         print("✅ Successfully loaded " .. #result .. " real cars")
-        
-        -- Extract useful information
-        local processedCars = {}
-        for i, carTable in ipairs(result) do
-            if type(carTable) == "table" then
-                -- Get car name from various possible fields
-                local carName = carTable.Name or carTable.name or carTable.DisplayName or carTable.NameTag or "Car " .. i
-                
-                -- Get car ID from various possible fields
-                local carId = carTable.Id or carTable.id or carTable.UUID or carTable.uuid or tostring(i)
-                
-                table.insert(processedCars, {
-                    Name = carName,
-                    Id = carId,
-                    FullTable = carTable,  -- Keep the full table for duplication
-                    Index = i
-                })
-                
-                -- Show first few cars for verification
-                if i <= 3 then
-                    print("   " .. i .. ". " .. carName .. " (ID: " .. carId .. ")")
-                end
-            end
-        end
-        
-        if #result > 3 then
-            print("   ... and " .. (#result - 3) .. " more cars")
-        end
-        
-        return processedCars
+        return result
     else
-        print("❌ Failed to get car data. Error: " .. tostring(result))
+        print("❌ Failed to get car data")
         return {}
     end
 end
 
--- ===== FIND VALID CAR TRANSFER REMOTES =====
-local function findTransferRemotes()
-    print("\n🔍 Finding car transfer/duplication remotes...")
+-- ===== FIND ALL REMOTES =====
+local function findAllRemotes()
+    print("\n🔍 Finding ALL remotes...")
     
-    local transferRemotes = {}
-    
-    -- Common transfer/duplication remote names (expanded list)
-    local transferPatterns = {
-        "Claim", "Redeem", "Collect", "Receive",
-        "Transfer", "Move", "Duplicate", "Copy",
-        "Give", "Add", "Purchase", "Buy",
-        "Sell", "Trade", "Exchange", "Spawn",
-        "Get", "Enable", "Update", "Set"
-    }
-    
-    -- Search all remotes
+    local remotes = {}
     for _, obj in pairs(game:GetDescendants()) do
         if obj:IsA("RemoteEvent") then
-            local remoteName = obj.Name
-            local nameLower = remoteName:lower()
-            
-            -- Check for transfer patterns
-            for _, pattern in pairs(transferPatterns) do
-                if nameLower:find(pattern:lower()) then
-                    table.insert(transferRemotes, {
-                        Object = obj,
-                        Name = remoteName,
-                        Path = obj:GetFullName(),
-                        Pattern = pattern
-                    })
-                    break
-                end
-            end
+            table.insert(remotes, {
+                Object = obj,
+                Name = obj.Name,
+                Path = obj:GetFullName()
+            })
         end
     end
     
-    -- Sort by likely relevance
-    table.sort(transferRemotes, function(a, b)
-        local aScore = 0
-        local bScore = 0
-        
-        -- Higher score for specific patterns
-        if a.Name:lower():find("claim") then aScore = aScore + 10 end
-        if b.Name:lower():find("claim") then bScore = bScore + 10 end
-        
-        if a.Name:lower():find("duplicate") then aScore = aScore + 9 end
-        if b.Name:lower():find("duplicate") then bScore = bScore + 9 end
-        
-        if a.Name:lower():find("copy") then aScore = aScore + 8 end
-        if b.Name:lower():find("copy") then bScore = bScore + 8 end
-        
-        if a.Name:lower():find("car") then aScore = aScore + 5 end
-        if b.Name:lower():find("car") then bScore = bScore + 5 end
-        
-        if a.Name:lower():find("vehicle") then aScore = aScore + 5 end
-        if b.Name:lower():find("vehicle") then bScore = bScore + 5 end
-        
-        return aScore > bScore
-    end)
-    
-    print("📡 Found " .. #transferRemotes .. " transfer remotes")
-    
-    -- Show top 5 most promising remotes
-    if #transferRemotes > 0 then
-        print("\n🎯 TOP REMOTES:")
-        for i = 1, math.min(5, #transferRemotes) do
-            print("   " .. i .. ". " .. transferRemotes[i].Name .. " (" .. transferRemotes[i].Pattern .. ")")
-        end
-    end
-    
-    return transferRemotes
+    print("📡 Found " .. #remotes .. " RemoteEvents")
+    return remotes
 end
 
--- ===== ENHANCED RAPID-FIRE DUPLICATION =====
-local function rapidFireDuplication(remote, carData)
-    print("\n⚡ ENHANCED RAPID-FIRE DUPLICATION")
+-- ===== FLOOD ATTACK TECHNIQUE =====
+local function floodAttack(remote, carTable, attackName)
+    print("\n💣 " .. attackName .. " FLOOD ATTACK")
     print("🎯 Target: " .. remote.Name)
-    print("🚗 Using: " .. carData.Name .. " (ID: " .. carData.Id .. ")")
+    print("🚗 Using: " .. tostring(carTable.Name or carTable.name or "Unknown"))
     
-    local attempts = 0
-    local successes = 0
+    local packetsSent = 0
     local startTime = tick()
     
-    -- Enhanced data formats using REAL car table
-    local dataFormats = {
-        -- Format 1: Full car table (most likely to work)
-        carData.FullTable,
+    -- Different flood patterns
+    local floodPatterns = {
+        -- Pattern 1: Ultra-fast burst
+        function()
+            print("⚡ ULTRA-FAST BURST (100 requests)")
+            for i = 1, 100 do
+                pcall(function() remote:FireServer(carTable) end)
+                packetsSent = packetsSent + 1
+                if i % 5 == 0 then
+                    task.wait(0.001) -- Minimal delay
+                end
+            end
+        end,
         
-        -- Format 2: Car table in array
-        {carData.FullTable},
+        -- Pattern 2: Wave attack
+        function()
+            print("🌊 WAVE ATTACK (3 waves of 33)")
+            for wave = 1, 3 do
+                print("   Wave " .. wave .. "...")
+                for i = 1, 33 do
+                    pcall(function() remote:FireServer(carTable) end)
+                    packetsSent = packetsSent + 1
+                    task.wait(0.005)
+                end
+                task.wait(0.2) -- Wave delay
+            end
+        end,
         
-        -- Format 3: Just car ID
-        carData.Id,
-        
-        -- Format 4: Just car name
-        carData.Name,
-        
-        -- Format 5: With player
-        {player, carData.FullTable},
-        {player.UserId, carData.FullTable},
-        
-        -- Format 6: With player and car ID
-        {player.UserId, carData.Id},
-        {player.Name, carData.Name},
-        
-        -- Format 7: Transaction format
-        {carData.FullTable, 1},  -- Car + quantity
-        {carData.FullTable, os.time(), "duplicate"},
-        
-        -- Format 8: Key-value pairs
-        {Car = carData.FullTable, Player = player},
-        {Vehicle = carData.FullTable, Owner = player.UserId},
-        {carId = carData.Id, playerId = player.UserId}
+        -- Pattern 3: Mixed data attack
+        function()
+            print("🎲 MIXED DATA ATTACK (various formats)")
+            local formats = {
+                carTable,
+                {carTable},
+                {carTable, 1},
+                {carTable, player.UserId},
+                {carTable, os.time()},
+                {Car = carTable, Player = player}
+            }
+            
+            for i = 1, 50 do
+                local format = formats[math.random(1, #formats)]
+                pcall(function() remote:FireServer(format) end)
+                packetsSent = packetsSent + 1
+                task.wait(0.01)
+            end
+        end
     }
     
-    -- Test formats first
-    print("\n🔬 TESTING DATA FORMATS...")
-    local workingFormat = nil
-    
-    for i, data in ipairs(dataFormats) do
-        local success = pcall(function()
-            remote.Object:FireServer(data)
-            return true
-        end)
-        
-        if success then
-            print("   ✅ Format " .. i .. " ACCEPTED!")
-            workingFormat = data
-            successes = successes + 1
-            break
-        end
-    end
-    
-    if not workingFormat then
-        print("❌ No data format accepted by this remote")
-        return false
-    end
-    
-    -- RAPID FIRE with working format
-    print("\n🚀 STARTING RAPID FIRE (40 attempts)...")
-    
-    for i = 1, 40 do
-        attempts = attempts + 1
-        
-        local success = pcall(function()
-            remote.Object:FireServer(workingFormat)
-            return true
-        end)
-        
-        if success then
-            successes = successes + 1
-        end
-        
-        -- Variable delay to avoid rate limiting
-        task.wait(0.02 + (i % 10) * 0.001)  -- 20-30ms delay
-        
-        if i % 10 == 0 then
-            print("   Sent " .. i .. "/40 rapid requests...")
+    -- Execute all flood patterns
+    for i, pattern in ipairs(floodPatterns) do
+        pattern()
+        if i < #floodPatterns then
+            print("   ⏳ Brief pause between patterns...")
+            task.wait(0.5)
         end
     end
     
     local totalTime = tick() - startTime
-    print("\n📊 RAPID FIRE RESULTS:")
-    print("   Total attempts: " .. attempts)
-    print("   Successful sends: " .. successes)
-    print("   Success rate: " .. string.format("%.1f", (successes/attempts)*100) .. "%")
-    print("   Total time: " .. string.format("%.2f", totalTime) .. " seconds")
-    print("   Average speed: " .. string.format("%.1f", attempts/totalTime) .. " req/sec")
+    print("\n📊 FLOOD RESULTS:")
+    print("   Packets sent: " .. packetsSent)
+    print("   Total time: " .. string.format("%.2f", totalTime) .. "s")
+    print("   Rate: " .. string.format("%.0f", packetsSent/totalTime) .. " packets/sec")
     
-    return successes > 0
+    return packetsSent
 end
 
--- ===== MULTI-CAR DUPLICATION =====
-local function multiCarDuplication(remote, allCars)
-    print("\n🚀 MULTI-CAR DUPLICATION ATTEMPT")
-    print("🎯 Testing multiple cars with: " .. remote.Name)
-    
-    local totalSuccesses = 0
-    local testedCars = 0
-    
-    -- Test with top 3 cars
-    for i = 1, math.min(3, #allCars) do
-        local carData = allCars[i]
-        print("\n🎯 Testing Car " .. i .. ": " .. carData.Name)
-        
-        -- Test this car
-        local success = rapidFireDuplication(remote, carData)
-        
-        if success then
-            totalSuccesses = totalSuccesses + 1
-            print("   ✅ This car works with this remote!")
-            
-            -- Wait a bit before next car
-            task.wait(2)
-        else
-            print("   ❌ This car doesn't work with this remote")
-        end
-        
-        testedCars = testedCars + 1
-    end
-    
-    print("\n📊 MULTI-CAR RESULTS:")
-    print("   Cars tested: " .. testedCars)
-    print("   Working combinations: " .. totalSuccesses)
-    
-    return totalSuccesses > 0
-end
-
--- ===== STATE-BASED DUPLICATION =====
-local function stateBasedDuplication()
-    print("\n🧠 STATE-BASED DUPLICATION STRATEGY v2.0")
+-- ===== RACE CONDITION EXPLOIT =====
+local function raceConditionExploit()
+    print("\n🏁 RACE CONDITION EXPLOIT")
     print("=" .. string.rep("=", 50))
     
-    -- Step 1: Get REAL car data
-    local myCars = getRealCarData()
-    if #myCars == 0 then
-        print("❌ No real car data found")
-        return
-    end
+    -- Get car data
+    local cars = getRealCarData()
+    if #cars == 0 then return end
     
-    print("\n🚗 YOUR REAL CARS (" .. #myCars .. " total):")
-    for i, car in ipairs(myCars) do
-        if i <= 5 then
-            print("   " .. i .. ". " .. car.Name .. " (ID: " .. car.Id .. ")")
+    -- Find relevant remotes
+    local allRemotes = findAllRemotes()
+    local targetRemotes = {}
+    
+    for _, remote in pairs(allRemotes) do
+        local name = remote.Name:lower()
+        if name:find("claim") or name:find("give") or 
+           name:find("get") or name:find("add") or
+           name:find("duplicate") or name:find("copy") then
+            table.insert(targetRemotes, remote)
         end
     end
     
-    -- Step 2: Find transfer remotes
-    local transferRemotes = findTransferRemotes()
-    if #transferRemotes == 0 then
-        print("❌ No transfer remotes found")
+    if #targetRemotes == 0 then
+        print("❌ No target remotes found")
         return
     end
     
-    -- Step 3: Select best remote and car
-    local bestRemote = nil
-    for _, remote in pairs(transferRemotes) do
-        if remote.Name:find("Claim") or remote.Name:find("Duplicate") then
-            bestRemote = remote
-            print("🎯 Selected high-probability remote: " .. remote.Name)
+    print("🎯 Found " .. #targetRemotes .. " target remotes")
+    
+    -- Select a car
+    local selectedCar = cars[1]
+    if not selectedCar then return end
+    
+    print("🚗 Using car: " .. tostring(selectedCar.Name or selectedCar.name or "Car 1"))
+    
+    -- SIMULTANEOUS attack on multiple remotes
+    print("\n💥 SIMULTANEOUS ATTACK ON " .. #targetRemotes .. " REMOTES")
+    
+    local attackThreads = {}
+    for i, remote in ipairs(targetRemotes) do
+        local thread = coroutine.create(function()
+            print("   Thread " .. i .. " targeting: " .. remote.Name)
+            floodAttack(remote.Object, selectedCar, "RACE-" .. i)
+        end)
+        table.insert(attackThreads, thread)
+    end
+    
+    -- Start all threads at nearly the same time
+    for _, thread in ipairs(attackThreads) do
+        coroutine.resume(thread)
+        task.wait(0.001) -- Tiny delay to create race condition
+    end
+    
+    -- Wait for all to complete
+    task.wait(3)
+    print("\n✅ Race condition attack complete!")
+end
+
+-- ===== STATE MANIPULATION ATTACK =====
+local function stateManipulationAttack()
+    print("\n🌀 STATE MANIPULATION ATTACK")
+    print("=" .. string.rep("=", 50))
+    
+    local cars = getRealCarData()
+    if #cars < 2 then
+        print("❌ Need at least 2 cars for state manipulation")
+        return
+    end
+    
+    -- Find ClaimGiveawayCar remote (from your logs)
+    local claimRemote = nil
+    for _, obj in pairs(game:GetDescendants()) do
+        if obj:IsA("RemoteEvent") and obj.Name == "ClaimGiveawayCar" then
+            claimRemote = obj
             break
         end
     end
     
-    if not bestRemote then
-        bestRemote = transferRemotes[1]
-        print("🎯 Selected first remote: " .. bestRemote.Name)
+    if not claimRemote then
+        print("❌ ClaimGiveawayCar remote not found")
+        return
     end
     
-    local bestCar = myCars[1]  -- Use first car
+    print("🎯 Found ClaimGiveawayCar remote")
     
-    -- Step 4: Attempt duplication with first car
-    print("\n🎯 ATTEMPT 1: Single Car Duplication")
-    print("   Remote: " .. bestRemote.Name)
-    print("   Car: " .. bestCar.Name)
+    -- STATE MANIPULATION STRATEGY:
+    -- Rapidly switch between different cars to confuse server state
     
-    local success = rapidFireDuplication(bestRemote, bestCar)
+    print("\n🔄 RAPID CAR SWITCHING ATTACK")
+    print("   Switching between " .. math.min(5, #cars) .. " cars rapidly")
     
-    if success then
-        print("\n✅ SINGLE CAR DUPLICATION SUCCESSFUL!")
-        print("💡 Check your inventory now...")
+    local packetsSent = 0
+    local startTime = tick()
+    
+    for cycle = 1, 3 do  -- 3 cycles
+        print("   Cycle " .. cycle .. "...")
         
-        -- Step 5: Try multi-car duplication
-        task.wait(5)
-        print("\n🔄 ATTEMPT 2: Multi-Car Duplication")
-        multiCarDuplication(bestRemote, myCars)
-        
-        -- Step 6: Try second wave
-        task.wait(8)
-        print("\n🚀 ATTEMPT 3: Second Wave Duplication")
-        print("   Sending another 30 requests...")
-        
-        for i = 1, 30 do
-            pcall(function()
-                bestRemote.Object:FireServer(bestCar.FullTable)
-            end)
-            task.wait(0.03)
+        for i = 1, 20 do  -- 20 rapid switches per cycle
+            -- Pick random car
+            local randomCar = cars[math.random(1, math.min(5, #cars))]
+            
+            -- Send with random delay
+            pcall(function() claimRemote:FireServer(randomCar) end)
+            packetsSent = packetsSent + 1
+            
+            -- Random delay to avoid pattern detection
+            task.wait(math.random(10, 50) / 1000)  -- 10-50ms
         end
         
-        print("✅ Second wave complete!")
-        
-    else
-        print("\n❌ Single car duplication failed")
-        print("💡 Trying multi-car approach...")
-        
-        task.wait(3)
-        multiCarDuplication(bestRemote, myCars)
+        -- Brief pause between cycles
+        if cycle < 3 then
+            task.wait(0.3)
+        end
     end
     
-    print("\n🎯 DUPLICATION PROCESS COMPLETE!")
-    print("💡 Check your inventory/garage")
-    print("🔄 Wait 15 seconds and run again if needed")
+    local totalTime = tick() - startTime
+    print("\n📊 STATE MANIPULATION RESULTS:")
+    print("   Packets sent: " .. packetsSent)
+    print("   Cars used: " .. math.min(5, #cars))
+    print("   Time: " .. string.format("%.2f", totalTime) .. "s")
+    
+    return packetsSent
 end
 
--- ===== CREATE DUPER UI v2 =====
-local function createDuperUI()
+-- ===== BACK-TO-BACK FLOOD =====
+local function backToBackFlood()
+    print("\n⚡ BACK-TO-BACK FLOOD ATTACK")
+    print("=" .. string.rep("=", 50))
+    
+    local cars = getRealCarData()
+    if #cars == 0 then return end
+    
+    -- Find ClaimGiveawayCar
+    local claimRemote = nil
+    for _, obj in pairs(game:GetDescendants()) do
+        if obj:IsA("RemoteEvent") and obj.Name == "ClaimGiveawayCar" then
+            claimRemote = obj
+            break
+        end
+    end
+    
+    if not claimRemote then
+        print("❌ ClaimGiveawayCar remote not found")
+        return
+    end
+    
+    local selectedCar = cars[1]
+    print("🎯 Target: ClaimGiveawayCar")
+    print("🚗 Car: " .. tostring(selectedCar.Name or selectedCar.name or "Car 1"))
+    
+    -- MULTIPLE BACK-TO-BACK ATTACKS
+    local totalPackets = 0
+    
+    for attackNum = 1, 5 do
+        print("\n💥 ATTACK #" .. attackNum)
+        
+        local attackPackets = 0
+        local attackStart = tick()
+        
+        -- Ultra-dense packet burst
+        for i = 1, 50 do
+            pcall(function() 
+                claimRemote:FireServer(selectedCar)
+                claimRemote:FireServer(selectedCar)  -- Double fire
+            end)
+            attackPackets = attackPackets + 2
+            
+            -- Increasing delay to avoid rate limits
+            task.wait(0.001 * attackNum)
+        end
+        
+        totalPackets = totalPackets + attackPackets
+        
+        print("   Sent: " .. attackPackets .. " packets")
+        print("   Time: " .. string.format("%.2f", tick() - attackStart) .. "s")
+        
+        if attackNum < 5 then
+            print("   ⏳ Brief cooldown...")
+            task.wait(1)  -- Cooldown between attacks
+        end
+    end
+    
+    print("\n📊 BACK-TO-BACK RESULTS:")
+    print("   Total packets: " .. totalPackets)
+    print("   Attacks: 5")
+    
+    return totalPackets
+end
+
+-- ===== MAIN ATTACK SEQUENCE =====
+local function executeFullAttack()
+    print("\n🚀 EXECUTING FULL ATTACK SEQUENCE")
+    print("=" .. string.rep("=", 60))
+    
+    -- Phase 1: Initial flood
+    print("\n📡 PHASE 1: INITIAL FLOOD")
+    raceConditionExploit()
+    
+    task.wait(2)
+    
+    -- Phase 2: State manipulation
+    print("\n📡 PHASE 2: STATE MANIPULATION")
+    stateManipulationAttack()
+    
+    task.wait(3)
+    
+    -- Phase 3: Back-to-back flood
+    print("\n📡 PHASE 3: BACK-TO-BACK FLOOD")
+    backToBackFlood()
+    
+    task.wait(2)
+    
+    -- Phase 4: Final massive flood
+    print("\n📡 PHASE 4: FINAL MASSIVE FLOOD")
+    
+    local cars = getRealCarData()
+    local claimRemote = nil
+    
+    for _, obj in pairs(game:GetDescendants()) do
+        if obj:IsA("RemoteEvent") and obj.Name == "ClaimGiveawayCar" then
+            claimRemote = obj
+            break
+        end
+    end
+    
+    if claimRemote and #cars > 0 then
+        local selectedCar = cars[1]
+        print("🎯 FINAL ATTACK: 200 packets to ClaimGiveawayCar")
+        
+        local finalCount = 0
+        for i = 1, 200 do
+            pcall(function() claimRemote:FireServer(selectedCar) end)
+            finalCount = finalCount + 1
+            
+            if i % 20 == 0 then
+                print("   Sent " .. i .. "/200 packets...")
+                task.wait(0.1)  -- Brief pause every 20
+            else
+                task.wait(0.002)  -- Ultra-fast
+            end
+        end
+        
+        print("✅ Final attack complete: " .. finalCount .. " packets sent")
+    end
+    
+    print("\n🎯 FULL ATTACK SEQUENCE COMPLETE!")
+    print("💡 Check your inventory NOW")
+    print("🔄 Wait 30 seconds and run again")
+end
+
+-- ===== CREATE ATTACK UI =====
+local function createAttackUI()
     local gui = Instance.new("ScreenGui")
-    gui.Name = "CarDuperProV2"
+    gui.Name = "CarAttackSystem"
     gui.Parent = player:WaitForChild("PlayerGui")
     
-    -- Main window
     local main = Instance.new("Frame")
-    main.Size = UDim2.new(0, 450, 0, 500)
-    main.Position = UDim2.new(0.5, -225, 0.5, -250)
+    main.Size = UDim2.new(0, 400, 0, 350)
+    main.Position = UDim2.new(0.5, -200, 0.5, -175)
     main.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
     main.Parent = gui
     
-    -- Title
     local title = Instance.new("TextLabel")
-    title.Text = "⚡ CAR DUPLICATION SYSTEM v2.0"
+    title.Text = "💣 CAR ATTACK SYSTEM v3.0"
     title.Size = UDim2.new(1, 0, 0, 50)
-    title.BackgroundColor3 = Color3.fromRGB(0, 100, 0)
+    title.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
     title.TextColor3 = Color3.new(1, 1, 1)
     title.Font = Enum.Font.GothamBold
     title.TextSize = 18
     title.Parent = main
     
-    -- Status
     local status = Instance.new("TextLabel")
-    status.Text = "🧠 Using REAL car data from server\n🎯 Rapid-fire actual car tables"
+    status.Text = "Anti-validation attack system\nTarget: ClaimGiveawayCar remote"
     status.Size = UDim2.new(1, -20, 0, 60)
     status.Position = UDim2.new(0, 10, 0, 60)
     status.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
@@ -390,45 +411,46 @@ local function createDuperUI()
     status.TextWrapped = true
     status.Parent = main
     
-    -- Results display
-    local results = Instance.new("ScrollingFrame")
-    results.Size = UDim2.new(1, -20, 0, 250)
-    results.Position = UDim2.new(0, 10, 0, 130)
-    results.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-    results.BorderSizePixel = 0
-    results.ScrollBarThickness = 8
-    results.Parent = main
+    -- Attack buttons
+    local floodBtn = Instance.new("TextButton")
+    floodBtn.Text = "💣 FLOOD ATTACK"
+    floodBtn.Size = UDim2.new(1, -20, 0, 40)
+    floodBtn.Position = UDim2.new(0, 10, 0, 130)
+    floodBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    floodBtn.TextColor3 = Color3.new(1, 1, 1)
+    floodBtn.Font = Enum.Font.GothamBold
+    floodBtn.TextSize = 14
+    floodBtn.Parent = main
     
-    -- Buttons
-    local scanBtn = Instance.new("TextButton")
-    scanBtn.Text = "🔍 LOAD REAL CARS"
-    scanBtn.Size = UDim2.new(0.48, 0, 0, 40)
-    scanBtn.Position = UDim2.new(0, 10, 0, 390)
-    scanBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 220)
-    scanBtn.TextColor3 = Color3.new(1, 1, 1)
-    scanBtn.Font = Enum.Font.GothamBold
-    scanBtn.TextSize = 14
-    scanBtn.Parent = main
+    local raceBtn = Instance.new("TextButton")
+    raceBtn.Text = "🏁 RACE ATTACK"
+    raceBtn.Size = UDim2.new(1, -20, 0, 40)
+    raceBtn.Position = UDim2.new(0, 10, 0, 180)
+    raceBtn.BackgroundColor3 = Color3.fromRGB(200, 100, 0)
+    raceBtn.TextColor3 = Color3.new(1, 1, 1)
+    raceBtn.Font = Enum.Font.GothamBold
+    raceBtn.TextSize = 14
+    raceBtn.Parent = main
     
-    local findBtn = Instance.new("TextButton")
-    findBtn.Text = "📡 FIND REMOTES"
-    findBtn.Size = UDim2.new(0.48, 0, 0, 40)
-    findBtn.Position = UDim2.new(0.52, 0, 0, 390)
-    findBtn.BackgroundColor3 = Color3.fromRGB(120, 0, 200)
-    findBtn.TextColor3 = Color3.new(1, 1, 1)
-    findBtn.Font = Enum.Font.GothamBold
-    findBtn.TextSize = 14
-    findBtn.Parent = main
+    local stateBtn = Instance.new("TextButton")
+    stateBtn.Text = "🌀 STATE ATTACK"
+    stateBtn.Size = UDim2.new(1, -20, 0, 40)
+    stateBtn.Position = UDim2.new(0, 10, 0, 230)
+    stateBtn.BackgroundColor3 = Color3.fromRGB(100, 0, 200)
+    stateBtn.TextColor3 = Color3.new(1, 1, 1)
+    stateBtn.Font = Enum.Font.GothamBold
+    stateBtn.TextSize = 14
+    stateBtn.Parent = main
     
-    local dupeBtn = Instance.new("TextButton")
-    dupeBtn.Text = "⚡ START DUPLICATION"
-    dupeBtn.Size = UDim2.new(1, -20, 0, 50)
-    dupeBtn.Position = UDim2.new(0, 10, 0, 440)
-    dupeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-    dupeBtn.TextColor3 = Color3.new(1, 1, 1)
-    dupeBtn.Font = Enum.Font.GothamBold
-    dupeBtn.TextSize = 16
-    dupeBtn.Parent = main
+    local fullBtn = Instance.new("TextButton")
+    fullBtn.Text = "⚡ FULL ATTACK SEQUENCE"
+    fullBtn.Size = UDim2.new(1, -20, 0, 50)
+    fullBtn.Position = UDim2.new(0, 10, 0, 290)
+    fullBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+    fullBtn.TextColor3 = Color3.new(1, 1, 1)
+    fullBtn.Font = Enum.Font.GothamBold
+    fullBtn.TextSize = 16
+    fullBtn.Parent = main
     
     -- Add corners
     local function addCorner(obj)
@@ -437,121 +459,67 @@ local function createDuperUI()
         corner.Parent = obj
     end
     
-    addCorner(main)
-    addCorner(title)
-    addCorner(status)
-    addCorner(results)
-    addCorner(scanBtn)
-    addCorner(findBtn)
-    addCorner(dupeBtn)
-    
-    -- Functions
-    local function updateResults(text, color)
-        results:ClearAllChildren()
-        
-        local label = Instance.new("TextLabel")
-        label.Text = text
-        label.Size = UDim2.new(1, -10, 1, -10)
-        label.Position = UDim2.new(0, 5, 0, 5)
-        label.BackgroundTransparency = 1
-        label.TextColor3 = color or Color3.new(1, 1, 1)
-        label.Font = Enum.Font.Code
-        label.TextSize = 10
-        label.TextWrapped = true
-        label.TextXAlignment = Enum.TextXAlignment.Left
-        label.TextYAlignment = Enum.TextYAlignment.Top
-        label.Parent = results
+    for _, obj in pairs({main, title, status, floodBtn, raceBtn, stateBtn, fullBtn}) do
+        addCorner(obj)
     end
     
-    -- Variables
-    local transferRemotes = {}
-    local myCars = {}
-    
     -- Button actions
-    scanBtn.MouseButton1Click:Connect(function()
-        scanBtn.Text = "LOADING..."
-        scanBtn.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
-        status.Text = "Loading REAL car data from server..."
+    floodBtn.MouseButton1Click:Connect(function()
+        floodBtn.Text = "ATTACKING..."
+        status.Text = "Executing flood attack..."
         
         task.spawn(function()
-            myCars = getRealCarData()
+            local cars = getRealCarData()
+            local claimRemote = nil
             
-            local resultText = "🚗 REAL CAR DATA:\n\n"
-            if #myCars > 0 then
-                resultText = resultText .. "Loaded " .. #myCars .. " cars:\n\n"
-                for i, car in ipairs(myCars) do
-                    if i <= 8 then
-                        resultText = resultText .. i .. ". " .. car.Name .. "\n"
-                    end
+            for _, obj in pairs(game:GetDescendants()) do
+                if obj:IsA("RemoteEvent") and obj.Name == "ClaimGiveawayCar" then
+                    claimRemote = obj
+                    break
                 end
-                if #myCars > 8 then
-                    resultText = resultText .. "... and " .. (#myCars - 8) .. " more\n"
-                end
-                status.Text = "✅ Loaded " .. #myCars .. " real cars!"
-            else
-                resultText = resultText .. "❌ Failed to load car data"
-                status.Text = "❌ Failed to load car data"
             end
             
-            updateResults(resultText, Color3.fromRGB(0, 255, 150))
-            scanBtn.Text = "✅ CARS LOADED"
-            scanBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
+            if claimRemote and #cars > 0 then
+                floodAttack(claimRemote, cars[1], "FLOOD")
+                status.Text = "✅ Flood attack complete!\nCheck inventory"
+            else
+                status.Text = "❌ Target not found"
+            end
+            
+            floodBtn.Text = "💣 FLOOD ATTACK"
         end)
     end)
     
-    findBtn.MouseButton1Click:Connect(function()
-        findBtn.Text = "SCANNING..."
-        findBtn.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
-        status.Text = "Scanning for transfer remotes..."
+    raceBtn.MouseButton1Click:Connect(function()
+        raceBtn.Text = "ATTACKING..."
+        status.Text = "Executing race condition attack..."
         
         task.spawn(function()
-            transferRemotes = findTransferRemotes()
-            
-            local resultText = "📡 TRANSFER REMOTES:\n\n"
-            if #transferRemotes > 0 then
-                resultText = resultText .. "Found " .. #transferRemotes .. " remotes:\n\n"
-                for i, remote in ipairs(transferRemotes) do
-                    if i <= 8 then
-                        resultText = resultText .. i .. ". " .. remote.Name .. "\n"
-                    end
-                end
-                status.Text = "✅ Found " .. #transferRemotes .. " remotes!"
-            else
-                resultText = resultText .. "❌ No transfer remotes found"
-                status.Text = "❌ No remotes found"
-            end
-            
-            updateResults(resultText, Color3.fromRGB(150, 150, 255))
-            findBtn.Text = "✅ REMOTES FOUND"
-            findBtn.BackgroundColor3 = Color3.fromRGB(120, 0, 200)
+            raceConditionExploit()
+            status.Text = "✅ Race attack complete!\nCheck inventory"
+            raceBtn.Text = "🏁 RACE ATTACK"
         end)
     end)
     
-    dupeBtn.MouseButton1Click:Connect(function()
-        if #transferRemotes == 0 then
-            status.Text = "❌ Find remotes first!"
-            updateResults("Please click FIND REMOTES first", Color3.fromRGB(255, 100, 100))
-            return
-        end
-        
-        if #myCars == 0 then
-            status.Text = "❌ Load cars first!"
-            updateResults("Please click LOAD REAL CARS first", Color3.fromRGB(255, 100, 100))
-            return
-        end
-        
-        dupeBtn.Text = "DUPLICATING..."
-        dupeBtn.BackgroundColor3 = Color3.fromRGB(255, 100, 0)
-        status.Text = "Starting state-based duplication..."
-        updateResults("⚡ STARTING DUPLICATION...\nUsing REAL car data...", Color3.fromRGB(255, 200, 100))
+    stateBtn.MouseButton1Click:Connect(function()
+        stateBtn.Text = "ATTACKING..."
+        status.Text = "Executing state manipulation..."
         
         task.spawn(function()
-            stateBasedDuplication()
-            
-            dupeBtn.Text = "⚡ DUPE COMPLETE"
-            dupeBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
-            status.Text = "✅ Duplication attempt complete!"
-            updateResults("🎯 Check your inventory NOW!\n💡 Wait 15 seconds and try again.", Color3.fromRGB(0, 255, 0))
+            stateManipulationAttack()
+            status.Text = "✅ State attack complete!\nCheck inventory"
+            stateBtn.Text = "🌀 STATE ATTACK"
+        end)
+    end)
+    
+    fullBtn.MouseButton1Click:Connect(function()
+        fullBtn.Text = "EXECUTING..."
+        status.Text = "Starting full attack sequence...\nThis will take ~30 seconds"
+        
+        task.spawn(function()
+            executeFullAttack()
+            status.Text = "✅ FULL ATTACK COMPLETE!\nCheck inventory NOW\nWait 30s and try again"
+            fullBtn.Text = "⚡ FULL ATTACK SEQUENCE"
         end)
     end)
     
@@ -565,64 +533,36 @@ local function createDuperUI()
     closeBtn.Font = Enum.Font.GothamBold
     closeBtn.TextSize = 16
     closeBtn.Parent = title
-    
     addCorner(closeBtn)
     
     closeBtn.MouseButton1Click:Connect(function()
         gui:Destroy()
     end)
     
-    -- Make draggable
-    local dragging = false
-    local dragStart, frameStart
-    
-    title.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = true
-            dragStart = input.Position
-            frameStart = main.Position
-        end
-    end)
-    
-    game:GetService("UserInputService").InputChanged:Connect(function(input)
-        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-            local delta = input.Position - dragStart
-            main.Position = UDim2.new(
-                frameStart.X.Scale, frameStart.X.Offset + delta.X,
-                frameStart.Y.Scale, frameStart.Y.Offset + delta.Y
-            )
-        end
-    end)
-    
-    -- Initial display
-    updateResults("1. Click LOAD REAL CARS\n2. Click FIND REMOTES\n3. Click START DUPLICATION\n\nUses actual car data from server!", Color3.fromRGB(150, 150, 150))
-    
     return gui
 end
 
 -- ===== MAIN =====
-print("\n🎯 REAL CAR DATA DUPLICATION:")
-print("1. Get ACTUAL car tables from server")
-print("2. Find car transfer remotes")
-print("3. Test remotes with REAL car data")
-print("4. Rapid-fire working combinations")
-print("5. Multi-car and multi-wave attempts")
+print("\n🎯 ANTI-VALIDATION ATTACK SYSTEM")
+print("=" .. string.rep("=", 60))
+print("\n💡 ISSUE IDENTIFIED:")
+print("• Requests are being accepted (102.5% success rate)")
+print("• But cars aren't duplicating")
+print("• Server has validation preventing duplication")
+print("\n🎯 SOLUTION:")
+print("• Flood the server with requests")
+print("• Create race conditions")
+print("• Manipulate server state")
+print("• Overwhelm validation checks")
 
-print("\n🚀 Starting system...")
+print("\n🚀 Creating attack interface...")
+createAttackUI()
 
--- Create UI
-local ui = createDuperUI()
-
-print("\n✅ SYSTEM READY WITH REAL CAR DATA!")
-print("\n💡 HOW TO USE:")
-print("1. LOAD REAL CARS - Gets your actual car tables")
-print("2. FIND REMOTES - Finds transfer/duplication remotes")
-print("3. START DUPLICATION - Tests and rapid-fires")
-print("4. Check inventory - Look for duplicates")
-print("5. Wait 15s - Try again")
-
-print("\n🎯 KEY IMPROVEMENTS:")
-print("• Uses REAL car data from GetOwnedCars")
-print("• Tests with full car tables (not just names)")
-print("• Multi-car testing approach")
-print("• Multiple duplication waves")
+print("\n✅ ATTACK SYSTEM READY!")
+print("\n💡 RECOMMENDED STRATEGY:")
+print("1. Click FULL ATTACK SEQUENCE")
+print("2. Wait for all attacks to complete")
+print("3. IMMEDIATELY check inventory")
+print("4. If no duplicates, wait 30s")
+print("5. Try individual attacks")
+print("6. Try different cars")
