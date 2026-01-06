@@ -1,516 +1,701 @@
--- 🚗 CAR DUPLICATION SYSTEM (FIXED VERSION)
+-- 🔍 COSMETIC ID FINDER & UNLOCKER
+-- Finds all cosmetic IDs and lets you unlock them
+
 local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RS = game:GetService("ReplicatedStorage")
+local SS = game:GetService("ServerStorage")
+local Player = Players.LocalPlayer
 
-local player = Players.LocalPlayer
-local carService = ReplicatedStorage.Remotes.Services.CarServiceRemotes
-
--- Wait for game to load
 repeat task.wait() until game:IsLoaded()
-task.wait(2)
+task.wait(3)
 
-print("🚗 CAR DUPLICATION SYSTEM LOADED")
-
--- ===== CAR DUPLICATION FUNCTIONS =====
-local CarDuplicator = {
-    OwnedCars = {},
-    SelectedCar = nil,
-    SelectedCarIndex = nil,
-    IsDuplicating = false
-}
-
--- Get owned cars
-function CarDuplicator:GetOwnedCars()
-    local success, result = pcall(function()
-        return carService.GetOwnedCars:InvokeServer()
-    end)
+-- ===== SCAN FOR COSMETIC IDs =====
+local function ScanForCosmeticIDs()
+    print("🔍 Scanning for cosmetic IDs...")
     
-    if success and type(result) == "table" then
-        self.OwnedCars = result
-        return true
-    end
-    return false
-end
-
--- Extract car name from car data
-function CarDuplicator:GetCarName(carData)
-    if type(carData) ~= "table" then return "Unknown Car" end
-    
-    -- Try different possible name fields
-    return carData.Name or carData.name or carData.CarName or 
-           carData.DisplayName or carData.NameTag or "Car #" .. tostring(carData.id or "")
-end
-
--- Get car class
-function CarDuplicator:GetCarClass(carData)
-    if type(carData) ~= "table" then return 1 end
-    
-    local class = carData.Class or carData.class or carData.CarClass or 1
-    if type(class) == "string" then
-        if class:find("3") then return 3
-        elseif class:find("2") then return 2
-        else return 1 end
-    end
-    return math.floor(class)
-end
-
--- Duplicate selected car
-function CarDuplicator:DuplicateCar()
-    if self.IsDuplicating then
-        return false, "Already duplicating..."
-    end
-    
-    if not self.SelectedCar then
-        return false, "No car selected!"
-    end
-    
-    self.IsDuplicating = true
-    
-    -- Try different duplication methods
-    local methods = {
-        -- Method 1: Try UpdateCarPack remote
-        function()
-            local updateRemote = carService:FindFirstChild("UpdateCarPack")
-            if updateRemote then
-                updateRemote:FireServer(self.SelectedCar)
-                return true, "UpdateCarPack method"
-            end
-            return false
-        end,
-        
-        -- Method 2: Try UpdateCar remote
-        function()
-            local updateRemote = ReplicatedStorage.Remotes:FindFirstChild("UpdateCar")
-            if updateRemote then
-                updateRemote:FireServer(self.SelectedCar)
-                return true, "UpdateCar method"
-            end
-            return false
-        end,
-        
-        -- Method 3: Try EnableCar remote
-        function()
-            local enableRemote = ReplicatedStorage.Remotes:FindFirstChild("EnableCar")
-            if enableRemote then
-                enableRemote:FireServer(self.SelectedCar)
-                return true, "EnableCar method"
-            end
-            return false
-        end,
-        
-        -- Method 4: Try Spawn remote (might work for cars)
-        function()
-            local spawnRemote = ReplicatedStorage.Remotes:FindFirstChild("Spawn")
-            if spawnRemote then
-                spawnRemote:FireServer(self.SelectedCar)
-                return true, "Spawn method"
-            end
-            return false
-        end
+    local foundIDs = {}
+    local categories = {
+        Wraps = {},
+        Kits = {},
+        Wheels = {},
+        Neons = {},
+        Other = {}
     }
     
-    -- Try each method
-    local success, methodName = false, "No method found"
-    for i, method in ipairs(methods) do
-        local result, name = method()
-        if result then
-            success, methodName = true, name
-            break
+    -- Function to add ID with category
+    local function AddID(id, category, source)
+        if not id or id == "" then return end
+        
+        if not foundIDs[id] then
+            foundIDs[id] = {
+                id = id,
+                category = category,
+                source = source
+            }
+            table.insert(categories[category], id)
         end
     end
     
-    self.IsDuplicating = false
-    
-    if success then
-        -- Refresh car list after delay
-        task.wait(2)
-        self:GetOwnedCars()
-        return true, "Duplication attempted via " .. methodName
-    else
-        return false, "No duplication method worked"
+    -- Scan ReplicatedStorage
+    print("📦 Scanning ReplicatedStorage...")
+    for _, obj in pairs(RS:GetDescendants()) do
+        -- Look for cosmetic items
+        local name = obj.Name:lower()
+        
+        -- Check by name patterns
+        if name:find("wrap") or name:find("paint") or name:find("color") then
+            AddID(obj.Name, "Wraps", "RS: " .. obj:GetFullName())
+        elseif name:find("kit") or name:find("spoiler") or name:find("body") then
+            AddID(obj.Name, "Kits", "RS: " .. obj:GetFullName())
+        elseif name:find("wheel") or name:find("rim") or name:find("tire") then
+            AddID(obj.Name, "Wheels", "RS: " .. obj:GetFullName())
+        elseif name:find("neon") or name:find("light") or name:find("glow") then
+            AddID(obj.Name, "Neons", "RS: " .. obj:GetFullName())
+        elseif name:find("exhaust") or name:find("hood") or name:find("window") then
+            AddID(obj.Name, "Other", "RS: " .. obj:GetFullName())
+        end
+        
+        -- Check for StringValues with IDs
+        if obj:IsA("StringValue") then
+            local value = obj.Value:lower()
+            if value:find("wrap") or value:find("paint") or value:find("color") then
+                AddID(obj.Value, "Wraps", "RS Value: " .. obj:GetFullName())
+            end
+        end
+        
+        -- Check for folders that might contain cosmetics
+        if obj:IsA("Folder") then
+            local folderName = obj.Name:lower()
+            if folderName:find("wrap") or folderName:find("paint") 
+               or folderName:find("kit") or folderName:find("wheel") then
+                -- Add the folder itself as an ID
+                AddID(obj.Name, "Other", "RS Folder: " .. obj:GetFullName())
+                
+                -- Add all children
+                for _, child in pairs(obj:GetChildren()) do
+                    AddID(child.Name, "Other", "RS Child: " .. child:GetFullName())
+                end
+            end
+        end
     end
+    
+    -- Scan ServerStorage
+    print("📦 Scanning ServerStorage...")
+    for _, obj in pairs(SS:GetDescendants()) do
+        local name = obj.Name:lower()
+        if name:find("wrap") or name:find("paint") then
+            AddID(obj.Name, "Wraps", "SS: " .. obj:GetFullName())
+        elseif name:find("kit") or name:find("body") then
+            AddID(obj.Name, "Kits", "SS: " .. obj:GetFullName())
+        end
+    end
+    
+    -- Scan shop UI for IDs (when shop is open)
+    local function ScanShopUI()
+        local PlayerGui = Player:WaitForChild("PlayerGui")
+        
+        for _, gui in pairs(PlayerGui:GetDescendants()) do
+            if gui:IsA("TextButton") or gui:IsA("ImageButton") then
+                -- Check for ItemId attribute
+                local itemId = gui:GetAttribute("ItemId") 
+                              or gui:GetAttribute("ID")
+                              or gui:GetAttribute("CosmeticId")
+                
+                if itemId then
+                    local name = gui.Name:lower()
+                    local category = "Other"
+                    
+                    if name:find("wrap") or itemId:lower():find("wrap") then
+                        category = "Wraps"
+                    elseif name:find("kit") or itemId:lower():find("kit") then
+                        category = "Kits"
+                    elseif name:find("wheel") or itemId:lower():find("wheel") then
+                        category = "Wheels"
+                    elseif name:find("neon") or itemId:lower():find("neon") then
+                        category = "Neons"
+                    end
+                    
+                    AddID(itemId, category, "Shop UI: " .. gui:GetFullName())
+                end
+            end
+        end
+    end
+    
+    task.spawn(ScanShopUI)
+    
+    -- Wait a bit for UI to load if shop is open
+    task.wait(2)
+    ScanShopUI()
+    
+    -- Display results
+    print("\n" .. string.rep("=", 50))
+    print("📊 FOUND COSMETIC IDs:")
+    print(string.rep("=", 50))
+    
+    local total = 0
+    for category, ids in pairs(categories) do
+        if #ids > 0 then
+            print("\n🎨 " .. category .. " (" .. #ids .. " items):")
+            for i, id in ipairs(ids) do
+                print("  " .. i .. ". " .. id)
+                total = total + 1
+            end
+        end
+    end
+    
+    print("\n" .. string.rep("=", 50))
+    print("✅ Found " .. total .. " total cosmetic IDs")
+    print(string.rep("=", 50))
+    
+    return foundIDs, categories
 end
 
--- ===== CREATE SIMPLIFIED UI =====
-function CarDuplicator:CreateUI()
-    -- Destroy old UI if exists
-    if player.PlayerGui:FindFirstChild("CarDuplicatorUI") then
-        player.PlayerGui.CarDuplicatorUI:Destroy()
-    end
+-- ===== EXTRACT IDs FROM SHOP =====
+local function ExtractIDsFromCurrentShop()
+    print("🛒 Extracting IDs from currently open shop...")
     
-    -- Main GUI
-    local gui = Instance.new("ScreenGui")
-    gui.Name = "CarDuplicatorUI"
-    gui.Parent = player.PlayerGui
+    local PlayerGui = Player:WaitForChild("PlayerGui")
+    local extracted = {}
     
-    -- Main Window
-    local mainFrame = Instance.new("Frame")
-    mainFrame.Size = UDim2.new(0, 500, 0, 600)
-    mainFrame.Position = UDim2.new(0.5, -250, 0.5, -300)
-    mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-    mainFrame.Parent = gui
-    
-    -- Title Bar
-    local titleBar = Instance.new("Frame")
-    titleBar.Size = UDim2.new(1, 0, 0, 40)
-    titleBar.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
-    titleBar.Parent = mainFrame
-    
-    local title = Instance.new("TextLabel")
-    title.Text = "🚗 CAR DUPLICATION SYSTEM"
-    title.Size = UDim2.new(1, -50, 1, 0)
-    title.Position = UDim2.new(0, 10, 0, 0)
-    title.BackgroundTransparency = 1
-    title.TextColor3 = Color3.new(1, 1, 1)
-    title.Font = Enum.Font.GothamBold
-    title.TextSize = 18
-    title.TextXAlignment = Enum.TextXAlignment.Left
-    title.Parent = titleBar
-    
-    -- Close Button
-    local closeBtn = Instance.new("TextButton")
-    closeBtn.Text = "✕"
-    closeBtn.Size = UDim2.new(0, 30, 0, 30)
-    closeBtn.Position = UDim2.new(1, -35, 0, 5)
-    closeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-    closeBtn.TextColor3 = Color3.new(1, 1, 1)
-    closeBtn.Font = Enum.Font.GothamBold
-    closeBtn.TextSize = 16
-    closeBtn.Parent = titleBar
-    
-    closeBtn.MouseButton1Click:Connect(function()
-        gui:Destroy()
-    end)
-    
-    -- Status Bar
-    local statusBar = Instance.new("Frame")
-    statusBar.Size = UDim2.new(1, -20, 0, 40)
-    statusBar.Position = UDim2.new(0, 10, 0, 50)
-    statusBar.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-    statusBar.Parent = mainFrame
-    
-    local statusText = Instance.new("TextLabel")
-    statusText.Name = "Status"
-    statusText.Text = "Loading your cars..."
-    statusText.Size = UDim2.new(1, -20, 1, -10)
-    statusText.Position = UDim2.new(0, 10, 0, 5)
-    statusText.BackgroundTransparency = 1
-    statusText.TextColor3 = Color3.new(1, 1, 1)
-    statusText.Font = Enum.Font.Gotham
-    statusText.TextSize = 12
-    statusText.TextXAlignment = Enum.TextXAlignment.Left
-    statusText.Parent = statusBar
-    
-    -- Car Count Display
-    local countFrame = Instance.new("Frame")
-    countFrame.Size = UDim2.new(1, -20, 0, 30)
-    countFrame.Position = UDim2.new(0, 10, 0, 100)
-    countFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
-    countFrame.Parent = mainFrame
-    
-    local countText = Instance.new("TextLabel")
-    countText.Text = "Total Cars: 0"
-    countText.Size = UDim2.new(1, 0, 1, 0)
-    countText.BackgroundTransparency = 1
-    countText.TextColor3 = Color3.new(1, 1, 1)
-    countText.Font = Enum.Font.Gotham
-    countText.TextSize = 14
-    countText.Parent = countFrame
-    
-    -- Car List (Scrollable)
-    local scrollFrame = Instance.new("ScrollingFrame")
-    scrollFrame.Size = UDim2.new(1, -20, 0, 300)
-    scrollFrame.Position = UDim2.new(0, 10, 0, 140)
-    scrollFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-    scrollFrame.BorderSizePixel = 0
-    scrollFrame.ScrollBarThickness = 8
-    scrollFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
-    scrollFrame.Parent = mainFrame
-    
-    -- Selected Car Display
-    local selectedFrame = Instance.new("Frame")
-    selectedFrame.Size = UDim2.new(1, -20, 0, 60)
-    selectedFrame.Position = UDim2.new(0, 10, 0, 450)
-    selectedFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-    selectedFrame.Parent = mainFrame
-    
-    local selectedTitle = Instance.new("TextLabel")
-    selectedTitle.Text = "SELECTED CAR:"
-    selectedTitle.Size = UDim2.new(1, 0, 0, 20)
-    selectedTitle.Position = UDim2.new(0, 10, 0, 5)
-    selectedTitle.BackgroundTransparency = 1
-    selectedTitle.TextColor3 = Color3.fromRGB(200, 200, 200)
-    selectedTitle.Font = Enum.Font.Gotham
-    selectedTitle.TextSize = 12
-    selectedTitle.TextXAlignment = Enum.TextXAlignment.Left
-    selectedTitle.Parent = selectedFrame
-    
-    local selectedName = Instance.new("TextLabel")
-    selectedName.Name = "SelectedName"
-    selectedName.Text = "None"
-    selectedName.Size = UDim2.new(1, -20, 0, 30)
-    selectedName.Position = UDim2.new(0, 10, 0, 25)
-    selectedName.BackgroundTransparency = 1
-    selectedName.TextColor3 = Color3.new(1, 1, 1)
-    selectedName.Font = Enum.Font.GothamBold
-    selectedName.TextSize = 16
-    selectedName.TextXAlignment = Enum.TextXAlignment.Left
-    selectedName.Parent = selectedFrame
-    
-    -- Action Buttons
-    local buttonFrame = Instance.new("Frame")
-    buttonFrame.Size = UDim2.new(1, -20, 0, 50)
-    buttonFrame.Position = UDim2.new(0, 10, 1, -60)
-    buttonFrame.BackgroundTransparency = 1
-    buttonFrame.Parent = mainFrame
-    
-    local refreshBtn = Instance.new("TextButton")
-    refreshBtn.Text = "🔄 Refresh"
-    refreshBtn.Size = UDim2.new(0.3, -5, 1, 0)
-    refreshBtn.Position = UDim2.new(0, 0, 0, 0)
-    refreshBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 220)
-    refreshBtn.TextColor3 = Color3.new(1, 1, 1)
-    refreshBtn.Font = Enum.Font.Gotham
-    refreshBtn.TextSize = 14
-    refreshBtn.Parent = buttonFrame
-    
-    local duplicateBtn = Instance.new("TextButton")
-    duplicateBtn.Text = "🚗 Duplicate"
-    duplicateBtn.Size = UDim2.new(0.7, -5, 1, 0)
-    duplicateBtn.Position = UDim2.new(0.3, 5, 0, 0)
-    duplicateBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
-    duplicateBtn.TextColor3 = Color3.new(1, 1, 1)
-    duplicateBtn.Font = Enum.Font.GothamBold
-    duplicateBtn.TextSize = 14
-    duplicateBtn.Parent = buttonFrame
-    
-    -- Add rounded corners
-    local function addCorner(obj, radius)
-        local corner = Instance.new("UICorner")
-        corner.CornerRadius = UDim.new(0, radius or 6)
-        corner.Parent = obj
-    end
-    
-    addCorner(mainFrame, 8)
-    addCorner(titleBar, 8)
-    addCorner(statusBar, 6)
-    addCorner(countFrame, 6)
-    addCorner(scrollFrame, 6)
-    addCorner(selectedFrame, 6)
-    addCorner(refreshBtn, 6)
-    addCorner(duplicateBtn, 6)
-    addCorner(closeBtn, 15)
-    
-    -- Make window draggable
-    local dragging = false
-    local dragStart, frameStart
-    
-    titleBar.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = true
-            dragStart = input.Position
-            frameStart = mainFrame.Position
-        end
-    end)
-    
-    titleBar.InputEnded:Connect(function()
-        dragging = false
-    end)
-    
-    game:GetService("UserInputService").InputChanged:Connect(function(input)
-        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-            local delta = input.Position - dragStart
-            mainFrame.Position = UDim2.new(
-                frameStart.X.Scale, frameStart.X.Offset + delta.X,
-                frameStart.Y.Scale, frameStart.Y.Offset + delta.Y
-            )
-        end
-    end)
-    
-    -- ===== UI FUNCTIONS =====
-    local function updateStatus(text, color)
-        statusText.Text = text
-        statusText.TextColor3 = color or Color3.new(1, 1, 1)
-    end
-    
-    local function updateCarCount()
-        countText.Text = "Total Cars: " .. #CarDuplicator.OwnedCars
-    end
-    
-    local function updateSelectedDisplay()
-        if CarDuplicator.SelectedCar then
-            local carName = CarDuplicator:GetCarName(CarDuplicator.SelectedCar)
-            local carClass = CarDuplicator:GetCarClass(CarDuplicator.SelectedCar)
-            local classIcon = carClass == 3 and "🔴" or carClass == 2 and "🟡" or "🟢"
-            selectedName.Text = classIcon .. " " .. carName .. " (Class " .. carClass .. ")"
-        else
-            selectedName.Text = "None"
-        end
-    end
-    
-    local function clearSelection()
-        CarDuplicator.SelectedCar = nil
-        CarDuplicator.SelectedCarIndex = nil
-        
-        -- Reset all button colors
-        for _, child in pairs(scrollFrame:GetChildren()) do
-            if child:IsA("Frame") then
-                child.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-            end
-        end
-        
-        updateSelectedDisplay()
-    end
-    
-    local function createCarButton(carData, index)
-        local buttonFrame = Instance.new("Frame")
-        buttonFrame.Size = UDim2.new(1, -10, 0, 50)
-        buttonFrame.Position = UDim2.new(0, 5, 0, (index-1) * 55)
-        buttonFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-        buttonFrame.Parent = scrollFrame
-        
-        addCorner(buttonFrame, 6)
-        
-        -- Car name
-        local carName = CarDuplicator:GetCarName(carData)
-        local carClass = CarDuplicator:GetCarClass(carData)
-        
-        local nameLabel = Instance.new("TextLabel")
-        nameLabel.Text = carName
-        nameLabel.Size = UDim2.new(1, -10, 0, 25)
-        nameLabel.Position = UDim2.new(0, 5, 0, 5)
-        nameLabel.BackgroundTransparency = 1
-        nameLabel.TextColor3 = Color3.new(1, 1, 1)
-        nameLabel.Font = Enum.Font.Gotham
-        nameLabel.TextSize = 12
-        nameLabel.TextXAlignment = Enum.TextXAlignment.Left
-        nameLabel.Parent = buttonFrame
-        
-        -- Class indicator
-        local classLabel = Instance.new("TextLabel")
-        local classIcon = carClass == 3 and "🔴 Class 3" or carClass == 2 and "🟡 Class 2" or "🟢 Class 1"
-        classLabel.Text = classIcon
-        classLabel.Size = UDim2.new(0.4, 0, 0, 20)
-        classLabel.Position = UDim2.new(0.6, 0, 0, 28)
-        classLabel.BackgroundTransparency = 1
-        classLabel.TextColor3 = Color3.new(1, 1, 1)
-        classLabel.Font = Enum.Font.Gotham
-        classLabel.TextSize = 10
-        classLabel.Parent = buttonFrame
-        
-        -- Select button
-        local selectBtn = Instance.new("TextButton")
-        selectBtn.Text = "SELECT"
-        selectBtn.Size = UDim2.new(0.3, 0, 0, 20)
-        selectBtn.Position = UDim2.new(0, 5, 0, 28)
-        selectBtn.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
-        selectBtn.TextColor3 = Color3.new(1, 1, 1)
-        selectBtn.Font = Enum.Font.Gotham
-        selectBtn.TextSize = 10
-        selectBtn.Parent = buttonFrame
-        
-        addCorner(selectBtn, 4)
-        
-        -- Button click handler
-        selectBtn.MouseButton1Click:Connect(function()
-            -- Deselect all other cars
-            for _, child in pairs(scrollFrame:GetChildren()) do
-                if child:IsA("Frame") then
-                    child.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+    -- Look for shop containers
+    for _, container in pairs(PlayerGui:GetDescendants()) do
+        if container:IsA("ScrollingFrame") or container:IsA("Frame") then
+            local containerName = container.Name:lower()
+            
+            -- Check if this looks like a shop container
+            if containerName:find("shop") or containerName:find("store") 
+               or containerName:find("custom") or containerName:find("selection") then
+                
+                print("📋 Found shop container: " .. container.Name)
+                
+                -- Extract IDs from all buttons
+                for _, item in pairs(container:GetDescendants()) do
+                    if item:IsA("TextButton") or item:IsA("ImageButton") then
+                        -- Try to get item name from various sources
+                        local itemName = item.Name
+                        local displayText = ""
+                        
+                        -- Get text from child labels
+                        for _, child in pairs(item:GetDescendants()) do
+                            if child:IsA("TextLabel") then
+                                displayText = child.Text
+                                break
+                            end
+                        end
+                        
+                        -- Check if this looks like a cosmetic item
+                        local nameLower = itemName:lower()
+                        local textLower = displayText:lower()
+                        
+                        if nameLower:find("wrap") or textLower:find("wrap") 
+                           or nameLower:find("paint") or textLower:find("paint")
+                           or nameLower:find("kit") or textLower:find("kit")
+                           or nameLower:find("wheel") or textLower:find("wheel")
+                           or nameLower:find("neon") or textLower:find("neon") then
+                            
+                            -- Use display text if available, otherwise use button name
+                            local id = displayText ~= "" and displayText or itemName
+                            
+                            if not extracted[id] then
+                                extracted[id] = {
+                                    id = id,
+                                    button = item,
+                                    container = container.Name
+                                }
+                                print("  • Found: " .. id)
+                            end
+                        end
+                    end
                 end
             end
-            
-            -- Select this car
-            CarDuplicator.SelectedCar = carData
-            CarDuplicator.SelectedCarIndex = index
-            buttonFrame.BackgroundColor3 = Color3.fromRGB(60, 100, 180) -- Blue highlight
-            
-            updateSelectedDisplay()
-            updateStatus("Selected: " .. carName, Color3.fromRGB(0, 200, 100))
+        end
+    end
+    
+    -- If nothing found, look for any button with cosmetic-like text
+    if next(extracted) == nil then
+        print("🔍 Doing deep search for cosmetic items...")
+        
+        for _, item in pairs(PlayerGui:GetDescendants()) do
+            if item:IsA("TextButton") then
+                local text = item.Text:lower()
+                if text:find("wrap") or text:find("paint") 
+                   or text:find("kit") or text:find("wheel") 
+                   or text:find("neon") or text:find("color") then
+                    
+                    extracted[item.Text] = {
+                        id = item.Text,
+                        button = item,
+                        container = "Unknown"
+                    }
+                    print("  • Found via text: " .. item.Text)
+                end
+            end
+        end
+    end
+    
+    return extracted
+end
+
+-- ===== HOVER DETECTOR =====
+local function CreateHoverDetector()
+    print("🖱️ Creating hover detector...")
+    
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "HoverDetectorUI"
+    ScreenGui.Parent = Player:WaitForChild("PlayerGui")
+    
+    local DetectorFrame = Instance.new("Frame")
+    DetectorFrame.Size = UDim2.new(0, 300, 0, 100)
+    DetectorFrame.Position = UDim2.new(0.5, -150, 0, 20)
+    DetectorFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 50)
+    DetectorFrame.BorderSizePixel = 0
+    
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 10)
+    Corner.Parent = DetectorFrame
+    
+    local Title = Instance.new("TextLabel")
+    Title.Text = "🖱️ HOVER DETECTOR"
+    Title.Size = UDim2.new(1, 0, 0, 30)
+    Title.BackgroundColor3 = Color3.fromRGB(50, 50, 80)
+    Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Title.Font = Enum.Font.GothamBold
+    Title.TextSize = 14
+    
+    local TitleCorner = Instance.new("UICorner")
+    TitleCorner.CornerRadius = UDim.new(0, 10)
+    TitleCorner.Parent = Title
+    
+    local InfoLabel = Instance.new("TextLabel")
+    InfoLabel.Text = "Hover over shop items to see IDs"
+    InfoLabel.Size = UDim2.new(1, -20, 1, -40)
+    InfoLabel.Position = UDim2.new(0, 10, 0, 40)
+    InfoLabel.BackgroundTransparency = 1
+    InfoLabel.TextColor3 = Color3.fromRGB(200, 220, 255)
+    InfoLabel.Font = Enum.Font.Gotham
+    InfoLabel.TextSize = 12
+    InfoLabel.TextWrapped = true
+    
+    -- Close button
+    local CloseBtn = Instance.new("TextButton")
+    CloseBtn.Text = "✕"
+    CloseBtn.Size = UDim2.new(0, 25, 0, 25)
+    CloseBtn.Position = UDim2.new(1, -30, 0, 2)
+    CloseBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+    CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    CloseBtn.Font = Enum.Font.GothamBold
+    CloseBtn.TextSize = 12
+    
+    local CloseCorner = Instance.new("UICorner")
+    CloseCorner.CornerRadius = UDim.new(0, 6)
+    CloseCorner.Parent = CloseBtn
+    
+    -- Parent everything
+    Title.Parent = DetectorFrame
+    InfoLabel.Parent = DetectorFrame
+    CloseBtn.Parent = Title
+    DetectorFrame.Parent = ScreenGui
+    
+    -- Monitor hover events
+    local PlayerGui = Player:WaitForChild("PlayerGui")
+    local lastHovered = ""
+    
+    game:GetService("RunService").RenderStepped:Connect(function()
+        local mouse = Player:GetMouse()
+        local target = mouse.Target
+        
+        if target and target:IsDescendantOf(PlayerGui) then
+            if target ~= lastHovered then
+                lastHovered = target
+                
+                -- Extract info from hovered element
+                local info = "Hovering: " .. target.Name .. "\n"
+                info = info .. "Class: " .. target.ClassName .. "\n"
+                
+                -- Get text if available
+                if target:IsA("TextButton") or target:IsA("TextLabel") then
+                    info = info .. "Text: " .. target.Text .. "\n"
+                end
+                
+                -- Get attributes
+                local attributes = {}
+                for _, attr in pairs({"ItemId", "ID", "CosmeticId", "ProductId"}) do
+                    local value = target:GetAttribute(attr)
+                    if value then
+                        table.insert(attributes, attr .. ": " .. tostring(value))
+                    end
+                end
+                
+                if #attributes > 0 then
+                    info = info .. "Attributes:\n" .. table.concat(attributes, "\n")
+                end
+                
+                InfoLabel.Text = info
+            end
+        end
+    end)
+    
+    CloseBtn.MouseButton1Click:Connect(function()
+        ScreenGui:Destroy()
+    end)
+    
+    print("✅ Hover detector active! Hover over shop items to see their IDs.")
+    
+    return ScreenGui
+end
+
+-- ===== BULK UNLOCKER UI =====
+local function CreateBulkUnlocker(allIDs)
+    print("🚀 Creating bulk unlocker...")
+    
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "BulkUnlockerUI"
+    ScreenGui.Parent = Player:WaitForChild("PlayerGui")
+    
+    local MainFrame = Instance.new("Frame")
+    MainFrame.Size = UDim2.new(0, 400, 0, 600)
+    MainFrame.Position = UDim2.new(0.5, -200, 0.5, -300)
+    MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 40)
+    MainFrame.BorderSizePixel = 0
+    
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 15)
+    Corner.Parent = MainFrame
+    
+    -- Title
+    local Title = Instance.new("TextLabel")
+    Title.Text = "🎮 COSMETIC ID UNLOCKER"
+    Title.Size = UDim2.new(1, 0, 0, 50)
+    Title.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+    Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Title.Font = Enum.Font.GothamBold
+    Title.TextSize = 18
+    
+    local TitleCorner = Instance.new("UICorner")
+    TitleCorner.CornerRadius = UDim.new(0, 15)
+    TitleCorner.Parent = Title
+    
+    -- Scrolling frame for IDs
+    local ScrollFrame = Instance.new("ScrollingFrame")
+    ScrollFrame.Size = UDim2.new(1, -20, 0, 400)
+    ScrollFrame.Position = UDim2.new(0, 10, 0, 60)
+    ScrollFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 50)
+    ScrollFrame.BorderSizePixel = 0
+    ScrollFrame.ScrollBarThickness = 8
+    
+    local ScrollCorner = Instance.new("UICorner")
+    ScrollCorner.CornerRadius = UDim.new(0, 10)
+    ScrollCorner.Parent = ScrollFrame
+    
+    local UIListLayout = Instance.new("UIListLayout")
+    UIListLayout.Padding = UDim.new(0, 5)
+    UIListLayout.Parent = ScrollFrame
+    
+    -- Status
+    local Status = Instance.new("TextLabel")
+    Status.Text = "Select IDs to unlock"
+    Status.Size = UDim2.new(1, -20, 0, 80)
+    Status.Position = UDim2.new(0, 10, 1, -140)
+    Status.BackgroundColor3 = Color3.fromRGB(35, 35, 50)
+    Status.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Status.Font = Enum.Font.Gotham
+    Status.TextSize = 12
+    Status.TextWrapped = true
+    
+    local StatusCorner = Instance.new("UICorner")
+    StatusCorner.CornerRadius = UDim.new(0, 10)
+    StatusCorner.Parent = Status
+    
+    -- Buttons
+    local UnlockSelectedBtn = Instance.new("TextButton")
+    UnlockSelectedBtn.Text = "🔓 UNLOCK SELECTED"
+    UnlockSelectedBtn.Size = UDim2.new(1, -20, 0, 40)
+    UnlockSelectedBtn.Position = UDim2.new(0, 10, 1, -90)
+    UnlockSelectedBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
+    UnlockSelectedBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    UnlockSelectedBtn.Font = Enum.Font.GothamBold
+    UnlockSelectedBtn.TextSize = 14
+    
+    local BtnCorner = Instance.new("UICorner")
+    BtnCorner.CornerRadius = UDim.new(0, 10)
+    BtnCorner.Parent = UnlockSelectedBtn
+    
+    local UnlockAllBtn = Instance.new("TextButton")
+    UnlockAllBtn.Text = "🎯 UNLOCK ALL"
+    UnlockAllBtn.Size = UDim2.new(1, -20, 0, 40)
+    UnlockAllBtn.Position = UDim2.new(0, 10, 1, -40)
+    UnlockAllBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+    UnlockAllBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    UnlockAllBtn.Font = Enum.Font.GothamBold
+    UnlockAllBtn.TextSize = 14
+    
+    local AllBtnCorner = Instance.new("UICorner")
+    AllBtnCorner.CornerRadius = UDim.new(0, 10)
+    AllBtnCorner.Parent = UnlockAllBtn
+    
+    -- Close button
+    local CloseBtn = Instance.new("TextButton")
+    CloseBtn.Text = "✕"
+    CloseBtn.Size = UDim2.new(0, 30, 0, 30)
+    CloseBtn.Position = UDim2.new(1, -35, 0, 10)
+    CloseBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+    CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    CloseBtn.Font = Enum.Font.GothamBold
+    CloseBtn.TextSize = 14
+    
+    local CloseCorner = Instance.new("UICorner")
+    CloseCorner.CornerRadius = UDim.new(0, 6)
+    CloseCorner.Parent = CloseBtn
+    
+    -- Parent everything
+    Title.Parent = MainFrame
+    ScrollFrame.Parent = MainFrame
+    Status.Parent = MainFrame
+    UnlockSelectedBtn.Parent = MainFrame
+    UnlockAllBtn.Parent = MainFrame
+    CloseBtn.Parent = Title
+    MainFrame.Parent = ScreenGui
+    
+    -- Create checkboxes for each ID
+    local selectedIDs = {}
+    local checkboxes = {}
+    
+    local function AddCheckbox(id, category)
+        local checkboxFrame = Instance.new("Frame")
+        checkboxFrame.Size = UDim2.new(1, -10, 0, 30)
+        checkboxFrame.BackgroundColor3 = Color3.fromRGB(45, 45, 65)
+        checkboxFrame.BackgroundTransparency = 0.5
+        
+        local checkboxCorner = Instance.new("UICorner")
+        checkboxCorner.CornerRadius = UDim.new(0, 6)
+        checkboxCorner.Parent = checkboxFrame
+        
+        local checkbox = Instance.new("TextButton")
+        checkbox.Text = "☐ " .. id
+        checkbox.Size = UDim2.new(1, -30, 1, 0)
+        checkbox.Position = UDim2.new(0, 30, 0, 0)
+        checkbox.BackgroundTransparency = 1
+        checkbox.TextColor3 = Color3.fromRGB(255, 255, 255)
+        checkbox.Font = Enum.Font.Gotham
+        checkbox.TextSize = 12
+        checkbox.TextXAlignment = Enum.TextXAlignment.Left
+        
+        local checkIcon = Instance.new("TextLabel")
+        checkIcon.Text = "☐"
+        checkIcon.Size = UDim2.new(0, 20, 0, 20)
+        checkIcon.Position = UDim2.new(0, 5, 0, 5)
+        checkIcon.BackgroundTransparency = 1
+        checkIcon.TextColor3 = Color3.fromRGB(255, 255, 255)
+        checkIcon.Font = Enum.Font.Gotham
+        checkIcon.TextSize = 14
+        
+        local categoryLabel = Instance.new("TextLabel")
+        categoryLabel.Text = "[" .. category .. "]"
+        categoryLabel.Size = UDim2.new(0, 70, 0, 20)
+        categoryLabel.Position = UDim2.new(1, -75, 0, 5)
+        categoryLabel.BackgroundTransparency = 1
+        categoryLabel.TextColor3 = Color3.fromRGB(150, 200, 255)
+        categoryLabel.Font = Enum.Font.Gotham
+        categoryLabel.TextSize = 10
+        
+        -- Checkbox click
+        checkbox.MouseButton1Click:Connect(function()
+            if selectedIDs[id] then
+                selectedIDs[id] = nil
+                checkIcon.Text = "☐"
+                checkbox.Text = "☐ " .. id
+            else
+                selectedIDs[id] = true
+                checkIcon.Text = "✓"
+                checkbox.Text = "✓ " .. id
+            end
+            Status.Text = "Selected: " .. table.count(selectedIDs) .. " IDs"
         end)
         
-        return buttonFrame
+        checkIcon.Parent = checkboxFrame
+        checkbox.Parent = checkboxFrame
+        categoryLabel.Parent = checkboxFrame
+        checkboxFrame.Parent = ScrollFrame
+        
+        checkboxes[id] = {
+            frame = checkboxFrame,
+            checkIcon = checkIcon,
+            checkbox = checkbox
+        }
     end
     
-    local function loadCars()
-        updateStatus("Loading cars...", Color3.fromRGB(255, 255, 0))
+    -- Add all IDs to the list
+    local idCount = 0
+    for id, info in pairs(allIDs) do
+        AddCheckbox(id, info.category)
+        idCount = idCount + 1
+    end
+    
+    -- Update scroll frame size
+    ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, UIListLayout.AbsoluteContentSize.Y)
+    
+    -- Unlock function
+    local function PurchaseItem(itemId)
+        -- Find purchase remote
+        local purchaseRemote = RS:FindFirstChild("PurchaseShopItem", true)
+                             or RS:FindFirstChild("Purchase", true)
         
-        -- Clear existing cars
-        for _, child in pairs(scrollFrame:GetChildren()) do
-            if child:IsA("Frame") then
-                child:Destroy()
-            end
-        end
-        
-        -- Clear selection
-        clearSelection()
-        
-        -- Load cars
-        if CarDuplicator:GetOwnedCars() then
-            updateCarCount()
+        if purchaseRemote and purchaseRemote:IsA("RemoteFunction") then
+            -- Try different formats
+            local formats = {
+                itemId,
+                {ItemId = itemId},
+                {id = itemId},
+                {Name = itemId}
+            }
             
-            -- Create car buttons
-            for i, carData in ipairs(CarDuplicator.OwnedCars) do
-                if type(carData) == "table" then
-                    createCarButton(carData, i)
+            for _, data in ipairs(formats) do
+                local success, result = pcall(function()
+                    return purchaseRemote:InvokeServer(data)
+                end)
+                
+                if success then
+                    return true, result
                 end
             end
-            
-            updateStatus("Loaded " .. #CarDuplicator.OwnedCars .. " cars", Color3.fromRGB(0, 200, 100))
-        else
-            updateStatus("Failed to load cars", Color3.fromRGB(255, 50, 50))
         end
+        
+        return false, "No purchase remote found"
     end
     
-    -- Button click handlers
-    refreshBtn.MouseButton1Click:Connect(function()
-        loadCars()
-    end)
-    
-    duplicateBtn.MouseButton1Click:Connect(function()
-        if not CarDuplicator.SelectedCar then
-            updateStatus("Please select a car first!", Color3.fromRGB(255, 50, 50))
+    -- Unlock selected
+    UnlockSelectedBtn.MouseButton1Click:Connect(function()
+        local toUnlock = {}
+        for id, _ in pairs(selectedIDs) do
+            table.insert(toUnlock, id)
+        end
+        
+        if #toUnlock == 0 then
+            Status.Text = "Select IDs first!"
             return
         end
         
-        local carName = CarDuplicator:GetCarName(CarDuplicator.SelectedCar)
-        updateStatus("Attempting to duplicate " .. carName .. "...", Color3.fromRGB(255, 255, 0))
+        UnlockSelectedBtn.Text = "UNLOCKING..."
+        UnlockSelectedBtn.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
+        Status.Text = "Unlocking " .. #toUnlock .. " items..."
         
-        local success, message = CarDuplicator:DuplicateCar()
-        
-        if success then
-            updateStatus("✅ " .. message, Color3.fromRGB(0, 200, 100))
+        task.spawn(function()
+            local unlocked = 0
             
-            -- Refresh after delay
-            task.wait(3)
-            loadCars()
-        else
-            updateStatus("❌ " .. message, Color3.fromRGB(255, 50, 50))
-        end
+            for _, id in ipairs(toUnlock) do
+                local success, result = PurchaseItem(id)
+                if success then
+                    unlocked = unlocked + 1
+                    Status.Text = "Unlocked " .. unlocked .. "/" .. #toUnlock .. "\nLast: " .. id
+                end
+                
+                task.wait(0.1)
+            end
+            
+            UnlockSelectedBtn.Text = "🔓 UNLOCK SELECTED"
+            UnlockSelectedBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+            Status.Text = "✅ Unlocked " .. unlocked .. "/" .. #toUnlock .. " items!"
+        end)
     end)
     
-    -- Initial load
-    loadCars()
+    -- Unlock all
+    UnlockAllBtn.MouseButton1Click:Connect(function()
+        local total = idCount
+        
+        UnlockAllBtn.Text = "UNLOCKING ALL..."
+        UnlockAllBtn.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
+        Status.Text = "Unlocking all " .. total .. " items..."
+        
+        task.spawn(function()
+            local unlocked = 0
+            local current = 0
+            
+            for id, _ in pairs(allIDs) do
+                current = current + 1
+                local success, _ = PurchaseItem(id)
+                if success then
+                    unlocked = unlocked + 1
+                end
+                
+                Status.Text = "Progress: " .. current .. "/" .. total .. "\nUnlocked: " .. unlocked
+                task.wait(0.05)
+            end
+            
+            UnlockAllBtn.Text = "🎯 UNLOCK ALL"
+            UnlockAllBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+            Status.Text = "✅ Finished!\nUnlocked " .. unlocked .. "/" .. total .. " items"
+        end)
+    end)
     
-    return gui
+    -- Close
+    CloseBtn.MouseButton1Click:Connect(function()
+        ScreenGui:Destroy()
+    end)
+    
+    Status.Text = "Loaded " .. idCount .. " cosmetic IDs\nSelect items to unlock"
+    
+    return ScreenGui
 end
 
--- ===== START THE SYSTEM =====
-print("🚀 Initializing Car Duplication System...")
+-- ===== MAIN EXECUTION =====
+print("=" .. string.rep("=", 60))
+print("🔍 COSMETIC ID FINDER & UNLOCKER")
+print("=" .. string.rep("=", 60))
+print("This script will:")
+print("1. Scan game for cosmetic IDs")
+print("2. Create hover detector to find IDs")
+print("3. Show all found IDs in a list")
+print("4. Let you unlock selected IDs")
+print("=" .. string.rep("=", 60))
 
--- Create the UI
-local ui = CarDuplicator:CreateUI()
+-- Wait for game
+task.wait(2)
 
-print("✅ Car Duplication System Ready!")
-print("📋 Instructions:")
-print("1. Select a car from the list")
-print("2. Click 'Duplicate' button")
-print("3. Wait for confirmation")
-print("4. Refresh to see updated count")
-print("")
-print("🎯 Features:")
-print("• Shows all 56 of your cars")
-print("• Simple selection system")
-print("• Multiple duplication methods")
-print("• Real-time status updates")
-print("• Drag and move window")
+-- Start scanning
+local allIDs, categories = ScanForCosmeticIDs()
+
+-- Create hover detector (helps find IDs in shop)
+task.wait(1)
+CreateHoverDetector()
+
+-- Extract IDs from current shop if open
+task.wait(2)
+local shopIDs = ExtractIDsFromCurrentShop()
+if next(shopIDs) ~= nil then
+    print("🛒 Found", table.count(shopIDs), "IDs in current shop")
+    
+    -- Add shop IDs to allIDs
+    for id, info in pairs(shopIDs) do
+        if not allIDs[id] then
+            allIDs[id] = {
+                id = id,
+                category = "Shop",
+                source = info.container
+            }
+        end
+    end
+end
+
+-- Create bulk unlocker with all found IDs
+task.wait(3)
+if next(allIDs) ~= nil then
+    CreateBulkUnlocker(allIDs)
+    print("\n✅ Bulk unlocker created!")
+    print("🎯 Found", table.count(allIDs), "total cosmetic IDs")
+    print("📝 Open the UI to see and unlock them!")
+else
+    print("\n⚠️ No cosmetic IDs found!")
+    print("💡 Try opening the car customization shop first,")
+    print("   then run the script again.")
+end
+
+-- Instructions
+print("\n" .. string.rep("=", 60))
+print("📖 HOW TO FIND COSMETIC IDs:")
+print(string.rep("=", 60))
+print("1. OPEN the car customization shop in-game")
+print("2. HOVER over items with the hover detector")
+print("3. LOOK for IDs in the displayed info")
+print("4. CHECK the list in the unlocker UI")
+print("5. SELECT and UNLOCK items you want")
+print(string.rep("=", 60))
