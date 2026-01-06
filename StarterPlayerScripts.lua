@@ -1,256 +1,207 @@
--- 🎯 GUID-BASED COSMETIC UNLOCKER
--- Finds real item GUIDs and properly unlocks them
+-- 🔓 LOCKED VALUE UNLOCKER
+-- Changes "locked" or "Locked" values to 0 to unlock items
 
 local Players = game:GetService("Players")
-local RS = game:GetService("ReplicatedStorage")
 local Player = Players.LocalPlayer
-local HttpService = game:GetService("HttpService")
 
 -- Wait for game
 repeat task.wait() until game:IsLoaded()
 task.wait(3)
 
-print("🔓 GUID-BASED UNLOCKER LOADED")
+print("🔓 LOCKED VALUE UNLOCKER LOADED")
 
--- ===== GUID COLLECTOR =====
-local function CollectGUIDs()
-    print("🔍 Collecting item GUIDs...")
+-- ===== FIND AND UNLOCK ITEMS =====
+local function UnlockAllLockedValues()
+    print("🔍 Searching for locked values...")
     
     local PlayerGui = Player:WaitForChild("PlayerGui")
-    local collectedGUIDs = {}
-    local foundButtons = {}
-    
-    -- Find all cosmetic buttons and their GUIDs
-    for _, gui in pairs(PlayerGui:GetDescendants()) do
-        if gui:IsA("TextButton") or gui:IsA("ImageButton") then
-            local buttonName = gui.Name:lower()
-            local buttonText = gui:IsA("TextButton") and gui.Text:lower() or ""
-            
-            -- Check if this is a cosmetic button
-            local isCosmetic = buttonName:find("wrap") or buttonName:find("kit") 
-                             or buttonName:find("wheel") or buttonName:find("neon")
-                             or buttonName:find("paint") or buttonName:find("color")
-                             or buttonText:find("wrap") or buttonText:find("kit")
-                             or buttonText:find("wheel") or buttonText:find("neon")
-                             or buttonName:find("item_") or buttonName:find("cosmetic_")
-            
-            if isCosmetic then
-                local buttonInfo = {
-                    button = gui,
-                    name = gui.Name,
-                    text = gui:IsA("TextButton") and gui.Text or "",
-                    path = gui:GetFullName(),
-                    guids = {}
-                }
-                
-                -- Look for GUIDs in the button or its children
-                -- GUIDs look like: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-                local guidPattern = "%x%x%x%x%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x"
-                
-                -- Check button name
-                for guid in tostring(buttonInfo.name):gmatch(guidPattern) do
-                    table.insert(buttonInfo.guids, guid)
-                end
-                
-                -- Check button text
-                for guid in tostring(buttonInfo.text):gmatch(guidPattern) do
-                    table.insert(buttonInfo.guids, guid)
-                end
-                
-                -- Check children values
-                for _, child in pairs(gui:GetDescendants()) do
-                    if child:IsA("StringValue") or child:IsA("ObjectValue") then
-                        for guid in tostring(child.Value):gmatch(guidPattern) do
-                            table.insert(buttonInfo.guids, guid)
-                        end
-                    end
-                end
-                
-                if #buttonInfo.guids > 0 then
-                    table.insert(foundButtons, buttonInfo)
-                    print("✅ Found button: " .. buttonInfo.name)
-                    print("   GUIDs: " .. table.concat(buttonInfo.guids, ", "))
-                end
-            end
-        end
-    end
-    
-    return foundButtons
-end
-
--- ===== INTELLIGENT UNLOCK ATTEMPT =====
-local function IntelligentUnlock(buttons)
-    print("🔓 Attempting intelligent unlock...")
-    
-    -- Find purchase remotes
-    local purchaseRemotes = {}
-    
-    for _, obj in pairs(RS:GetDescendants()) do
-        if obj:IsA("RemoteFunction") or obj:IsA("RemoteEvent") then
-            local name = obj.Name:lower()
-            if name:find("purchase") or name:find("buy") 
-               or name:find("unlock") or name:find("additem") then
-                
-                table.insert(purchaseRemotes, {
-                    object = obj,
-                    name = obj.Name,
-                    type = obj.ClassName
-                })
-            end
-        end
-    end
-    
-    print("📡 Found " .. #purchaseRemotes .. " purchase remotes")
-    
-    -- Try to unlock each button
     local unlockedCount = 0
     
-    for _, buttonInfo in pairs(buttons) do
-        print("\n🔄 Processing: " .. buttonInfo.name)
-        
-        for _, guid in pairs(buttonInfo.guids) do
-            print("   Trying GUID: " .. guid)
+    -- Look for ALL values in the UI
+    for _, obj in pairs(PlayerGui:GetDescendants()) do
+        -- Check IntValues, NumberValues, StringValues, BoolValues
+        if obj:IsA("IntValue") or obj:IsA("NumberValue") 
+           or obj:IsA("StringValue") or obj:IsA("BoolValue") then
             
-            -- Try different data formats
-            local formats = {
-                guid,  -- Just the GUID
-                {ItemId = guid},
-                {Id = guid},
-                {GUID = guid},
-                {UUID = guid},
-                {ItemGUID = guid},
-                {CosmeticId = guid},
-                {ProductId = guid},
-                -- With additional info
-                {ItemId = guid, Type = "Cosmetic"},
-                {Id = guid, Category = "VehiclePart"},
-                {GUID = guid, Action = "Purchase"}
-            }
+            local valueName = obj.Name:lower()
             
-            local success = false
-            
-            for _, remote in pairs(purchaseRemotes) do
-                for i, data in ipairs(formats) do
-                    print("      Testing format " .. i .. " with " .. remote.name)
-                    
-                    local callSuccess, result = pcall(function()
-                        if remote.type == "RemoteFunction" then
-                            return remote.object:InvokeServer(data)
-                        else
-                            remote.object:FireServer(data)
-                            return "FireServer called"
-                        end
-                    end)
-                    
-                    if callSuccess then
-                        print("      ✅ Success!")
-                        print("      Result: " .. tostring(result))
-                        
-                        -- Mark button as unlocked visually
-                        if buttonInfo.button:IsA("TextButton") then
-                            buttonInfo.button.Text = "EQUIP"
-                            buttonInfo.button.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
-                        end
-                        
+            -- Check if this looks like a lock/unlock value
+            if valueName:find("lock") or valueName:find("owned")
+               or valueName:find("purchased") or valueName:find("unlocked")
+               or valueName:find("equipped") or valueName:find("bought") then
+                
+                print("🔓 Found value: " .. obj.Name .. " = " .. tostring(obj.Value))
+                
+                -- Try to unlock it
+                local originalValue = obj.Value
+                
+                if obj:IsA("IntValue") or obj:IsA("NumberValue") then
+                    -- For numeric values, change to 1 (unlocked) or 0 if it's > 0
+                    if tonumber(obj.Value) == 0 then
+                        obj.Value = 1  -- 0 = locked, 1 = unlocked
                         unlockedCount = unlockedCount + 1
-                        success = true
-                        break
-                    else
-                        print("      ❌ Failed: " .. tostring(result))
+                        print("   ✅ Changed from " .. originalValue .. " to 1")
+                    elseif tonumber(obj.Value) > 1 then
+                        obj.Value = 1
+                        unlockedCount = unlockedCount + 1
+                        print("   ✅ Changed from " .. originalValue .. " to 1")
+                    end
+                elseif obj:IsA("StringValue") then
+                    -- For string values, change "false" to "true", "locked" to "unlocked"
+                    local lowerValue = tostring(obj.Value):lower()
+                    if lowerValue == "false" or lowerValue == "locked" 
+                       or lowerValue == "no" or lowerValue == "0" then
+                        obj.Value = "true"
+                        unlockedCount = unlockedCount + 1
+                        print("   ✅ Changed from '" .. originalValue .. "' to 'true'")
+                    end
+                elseif obj:IsA("BoolValue") then
+                    -- For boolean values, change false to true
+                    if obj.Value == false then
+                        obj.Value = true
+                        unlockedCount = unlockedCount + 1
+                        print("   ✅ Changed from false to true")
                     end
                 end
-                
-                if success then break end
             end
-            
-            if success then break end
+        end
+        
+        -- Also check TextLabels/TextButtons that might show locked status
+        if obj:IsA("TextLabel") or obj:IsA("TextButton") then
+            local text = obj.Text:lower()
+            if text:find("locked") or text:find("not owned") 
+               or text:find("purchase") or text:find("buy") then
+                
+                -- Change the text to show unlocked
+                if text:find("locked") then
+                    obj.Text = "UNLOCKED"
+                    obj.TextColor3 = Color3.fromRGB(0, 255, 0)
+                    unlockedCount = unlockedCount + 1
+                    print("✅ Changed text from 'locked' to 'UNLOCKED'")
+                elseif text:find("buy") or text:find("purchase") then
+                    obj.Text = "EQUIP"
+                    obj.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+                    unlockedCount = unlockedCount + 1
+                    print("✅ Changed button from 'buy' to 'EQUIP'")
+                end
+            end
+        end
+    end
+    
+    -- Also look for specific patterns like "locked = 1" in properties
+    for _, obj in pairs(PlayerGui:GetDescendants()) do
+        if obj:IsA("Frame") or obj:IsA("ScrollingFrame") then
+            -- Check for common property names
+            for _, child in pairs(obj:GetChildren()) do
+                if child.Name:lower():find("lock") and (child:IsA("IntValue") or child:IsA("BoolValue")) then
+                    print("🔓 Found lock property: " .. child.Name)
+                    
+                    if child:IsA("IntValue") then
+                        if child.Value == 0 then
+                            child.Value = 1
+                            unlockedCount = unlockedCount + 1
+                            print("   ✅ Set " .. child.Name .. " from 0 to 1")
+                        end
+                    elseif child:IsA("BoolValue") and child.Value == false then
+                        child.Value = true
+                        unlockedCount = unlockedCount + 1
+                        print("   ✅ Set " .. child.Name .. " from false to true")
+                    end
+                end
+            end
         end
     end
     
     return unlockedCount
 end
 
--- ===== UI INTERCEPTION =====
-local function InterceptUIForRealUnlock()
-    print("🎯 Intercepting UI for real unlock...")
+-- ===== REAL-TIME MONITOR =====
+local function StartRealTimeUnlockMonitor()
+    print("👁️ Starting real-time unlock monitor...")
     
     local PlayerGui = Player:WaitForChild("PlayerGui")
     
-    -- This function monitors UI interactions to learn the correct format
-    local function setupUIInterceptor()
-        -- Find all cosmetic buttons
-        for _, gui in pairs(PlayerGui:GetDescendants()) do
-            if gui:IsA("TextButton") and (gui.Text:find("Buy") or gui.Text:find("Purchase")) then
-                -- Store original click function
-                local originalClick = gui.MouseButton1Click
+    -- Monitor for new UI elements
+    local connection = PlayerGui.DescendantAdded:Connect(function(obj)
+        task.wait(0.1)  -- Wait for properties to load
+        
+        -- Check if this is a lock-related value
+        if obj:IsA("IntValue") or obj:IsA("BoolValue") then
+            local name = obj.Name:lower()
+            if name:find("lock") or name:find("owned") then
+                print("👁️ New lock value detected: " .. obj.Name)
                 
-                gui.MouseButton1Click:Connect(function()
-                    print("🖱️ Button clicked: " .. gui.Name)
-                    print("   Text: " .. gui.Text)
-                    
-                    -- Try to find what data should be sent
-                    local parent = gui.Parent
-                    while parent do
-                        -- Look for GUIDs in parent hierarchy
-                        local guidPattern = "%x%x%x%x%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x"
-                        
-                        for guid in tostring(parent.Name):gmatch(guidPattern) do
-                            print("   Found GUID in parent: " .. guid)
-                        end
-                        
-                        parent = parent.Parent
-                    end
-                    
-                    -- Call original function
-                    if originalClick then
-                        originalClick()
-                    end
-                end)
+                -- Try to unlock it
+                if obj:IsA("IntValue") and obj.Value == 0 then
+                    obj.Value = 1
+                    print("   ✅ Auto-unlocked: " .. obj.Name .. " (0 → 1)")
+                elseif obj:IsA("BoolValue") and obj.Value == false then
+                    obj.Value = true
+                    print("   ✅ Auto-unlocked: " .. obj.Name .. " (false → true)")
+                end
             end
         end
-    end
+        
+        -- Check for locked text
+        if obj:IsA("TextLabel") then
+            local text = obj.Text:lower()
+            if text:find("locked") or text:find("not owned") then
+                obj.Text = "UNLOCKED"
+                obj.TextColor3 = Color3.fromRGB(0, 255, 0)
+                print("✅ Auto-changed text to UNLOCKED")
+            end
+        end
+    end)
     
-    pcall(setupUIInterceptor)
+    return connection
 end
 
--- ===== CREATE UI =====
+-- ===== SIMPLE UI =====
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "GUIDUnlockerUI"
+ScreenGui.Name = "LockedValueUnlockerUI"
 ScreenGui.Parent = Player:WaitForChild("PlayerGui")
 
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 450, 0, 400)
-MainFrame.Position = UDim2.new(0.5, -225, 0.5, -200)
+MainFrame.Size = UDim2.new(0, 350, 0, 250)
+MainFrame.Position = UDim2.new(0.5, -175, 0, 20)
 MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 40)
 
 local Title = Instance.new("TextLabel")
-Title.Text = "🔓 REAL COSMETIC UNLOCKER"
-Title.Size = UDim2.new(1, 0, 0, 50)
+Title.Text = "🔓 LOCKED VALUE UNLOCKER"
+Title.Size = UDim2.new(1, 0, 0, 40)
 Title.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.Font = Enum.Font.GothamBold
+Title.TextSize = 16
 
 local Status = Instance.new("TextLabel")
-Status.Text = "Ready to find and unlock real cosmetics!\n"
-Status.Size = UDim2.new(1, -20, 0, 250)
-Status.Position = UDim2.new(0, 10, 0, 60)
+Status.Name = "StatusLabel"
+Status.Text = "Ready...\n"
+Status.Size = UDim2.new(1, -20, 0, 130)
+Status.Position = UDim2.new(0, 10, 0, 50)
 Status.BackgroundTransparency = 1
 Status.TextColor3 = Color3.fromRGB(255, 255, 255)
-Status.TextWrapped = true
+Status.Font = Enum.Font.Code
+Status.TextSize = 12
 Status.TextXAlignment = Enum.TextXAlignment.Left
-
-local ScanBtn = Instance.new("TextButton")
-ScanBtn.Text = "🔍 SCAN FOR COSMETICS"
-ScanBtn.Size = UDim2.new(1, -20, 0, 40)
-ScanBtn.Position = UDim2.new(0, 10, 0, 320)
-ScanBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+Status.TextYAlignment = Enum.TextYAlignment.Top
+Status.TextWrapped = true
 
 local UnlockBtn = Instance.new("TextButton")
-UnlockBtn.Text = "🔓 UNLOCK ALL"
-UnlockBtn.Size = UDim2.new(1, -20, 0, 40)
-UnlockBtn.Position = UDim2.new(0, 10, 0, 370)
+UnlockBtn.Text = "🔓 UNLOCK ALL VALUES"
+UnlockBtn.Size = UDim2.new(1, -20, 0, 35)
+UnlockBtn.Position = UDim2.new(0, 10, 0, 190)
 UnlockBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
-UnlockBtn.Visible = false
+UnlockBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+UnlockBtn.Font = Enum.Font.GothamBold
+
+local MonitorBtn = Instance.new("TextButton")
+MonitorBtn.Text = "👁️ ENABLE AUTO-MONITOR"
+MonitorBtn.Size = UDim2.new(1, -20, 0, 35)
+MonitorBtn.Position = UDim2.new(0, 10, 0, 235)
+MonitorBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+MonitorBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+MonitorBtn.Font = Enum.Font.GothamBold
 
 -- Add corners
 local function addCorner(obj)
@@ -261,140 +212,119 @@ end
 
 addCorner(MainFrame)
 addCorner(Title)
-addCorner(ScanBtn)
 addCorner(UnlockBtn)
+addCorner(MonitorBtn)
 
 -- Parent
 Title.Parent = MainFrame
 Status.Parent = MainFrame
-ScanBtn.Parent = MainFrame
 UnlockBtn.Parent = MainFrame
+MonitorBtn.Parent = MainFrame
 MainFrame.Parent = ScreenGui
 
--- Variables
-local foundButtons = {}
-
--- Update status
+-- Update status (FIXED VERSION)
 local function updateStatus(text)
     Status.Text = Status.Text .. text .. "\n"
     
-    -- Auto-scroll
-    local textHeight = #text:split("\n") * 20
-    Status.Parent.CanvasSize = UDim2.new(0, 0, 0, Status.TextBounds.Y + 50)
+    -- Calculate text height and update canvas size if in a ScrollingFrame
+    if Status.Parent:IsA("ScrollingFrame") then
+        local textHeight = #Status.Text:split("\n") * 15
+        Status.Parent.CanvasSize = UDim2.new(0, 0, 0, textHeight + 20)
+    end
 end
 
 local function clearStatus()
     Status.Text = ""
 end
 
--- Scan function
-ScanBtn.MouseButton1Click:Connect(function()
-    ScanBtn.Text = "SCANNING..."
-    clearStatus()
-    
-    updateStatus("🔍 Scanning for cosmetics with GUIDs...")
-    foundButtons = CollectGUIDs()
-    
-    if #foundButtons > 0 then
-        updateStatus("\n✅ Found " .. #foundButtons .. " cosmetic buttons")
-        updateStatus("📊 Total GUIDs found: " .. #foundButtons)
-        
-        for i, button in ipairs(foundButtons) do
-            updateStatus("   " .. i .. ". " .. button.name)
-            if #button.guids > 0 then
-                updateStatus("      GUIDs: " .. table.concat(button.guids, ", "))
-            end
-        end
-        
-        UnlockBtn.Visible = true
-        UnlockBtn.Text = "🔓 UNLOCK " .. #foundButtons .. " ITEMS"
-        
-        updateStatus("\n🎯 Ready to unlock!")
-        updateStatus("Click UNLOCK ALL to attempt unlock")
-    else
-        updateStatus("❌ No cosmetics with GUIDs found")
-        updateStatus("\n💡 Tips:")
-        updateStatus("1. Make sure shop is open")
-        updateStatus("2. Navigate to wraps/kits/wheels")
-        updateStatus("3. Try scrolling through items")
-        updateStatus("4. Click scan again")
-    end
-    
-    ScanBtn.Text = "🔍 SCAN FOR COSMETICS"
-end)
+-- Variables
+local monitorConnection = nil
+local isMonitoring = false
 
--- Unlock function
+-- Unlock button
 UnlockBtn.MouseButton1Click:Connect(function()
     UnlockBtn.Text = "UNLOCKING..."
     clearStatus()
     
-    updateStatus("🔓 Attempting to unlock cosmetics...")
+    updateStatus("🔍 Searching for locked values...")
     
-    local unlocked = IntelligentUnlock(foundButtons)
+    local unlocked = UnlockAllLockedValues()
     
     updateStatus("\n📊 RESULTS:")
-    updateStatus("✅ Successfully unlocked: " .. unlocked .. "/" .. #foundButtons)
+    updateStatus("✅ Unlocked " .. unlocked .. " values")
     
     if unlocked > 0 then
-        updateStatus("🎉 Some items may now be unlocked!")
+        updateStatus("🎉 Items should now appear unlocked!")
         updateStatus("Check the shop - buttons should say 'EQUIP'")
         
-        -- Setup UI interceptor to help with future clicks
-        InterceptUIForRealUnlock()
-        
-        UnlockBtn.Text = "✅ PARTIALLY UNLOCKED"
+        UnlockBtn.Text = "✅ UNLOCKED!"
         UnlockBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
     else
-        updateStatus("❌ No items were unlocked")
-        updateStatus("\n💡 Possible issues:")
-        updateStatus("1. Server-side validation")
-        updateStatus("2. Wrong remote function")
-        updateStatus("3. Need specific data format")
-        updateStatus("4. Anti-cheat protection")
+        updateStatus("❌ No locked values found")
+        updateStatus("\n💡 Try:")
+        updateStatus("1. Open the car shop")
+        updateStatus("2. Browse different cosmetics")
+        updateStatus("3. Click UNLOCK again")
         
-        UnlockBtn.Text = "🔓 UNLOCK ALL"
-        UnlockBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        UnlockBtn.Text = "🔓 UNLOCK ALL VALUES"
+    end
+end)
+
+-- Monitor button
+MonitorBtn.MouseButton1Click:Connect(function()
+    if isMonitoring then
+        -- Stop monitoring
+        if monitorConnection then
+            monitorConnection:Disconnect()
+            monitorConnection = nil
+        end
+        isMonitoring = false
+        MonitorBtn.Text = "👁️ ENABLE AUTO-MONITOR"
+        MonitorBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+        updateStatus("\n⏹️ Auto-monitor stopped")
+    else
+        -- Start monitoring
+        monitorConnection = StartRealTimeUnlockMonitor()
+        isMonitoring = true
+        MonitorBtn.Text = "⏹️ DISABLE AUTO-MONITOR"
+        MonitorBtn.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
+        updateStatus("\n👁️ Auto-monitor enabled")
+        updateStatus("Will auto-unlock new items as they appear")
     end
 end)
 
 -- Initial instructions
 clearStatus()
-updateStatus("🔓 REAL COSMETIC UNLOCKER")
-updateStatus("=" .. string.rep("=", 40))
-updateStatus("This script finds REAL item GUIDs")
-updateStatus("and attempts to unlock them properly")
-updateStatus("=" .. string.rep("=", 40))
+updateStatus("🔓 LOCKED VALUE UNLOCKER")
+updateStatus("=" .. string.rep("=", 30))
+updateStatus("Changes 'locked' values to 0/1")
+updateStatus("to unlock items temporarily")
+updateStatus("=" .. string.rep("=", 30))
 updateStatus("HOW TO USE:")
-updateStatus("1. Open car customization shop")
-updateStatus("2. Select Pagani Huayra R")
-updateStatus("3. Open wraps/kits/wheels tabs")
-updateStatus("4. Click SCAN FOR COSMETICS")
-updateStatus("5. Click UNLOCK ALL")
-updateStatus("=" .. string.rep("=", 40))
-updateStatus("If successful, you'll see 'EQUIP' buttons")
-updateStatus("instead of 'Buy' buttons in the shop!")
+updateStatus("1. Open car shop")
+updateStatus("2. Browse cosmetics")
+updateStatus("3. Click UNLOCK ALL VALUES")
+updateStatus("4. Enable auto-monitor")
+updateStatus("=" .. string.rep("=", 30))
 
--- Auto-scan after 5 seconds
-task.wait(5)
-updateStatus("\n⏰ Auto-scanning in 3 seconds...")
-for i = 3, 1, -1 do
-    updateStatus(i .. "...")
-    task.wait(1)
-end
+-- Auto-scan after 3 seconds
+task.wait(3)
+updateStatus("\n⏰ Auto-scanning in 2 seconds...")
+task.wait(2)
 
-ScanBtn.Text = "SCANNING..."
+UnlockBtn.Text = "UNLOCKING..."
 clearStatus()
-updateStatus("🔍 Auto-scanning for cosmetics...")
-foundButtons = CollectGUIDs()
+updateStatus("🔍 Auto-scanning for locked values...")
 
-if #foundButtons > 0 then
-    updateStatus("\n✅ Found " .. #foundButtons .. " cosmetic buttons")
-    UnlockBtn.Visible = true
-    UnlockBtn.Text = "🔓 UNLOCK " .. #foundButtons .. " ITEMS"
-    updateStatus("Click UNLOCK ALL to attempt unlock")
+local unlocked = UnlockAllLockedValues()
+
+if unlocked > 0 then
+    updateStatus("✅ Auto-unlocked " .. unlocked .. " values")
+    updateStatus("Items should now appear unlocked!")
+    UnlockBtn.Text = "✅ UNLOCKED!"
+    UnlockBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
 else
-    updateStatus("❌ No cosmetics found")
-    updateStatus("Please open the shop and try SCAN again")
+    updateStatus("❌ No locked values found")
+    updateStatus("Open the shop and click UNLOCK")
+    UnlockBtn.Text = "🔓 UNLOCK ALL VALUES"
 end
-
-ScanBtn.Text = "🔍 SCAN FOR COSMETICS"
