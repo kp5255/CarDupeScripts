@@ -154,12 +154,32 @@ local function DeepScanCosmetics(carName)
     
     print("📦 Found " .. #shopContainers .. " shop containers")
     
-    -- Method 2: Scan all buttons in shop containers
-    for _, container in ipairs(shopContainers) do
-        for _, item in pairs(container:GetDescendants()) do
-            if item:IsA("TextButton") or item:IsA("ImageButton") then
-                local buttonText = item.Text or ""
-                local buttonName = item.Name:lower()
+ -- Method 2: Scan all buttons in shop containers
+for _, container in ipairs(shopContainers) do
+    for _, item in pairs(container:GetDescendants()) do
+        if item:IsA("TextButton") or item:IsA("ImageButton") then
+            -- FIXED: Handle TextButton and ImageButton separately
+            local buttonText = ""
+            local buttonName = item.Name:lower()
+            
+            if item:IsA("TextButton") then
+                buttonText = item.Text:lower()
+            elseif item:IsA("ImageButton") then
+                -- For ImageButtons, check their name or try to find child text labels
+                buttonText = buttonName  -- Use the button name as fallback
+                
+                -- Look for TextLabel children that might contain the cosmetic name
+                for _, child in pairs(item:GetDescendants()) do
+                    if child:IsA("TextLabel") or child:IsA("TextButton") then
+                        if child.Text ~= "" then
+                            buttonText = child.Text:lower()
+                            break
+                        end
+                    end
+                end
+            end
+            
+            -- Continue with your existing logic...
                 
                 -- Check if this is a cosmetic button
                 local isCosmetic = false
@@ -771,3 +791,4 @@ print("2. SELECT a specific car")
 print("3. OPEN wraps/kits/wheels/neons tabs")
 print("4. CLICK 'SCAN CAR & COSMETICS'")
 print("5. CLICK 'UNLOCK ALL COSMETICS'")
+
