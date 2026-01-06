@@ -1,233 +1,589 @@
--- 🔍 DEBUG SCRIPT - SHOW ALL UI DATA
--- Shows everything in the UI to find how items are stored
+-- 🎯 SMART CAR COSMETIC SCANNER & UNLOCKER v2
+-- Working scanner with improved unlock system
 
 local Players = game:GetService("Players")
+local RS = game:GetService("ReplicatedStorage")
 local Player = Players.LocalPlayer
 
--- Wait for game
 repeat task.wait() until game:IsLoaded()
-task.wait(2)
+task.wait(3)
 
-print("🔍 DEBUG SCRIPT LOADED")
+print("🎯 SMART UNLOCKER v2 LOADED")
 
--- Create debug UI
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "DebugViewerUI"
-ScreenGui.Parent = Player:WaitForChild("PlayerGui")
-
-local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 600, 0, 700)
-MainFrame.Position = UDim2.new(0.5, -300, 0.5, -350)
-MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
-
-local Title = Instance.new("TextLabel")
-Title.Text = "🔍 UI DATA VIEWER"
-Title.Size = UDim2.new(1, 0, 0, 40)
-Title.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
-Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-Title.Font = Enum.Font.GothamBold
-
-local Output = Instance.new("ScrollingFrame")
-Output.Size = UDim2.new(1, -20, 0, 600)
-Output.Position = UDim2.new(0, 10, 0, 50)
-Output.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
-Output.ScrollBarThickness = 8
-Output.CanvasSize = UDim2.new(0, 0, 0, 0)
-
-local OutputText = Instance.new("TextLabel")
-OutputText.Text = "DEBUG VIEWER READY\n" .. string.rep("=", 70) .. "\n"
-OutputText.Size = UDim2.new(1, -10, 0, 0)
-OutputText.Position = UDim2.new(0, 5, 0, 5)
-OutputText.BackgroundTransparency = 1
-OutputText.TextColor3 = Color3.fromRGB(255, 255, 255)
-OutputText.Font = Enum.Font.Code
-OutputText.TextSize = 12
-OutputText.TextXAlignment = Enum.TextXAlignment.Left
-OutputText.TextYAlignment = Enum.TextYAlignment.Top
-OutputText.TextWrapped = true
-OutputText.AutomaticSize = Enum.AutomaticSize.Y
-
-local ScanBtn = Instance.new("TextButton")
-ScanBtn.Text = "🔍 SCAN CURRENT UI"
-ScanBtn.Size = UDim2.new(1, -20, 0, 40)
-ScanBtn.Position = UDim2.new(0, 10, 0, 660)
-ScanBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
-
--- Add corners
-local corner = Instance.new("UICorner")
-corner.CornerRadius = UDim.new(0, 8)
-
-corner:Clone().Parent = MainFrame
-corner:Clone().Parent = Title
-corner:Clone().Parent = Output
-corner:Clone().Parent = ScanBtn
-
--- Parent
-OutputText.Parent = Output
-Title.Parent = MainFrame
-Output.Parent = MainFrame
-ScanBtn.Parent = MainFrame
-MainFrame.Parent = ScreenGui
-
--- Function to add text
-local function addDebug(text, color)
-    color = color or Color3.fromRGB(255, 255, 255)
-    OutputText.Text = OutputText.Text .. text .. "\n"
-    Output.CanvasSize = UDim2.new(0, 0, 0, OutputText.TextBounds.Y + 20)
-    Output.CanvasPosition = Vector2.new(0, OutputText.TextBounds.Y)
-    print(text)
-end
-
--- Clear function
-local function clearDebug()
-    OutputText.Text = "DEBUG VIEWER\n" .. string.rep("=", 70) .. "\n"
-end
-
--- Detailed scan function
-local function detailedUIScan()
-    clearDebug()
-    addDebug("🔍 STARTING DETAILED UI SCAN...", Color3.fromRGB(255, 200, 0))
+-- ===== WORKING SCANNER (from your script) =====
+local function GetCarNameFromShop()
+    print("🔍 Scanning for car name...")
     
     local PlayerGui = Player:WaitForChild("PlayerGui")
-    local totalObjects = 0
-    local interestingObjects = {}
+    local possibleCarNames = {}
     
-    addDebug("\n📁 SCANNING ALL OBJECTS IN Playergui...")
-    
-    -- First, show the structure
-    addDebug("📂 Top-level children:", Color3.fromRGB(200, 200, 255))
-    for _, child in pairs(PlayerGui:GetChildren()) do
-        addDebug("  " .. child.Name .. " (" .. child.ClassName .. ")")
-    end
-    
-    -- Now scan everything
-    addDebug("\n🔎 DETAILED SCAN:", Color3.fromRGB(200, 220, 255))
-    
-    for _, obj in pairs(PlayerGui:GetDescendants()) do
-        totalObjects = totalObjects + 1
-        
-        -- Only show interesting objects
-        local isInteresting = false
-        
-        -- Check class type
-        if obj:IsA("StringValue") or obj:IsA("IntValue") or obj:IsA("BoolValue") 
-           or obj:IsA("NumberValue") or obj:IsA("ObjectValue") then
-            isInteresting = true
-        elseif obj:IsA("TextButton") or obj:IsA("TextLabel") then
-            -- Check if it has interesting text
-            local text = obj.Text or ""
-            if text:find("buy", 1, true) or text:find("purchase", 1, true) 
-               or text:find("equip", 1, true) or text:find("locked", 1, true) 
-               or obj.Name:find("wrap", 1, true) or obj.Name:find("kit", 1, true) 
-               or obj.Name:find("wheel", 1, true) then
-                isInteresting = true
-            end
-        elseif obj:IsA("Frame") or obj:IsA("ScrollingFrame") then
-            -- Check if it's a shop/customization container
-            local name = obj.Name:lower()
-            if name:find("shop") or name:find("custom") 
-               or name:find("inventory") or name:find("menu") then
-                isInteresting = true
-            end
-        end
-        
-        if isInteresting then
-            table.insert(interestingObjects, obj)
+    -- Method 1: Look for large text that might be car name
+    for _, gui in pairs(PlayerGui:GetDescendants()) do
+        if gui:IsA("TextLabel") or gui:IsA("TextButton") then
+            local text = gui.Text
+            local textLower = text:lower()
             
-            -- Show object info
-            local indent = string.rep("  ", obj:GetFullName():gsub("[^%.]", ""):len())
-            local line = indent .. obj.Name .. " (" .. obj.ClassName .. ")"
-            
-            -- Add extra info based on type
-            if obj:IsA("StringValue") or obj:IsA("IntValue") 
-               or obj:IsA("BoolValue") or obj:IsA("NumberValue") then
-                line = line .. " = " .. tostring(obj.Value)
+            -- Skip common UI text
+            if text ~= "" and not textLower:find("shop") 
+               and not textLower:find("custom") and not textLower:find("back")
+               and not textLower:find("exit") and not textLower:find("close")
+               and not textLower:find("buy") and not textLower:find("purchase") then
                 
-                -- Check for GUID pattern
-                local valueStr = tostring(obj.Value)
-                if valueStr:match("^%x%x%x%x%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x$") then
-                    line = line .. " 🎯 <-- THIS IS A GUID!"
-                end
-            elseif obj:IsA("TextButton") or obj:IsA("TextLabel") then
-                if obj.Text and obj.Text ~= "" then
-                    line = line .. ' Text: "' .. obj.Text .. '"'
+                -- Check text characteristics (car names are usually 1-3 words)
+                local wordCount = #text:split(" ")
+                if wordCount <= 3 and #text > 3 then
+                    -- Check if it's likely a car name
+                    if not text:find("%$") and not text:find("%d") then
+                        -- Check font size (car names often larger)
+                        if gui.TextSize >= 14 or gui:FindFirstAncestorWhichIsA("Frame") then
+                            table.insert(possibleCarNames, {
+                                text = text,
+                                element = gui,
+                                size = gui.TextSize,
+                                path = gui:GetFullName()
+                            })
+                        end
+                    end
                 end
             end
-            
-            addDebug(line)
         end
     end
     
-    -- Summary
-    addDebug("\n📊 SCAN SUMMARY:", Color3.fromRGB(255, 200, 0))
-    addDebug("Total objects scanned: " .. totalObjects)
-    addDebug("Interesting objects found: " .. #interestingObjects)
-    
-    -- Look specifically for the paths you showed earlier
-    addDebug("\n🎯 LOOKING FOR KNOWN PATHS:", Color3.fromRGB(255, 200, 0))
-    local knownPaths = {
-        "Menu.Inventory.Cars",
-        "Menu.Inventory.CarConfig",
-        "Customization",
-        "Shop"
+    -- Method 2: Look for car brand names
+    local carBrands = {
+        "Pagani", "Bugatti", "Lamborghini", "Ferrari", "Porsche",
+        "McLaren", "Koenigsegg", "Audi", "BMW", "Mercedes",
+        "Ford", "Chevrolet", "Dodge", "Nissan", "Toyota",
+        "Mazda", "Subaru", "Honda", "Tesla", "Lexus"
     }
     
-    for _, path in pairs(knownPaths) do
-        local obj = PlayerGui:FindFirstChild(path, true)
-        if obj then
-            addDebug("✅ Found: " .. obj:GetFullName())
-            
-            -- Show its children
-            for _, child in pairs(obj:GetChildren()) do
-                addDebug("  ├─ " .. child.Name .. " (" .. child.ClassName .. ")")
-            end
-        else
-            addDebug("❌ Not found: " .. path)
-        end
-    end
-    
-    -- Try to find ANY StringValues with ANY content
-    addDebug("\n🔎 ALL STRING VALUES:", Color3.fromRGB(200, 220, 255))
-    local stringCount = 0
-    for _, obj in pairs(PlayerGui:GetDescendants()) do
-        if obj:IsA("StringValue") then
-            stringCount = stringCount + 1
-            local value = tostring(obj.Value)
-            if value ~= "" then
-                addDebug("  " .. obj.Name .. " = \"" .. value .. "\"")
+    for _, brand in ipairs(carBrands) do
+        for _, gui in pairs(PlayerGui:GetDescendants()) do
+            if (gui:IsA("TextLabel") or gui:IsA("TextButton")) and gui.Text:find(brand) then
+                table.insert(possibleCarNames, {
+                    text = gui.Text,
+                    element = gui,
+                    isBrand = true,
+                    path = gui:GetFullName()
+                })
             end
         end
     end
-    addDebug("Total StringValues found: " .. stringCount)
     
-    addDebug("\n✅ SCAN COMPLETE", Color3.fromRGB(0, 255, 0))
+    -- Display findings
+    print("📋 Possible car names found:")
+    for i, car in ipairs(possibleCarNames) do
+        print("  [" .. i .. "] " .. car.text .. " (from: " .. car.path .. ")")
+        if i >= 5 then break end
+    end
+    
+    if #possibleCarNames > 0 then
+        local bestGuess = possibleCarNames[1].text
+        print("🎯 Best guess: " .. bestGuess)
+        return bestGuess, possibleCarNames[1].element
+    end
+    
+    print("❌ Could not detect car name")
+    return "Unknown Car", nil
 end
 
--- Connect scan button
-ScanBtn.MouseButton1Click:Connect(function()
-    ScanBtn.Text = "SCANNING..."
-    detailedUIScan()
-    ScanBtn.Text = "🔍 SCAN CURRENT UI"
-end)
+-- ===== IMPROVED COSMETIC SCAN =====
+local function DeepScanCosmetics(carName)
+    print("🎨 Scanning for cosmetics...")
+    
+    local PlayerGui = Player:WaitForChild("PlayerGui")
+    local foundCosmetics = {
+        Wraps = {},
+        Kits = {},
+        Wheels = {},
+        Neons = {},
+        All = {}
+    }
+    
+    -- Look for shop containers
+    local shopContainers = {}
+    
+    for _, container in pairs(PlayerGui:GetDescendants()) do
+        if container:IsA("ScrollingFrame") or (container:IsA("Frame") and container.Visible) then
+            local containerName = container.Name:lower()
+            local isShopRelated = containerName:find("shop") or containerName:find("custom") 
+                                or containerName:find("select") or containerName:find("menu")
+                                or containerName:find("inventory") or containerName:find("item")
+            
+            if isShopRelated then
+                table.insert(shopContainers, container)
+            end
+        end
+    end
+    
+    print("📦 Found " .. #shopContainers .. " shop containers")
+    
+    -- Scan all buttons
+    for _, container in ipairs(shopContainers) do
+        for _, item in pairs(container:GetDescendants()) do
+            if item:IsA("TextButton") or item:IsA("ImageButton") then
+                local buttonText = ""
+                local buttonName = item.Name:lower()
+                
+                if item:IsA("TextButton") then
+                    buttonText = item.Text
+                elseif item:IsA("ImageButton") then
+                    buttonText = buttonName
+                    for _, child in pairs(item:GetDescendants()) do
+                        if child:IsA("TextLabel") and child.Text ~= "" then
+                            buttonText = child.Text
+                            break
+                        end
+                    end
+                end
+                
+                local buttonTextLower = buttonText:lower()
+                
+                -- Check if this is a cosmetic
+                local isCosmetic = false
+                local category = "Other"
+                
+                if buttonTextLower:find("wrap") or buttonTextLower:find("paint") 
+                   or buttonTextLower:find("color") or buttonName:find("wrap") then
+                    isCosmetic = true
+                    category = "Wraps"
+                elseif buttonTextLower:find("kit") or buttonTextLower:find("body") 
+                       or buttonTextLower:find("spoiler") or buttonName:find("kit") then
+                    isCosmetic = true
+                    category = "Kits"
+                elseif buttonTextLower:find("wheel") or buttonTextLower:find("rim") 
+                       or buttonTextLower:find("tire") or buttonName:find("wheel") then
+                    isCosmetic = true
+                    category = "Wheels"
+                elseif buttonTextLower:find("neon") or buttonTextLower:find("light") 
+                       or buttonTextLower:find("glow") or buttonName:find("neon") then
+                    isCosmetic = true
+                    category = "Neons"
+                end
+                
+                if isCosmetic and buttonText ~= "" then
+                    -- Look for GUIDs in the button or its children
+                    local guids = {}
+                    
+                    -- Check button text for GUIDs
+                    for guid in buttonText:gmatch("%x%x%x%x%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x") do
+                        table.insert(guids, guid)
+                    end
+                    
+                    -- Check children for GUIDs
+                    for _, child in pairs(item:GetDescendants()) do
+                        if child:IsA("StringValue") then
+                            local value = tostring(child.Value)
+                            for guid in value:gmatch("%x%x%x%x%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x") do
+                                table.insert(guids, guid)
+                            end
+                        end
+                    end
+                    
+                    -- Create cosmetic entry
+                    local cosmetic = {
+                        name = buttonText,
+                        button = item,
+                        category = category,
+                        guids = guids,
+                        path = item:GetFullName()
+                    }
+                    
+                    -- Avoid duplicates
+                    local isDuplicate = false
+                    for _, existing in ipairs(foundCosmetics.All) do
+                        if existing.name == buttonText then
+                            isDuplicate = true
+                            break
+                        end
+                    end
+                    
+                    if not isDuplicate then
+                        table.insert(foundCosmetics[category], cosmetic)
+                        table.insert(foundCosmetics.All, cosmetic)
+                        
+                        print("🎨 Found: [" .. category .. "] " .. buttonText)
+                        if #guids > 0 then
+                            print("   GUIDs: " .. table.concat(guids, ", "))
+                        end
+                    end
+                end
+            end
+        end
+    end
+    
+    -- Display results
+    print("\n📊 SCAN RESULTS:")
+    for category, items in pairs(foundCosmetics) do
+        if category ~= "All" and #items > 0 then
+            print("🎨 " .. category .. ": " .. #items .. " items")
+        end
+    end
+    
+    print("✅ Total cosmetics found: " .. #foundCosmetics.All)
+    
+    return foundCosmetics
+end
 
--- Initial instructions
-addDebug("🔍 UI DATA DEBUGGER", Color3.fromRGB(0, 200, 255))
-addDebug(string.rep("=", 70))
-addDebug("INSTRUCTIONS:", Color3.fromRGB(200, 220, 255))
-addDebug("1. Open car customization shop", Color3.fromRGB(255, 255, 200))
-addDebug("2. Browse wraps/kits/wheels", Color3.fromRGB(255, 255, 200))
-addDebug("3. Click SCAN CURRENT UI", Color3.fromRGB(255, 255, 200))
-addDebug("4. Look for GUIDs or item IDs", Color3.fromRGB(255, 255, 200))
-addDebug(string.rep("=", 70))
-addDebug("\n🎯 Look for lines ending with: 🎯 <-- THIS IS A GUID!")
-addDebug("🎯 Or look for StringValues with long codes")
-addDebug(string.rep("=", 70))
+-- ===== NEW: REAL UNLOCK SYSTEM =====
+local function RealUnlockSystem(carName, cosmetics)
+    print("🔓 Real unlock system starting...")
+    
+    local results = {
+        total = #cosmetics.All,
+        unlocked = 0,
+        failed = 0
+    }
+    
+    if results.total == 0 then
+        print("⚠️ No cosmetics to unlock!")
+        return results
+    end
+    
+    -- Find ALL remotes (both RemoteFunction AND RemoteEvent)
+    local allRemotes = {}
+    
+    print("📡 Searching for all remotes...")
+    
+    for _, obj in pairs(RS:GetDescendants()) do
+        if obj:IsA("RemoteFunction") or obj:IsA("RemoteEvent") then
+            table.insert(allRemotes, {
+                object = obj,
+                name = obj.Name,
+                type = obj.ClassName
+            })
+        end
+    end
+    
+    print("✅ Found " .. #allRemotes .. " remotes total")
+    
+    -- Try to unlock each cosmetic
+    for _, cosmetic in ipairs(cosmetics.All) do
+        print("\n🔄 Processing: " .. cosmetic.name)
+        
+        local unlocked = false
+        
+        -- First, try with any GUIDs found
+        if #cosmetic.guids > 0 then
+            for _, guid in ipairs(cosmetic.guids) do
+                print("   Trying GUID: " .. guid)
+                
+                for _, remote in ipairs(allRemotes) do
+                    local formats = {
+                        guid,
+                        {ItemId = guid},
+                        {id = guid},
+                        {productId = guid},
+                        {GUID = guid},
+                        {item = guid, category = cosmetic.category}
+                    }
+                    
+                    for i, data in ipairs(formats) do
+                        local success, result = pcall(function()
+                            if remote.type == "RemoteFunction" then
+                                return remote.object:InvokeServer(data)
+                            else
+                                remote.object:FireServer(data)
+                                return "FireServer called"
+                            end
+                        end)
+                        
+                        if success then
+                            print("   ✅ Success with " .. remote.name .. " (format " .. i .. ")")
+                            print("   Result: " .. tostring(result))
+                            results.unlocked = results.unlocked + 1
+                            unlocked = true
+                            
+                            -- Update button appearance
+                            if cosmetic.button and cosmetic.button:IsA("TextButton") then
+                                cosmetic.button.Text = "EQUIP"
+                                cosmetic.button.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+                            end
+                            
+                            break
+                        end
+                    end
+                    
+                    if unlocked then break end
+                end
+                
+                if unlocked then break end
+            end
+        else
+            -- If no GUIDs, try with cosmetic name
+            print("   No GUIDs found, trying with name...")
+            
+            for _, remote in ipairs(allRemotes) do
+                local formats = {
+                    cosmetic.name,
+                    {Name = cosmetic.name},
+                    {Item = cosmetic.name},
+                    {cosmetic = cosmetic.name, car = carName}
+                }
+                
+                for i, data in ipairs(formats) do
+                    local success, result = pcall(function()
+                        if remote.type == "RemoteFunction" then
+                            return remote.object:InvokeServer(data)
+                        else
+                            remote.object:FireServer(data)
+                            return "FireServer called"
+                        end
+                    })
+                    
+                    if success then
+                        print("   ✅ Success with " .. remote.name .. " (format " .. i .. ")")
+                        results.unlocked = results.unlocked + 1
+                        unlocked = true
+                        
+                        if cosmetic.button and cosmetic.button:IsA("TextButton") then
+                            cosmetic.button.Text = "EQUIP"
+                            cosmetic.button.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+                        end
+                        
+                        break
+                    end
+                end
+                
+                if unlocked then break end
+            end
+        end
+        
+        if not unlocked then
+            results.failed = results.failed + 1
+            print("   ❌ Failed to unlock")
+            
+            -- Mark as failed
+            if cosmetic.button and cosmetic.button:IsA("TextButton") then
+                cosmetic.button.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+            end
+        end
+        
+        task.wait(0.1) -- Small delay
+    end
+    
+    print("\n📊 FINAL RESULTS:")
+    print("✅ Successfully unlocked: " .. results.unlocked .. "/" .. results.total)
+    print("❌ Failed: " .. results.failed)
+    
+    return results
+end
 
--- Auto-scan after 3 seconds
-task.wait(3)
-addDebug("\n⏰ Auto-scanning in 2 seconds...", Color3.fromRGB(255, 200, 0))
+-- ===== NEW: VISUAL UNLOCK (UI Only) =====
+local function VisualUnlockUI(cosmetics)
+    print("🎨 Applying visual unlocks...")
+    
+    local PlayerGui = Player:WaitForChild("PlayerGui")
+    local modified = 0
+    
+    for _, cosmetic in ipairs(cosmetics.All) do
+        if cosmetic.button and cosmetic.button:IsDescendantOf(PlayerGui) then
+            local button = cosmetic.button
+            
+            -- Change button appearance
+            if button:IsA("TextButton") then
+                local text = button.Text:lower()
+                if text:find("buy") or text:find("purchase") 
+                   or text:find("$") or text:find("%d") then
+                    button.Text = "EQUIP"
+                    button.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
+                    modified = modified + 1
+                end
+            end
+            
+            -- Change child text labels
+            for _, child in pairs(button:GetDescendants()) do
+                if child:IsA("TextLabel") or child:IsA("TextButton") then
+                    local text = child.Text:lower()
+                    if text:find("buy") or text:find("purchase") 
+                       or text:find("$") or text:find("%d") 
+                       or text:find("locked") then
+                        child.Text = "UNLOCKED"
+                        child.TextColor3 = Color3.fromRGB(0, 255, 0)
+                        modified = modified + 1
+                    end
+                end
+            end
+        end
+    end
+    
+    print("🛍️ Visually modified " .. modified .. " UI elements")
+    return modified
+end
+
+-- ===== SIMPLE UI =====
+local function CreateSimpleUI()
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "SimpleUnlockerUI"
+    ScreenGui.Parent = Player:WaitForChild("PlayerGui")
+    
+    local MainFrame = Instance.new("Frame")
+    MainFrame.Size = UDim2.new(0, 350, 0, 350)
+    MainFrame.Position = UDim2.new(0.5, -175, 0.5, -175)
+    MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 40)
+    
+    local Title = Instance.new("TextLabel")
+    Title.Text = "🎯 SMART UNLOCKER v2"
+    Title.Size = UDim2.new(1, 0, 0, 50)
+    Title.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+    Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Title.Font = Enum.Font.GothamBold
+    
+    local Status = Instance.new("TextLabel")
+    Status.Text = "Ready to scan and unlock\n"
+    Status.Size = UDim2.new(1, -20, 0, 150)
+    Status.Position = UDim2.new(0, 10, 0, 60)
+    Status.BackgroundTransparency = 1
+    Status.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Status.TextWrapped = true
+    Status.TextXAlignment = Enum.TextXAlignment.Left
+    
+    local ScanBtn = Instance.new("TextButton")
+    ScanBtn.Text = "🔍 SCAN CAR & ITEMS"
+    ScanBtn.Size = UDim2.new(1, -20, 0, 40)
+    ScanBtn.Position = UDim2.new(0, 10, 0, 220)
+    ScanBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+    
+    local UnlockBtn = Instance.new("TextButton")
+    UnlockBtn.Text = "🔓 UNLOCK ALL"
+    UnlockBtn.Size = UDim2.new(1, -20, 0, 40)
+    UnlockBtn.Position = UDim2.new(0, 10, 0, 270)
+    UnlockBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
+    UnlockBtn.Visible = false
+    
+    -- Add corners
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    
+    corner:Clone().Parent = MainFrame
+    corner:Clone().Parent = Title
+    corner:Clone().Parent = ScanBtn
+    corner:Clone().Parent = UnlockBtn
+    
+    -- Parent
+    Title.Parent = MainFrame
+    Status.Parent = MainFrame
+    ScanBtn.Parent = MainFrame
+    UnlockBtn.Parent = MainFrame
+    MainFrame.Parent = ScreenGui
+    
+    -- Variables
+    local scanData = nil
+    
+    -- Update status
+    local function updateStatus(text)
+        Status.Text = Status.Text .. text .. "\n"
+    end
+    
+    -- Scan function
+    ScanBtn.MouseButton1Click:Connect(function()
+        ScanBtn.Text = "SCANNING..."
+        Status.Text = "🔍 Scanning...\n"
+        
+        -- Get car name
+        updateStatus("Step 1: Finding car...")
+        local carName = GetCarNameFromShop()
+        
+        -- Scan cosmetics
+        updateStatus("Step 2: Scanning cosmetics...")
+        local cosmetics = DeepScanCosmetics(carName)
+        
+        if #cosmetics.All > 0 then
+            updateStatus("✅ Found " .. #cosmetics.All .. " cosmetics!")
+            updateStatus("Car: " .. carName)
+            
+            scanData = {
+                carName = carName,
+                cosmetics = cosmetics
+            }
+            
+            UnlockBtn.Visible = true
+            UnlockBtn.Text = "🔓 UNLOCK " .. #cosmetics.All .. " ITEMS"
+            
+            ScanBtn.Text = "✅ SCAN COMPLETE"
+            ScanBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+        else
+            updateStatus("❌ No cosmetics found")
+            updateStatus("Open shop and try again")
+            
+            ScanBtn.Text = "🔍 SCAN CAR & ITEMS"
+            ScanBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        end
+    end)
+    
+    -- Unlock function
+    UnlockBtn.MouseButton1Click:Connect(function()
+        UnlockBtn.Text = "UNLOCKING..."
+        updateStatus("\n🔓 Attempting unlock...")
+        
+        if scanData then
+            -- Try real unlock first
+            local unlockResults = RealUnlockSystem(scanData.carName, scanData.cosmetics)
+            
+            -- Then apply visual unlock
+            local visualResults = VisualUnlockUI(scanData.cosmetics)
+            
+            updateStatus("📊 Results:")
+            updateStatus("Server attempts: " .. unlockResults.unlocked .. "/" .. unlockResults.total)
+            updateStatus("Visual changes: " .. visualResults .. " items")
+            
+            if unlockResults.unlocked > 0 or visualResults > 0 then
+                updateStatus("🎉 Some success!")
+                updateStatus("Check if items show 'EQUIP'")
+                
+                UnlockBtn.Text = "✅ PARTIAL SUCCESS"
+                UnlockBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+            else
+                updateStatus("❌ No unlocks")
+                updateStatus("Try manual click after scan")
+                
+                UnlockBtn.Text = "🔓 UNLOCK ALL"
+                UnlockBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+            end
+        else
+            updateStatus("❌ Scan first!")
+            UnlockBtn.Text = "🔓 UNLOCK ALL"
+        end
+    end)
+    
+    -- Initial message
+    updateStatus("🎯 SMART UNLOCKER v2")
+    updateStatus(string.rep("=", 30))
+    updateStatus("HOW TO USE:")
+    updateStatus("1. Open car shop")
+    updateStatus("2. Select a car")
+    updateStatus("3. Open cosmetic tabs")
+    updateStatus("4. Click SCAN")
+    updateStatus("5. Click UNLOCK")
+    updateStatus(string.rep("=", 30))
+    
+    return ScreenGui
+end
+
+-- Auto-start
+print("=" .. string.rep("=", 50))
+print("🎯 SMART UNLOCKER v2 - WITH WORKING SCANNER")
+print("=" .. string.rep("=", 50))
+
 task.wait(2)
+CreateSimpleUI()
 
-ScanBtn.Text = "SCANNING..."
-detailedUIScan()
-ScanBtn.Text = "🔍 SCAN CURRENT UI"
+-- Auto-scan after 5 seconds
+task.wait(5)
+print("\n⏰ Auto-scanning in 3 seconds...")
+for i = 3, 1, -1 do
+    print(i .. "...")
+    task.wait(1)
+end
+
+print("🔍 Auto-scanning...")
+local carName = GetCarNameFromShop()
+local cosmetics = DeepScanCosmetics(carName)
+
+if #cosmetics.All > 0 then
+    print("✅ Auto-found " .. #cosmetics.All .. " cosmetics")
+    print("💡 Open the UI and click UNLOCK")
+else
+    print("❌ Auto-scan found nothing")
+    print("💡 Open the shop and click SCAN")
+end
