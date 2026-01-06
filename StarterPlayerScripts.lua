@@ -1,50 +1,246 @@
--- 🎯 SMART CAR UNLOCKER - ITEM DETECTION EDITION
+-- 🎯 TEMPORARY VISUAL UNLOCKER
+-- Makes cosmetics appear unlocked for all players (client-side only)
+
 local Players = game:GetService("Players")
-local RS = game:GetService("ReplicatedStorage")
 local Player = Players.LocalPlayer
+local RunService = game:GetService("RunService")
 
 -- Wait for game
 repeat task.wait() until game:IsLoaded()
 task.wait(3)
 
--- Create UI
+print("🎨 TEMPORARY VISUAL UNLOCKER LOADED")
+
+-- ===== VISUAL MODIFICATION SYSTEM =====
+local function ApplyVisualUnlocks()
+    print("🎨 Applying visual unlocks...")
+    
+    local PlayerGui = Player:WaitForChild("PlayerGui")
+    local modifications = 0
+    
+    -- 1. Modify ALL cosmetic buttons to look unlocked
+    for _, gui in pairs(PlayerGui:GetDescendants()) do
+        if gui:IsA("TextButton") or gui:IsA("ImageButton") then
+            -- Check if this is a cosmetic button
+            local name = gui.Name:lower()
+            local text = gui:IsA("TextButton") and gui.Text:lower() or ""
+            
+            local isCosmetic = name:find("wrap") or name:find("kit") 
+                             or name:find("wheel") or name:find("neon")
+                             or name:find("paint") or name:find("color")
+                             or text:find("wrap") or text:find("kit")
+                             or text:find("wheel") or text:find("neon")
+                             or text:find("buy") or text:find("purchase")
+            
+            if isCosmetic then
+                -- Make it look unlocked
+                if gui:IsA("TextButton") then
+                    if gui.Text:find("Buy") or gui.Text:find("Purchase") 
+                       or gui.Text:find("$") or gui.Text:find("Locked") then
+                        gui.Text = "EQUIP"
+                        gui.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
+                        modifications = modifications + 1
+                    end
+                end
+                
+                -- Make button green
+                gui.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+                
+                -- Remove price labels
+                for _, child in pairs(gui:GetDescendants()) do
+                    if child:IsA("TextLabel") then
+                        local childText = child.Text:lower()
+                        if childText:find("$") or childText:find("price")
+                           or childText:find("locked") then
+                            child.Text = "UNLOCKED"
+                            child.TextColor3 = Color3.fromRGB(0, 255, 0)
+                            modifications = modifications + 1
+                        end
+                    end
+                    
+                    -- Hide lock icons
+                    if child:IsA("ImageLabel") or child:IsA("ImageButton") then
+                        if child.Name:lower():find("lock") 
+                           or tostring(child.Image):lower():find("lock") then
+                            child.Visible = false
+                            modifications = modifications + 1
+                        end
+                    end
+                end
+            end
+        end
+    end
+    
+    -- 2. Create a visual effect for ALL cars (makes them look customized)
+    for _, car in pairs(workspace:GetDescendants()) do
+        if car:FindFirstChild("Body") or car:FindFirstChild("Chassis") then
+            -- Apply random cool colors to make it look customized
+            local colors = {
+                Color3.fromRGB(255, 0, 0),    -- Red
+                Color3.fromRGB(0, 255, 0),    -- Green
+                Color3.fromRGB(0, 0, 255),    -- Blue
+                Color3.fromRGB(255, 255, 0),  -- Yellow
+                Color3.fromRGB(255, 0, 255),  -- Magenta
+                Color3.fromRGB(0, 255, 255),  -- Cyan
+                Color3.fromRGB(255, 128, 0),  -- Orange
+            }
+            
+            local randomColor = colors[math.random(1, #colors)]
+            
+            -- Apply to all parts
+            for _, part in pairs(car:GetDescendants()) do
+                if part:IsA("BasePart") and part.Name ~= "Head" then
+                    part.BrickColor = BrickColor.new(randomColor)
+                    part.Material = Enum.Material.Neon
+                    part.Transparency = 0.3
+                end
+            end
+        end
+    end
+    
+    print("✅ Applied " .. modifications .. " visual modifications")
+    return modifications
+end
+
+-- ===== UI HIJACK SYSTEM =====
+local function HijackShopUI()
+    print("💻 Hijacking shop UI...")
+    
+    local PlayerGui = Player:WaitForChild("PlayerGui")
+    
+    -- Hook into any purchase function to make it always succeed (visually)
+    local function hijackPurchaseCalls()
+        -- This makes any purchase attempt appear successful
+        local oldNamecall
+        oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+            local method = getnamecallmethod()
+            local args = {...}
+            
+            -- Check if this is a purchase call
+            if method == "InvokeServer" or method == "FireServer" then
+                local remoteName = tostring(self):lower()
+                if remoteName:find("purchase") or remoteName:find("buy") 
+                   or remoteName:find("unlock") then
+                    
+                    print("🎯 Intercepted purchase call: " .. remoteName)
+                    print("📦 Args: " .. tostring(args[1]))
+                    
+                    -- Return fake success
+                    return {
+                        Success = true,
+                        Message = "Item purchased successfully!",
+                        ItemId = args[1] or "Unknown"
+                    }
+                end
+            end
+            
+            return oldNamecall(self, ...)
+        end)
+        
+        print("✅ Purchase calls hijacked")
+    end
+    
+    -- Try to hijack (might not work in all games)
+    pcall(hijackPurchaseCalls)
+end
+
+-- ===== ALL PLAYER VISUAL EFFECT =====
+local function ApplyEffectsToAllPlayers()
+    print("👥 Applying effects to all players...")
+    
+    -- Make all player cars look customized
+    local function customizePlayerCar(player)
+        if player.Character then
+            -- Look for car in player's inventory/workspace
+            for _, obj in pairs(workspace:GetDescendants()) do
+                if obj:IsA("Model") and (obj:FindFirstChild("DriveSeat") 
+                   or obj:FindFirstChild("VehicleSeat")) then
+                    
+                    -- Check if this car belongs to the player
+                    local owner = obj:FindFirstChild("Owner") 
+                    if owner and owner.Value == player then
+                        -- Apply cool visual effects
+                        local rainbow = Instance.new("Texture")
+                        rainbow.Name = "RainbowWrap"
+                        rainbow.Texture = "rbxassetid://2781219493" -- Rainbow texture
+                        rainbow.StudsPerTileU = 2
+                        rainbow.StudsPerTileV = 2
+                        
+                        for _, part in pairs(obj:GetDescendants()) do
+                            if part:IsA("BasePart") then
+                                -- Apply rainbow texture
+                                local texture = rainbow:Clone()
+                                texture.Parent = part
+                                
+                                -- Add neon glow
+                                part.Material = Enum.Material.Neon
+                                part.Transparency = 0.2
+                                
+                                -- Add sparkling particles
+                                local sparkles = Instance.new("ParticleEmitter")
+                                sparkles.Texture = "rbxassetid://242019912"
+                                sparkles.Rate = 50
+                                sparkles.Lifetime = NumberRange.new(1, 2)
+                                sparkles.Size = NumberSequence.new(0.1, 0.5)
+                                sparkles.Transparency = NumberSequence.new(0, 1)
+                                sparkles.Parent = part
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    
+    -- Apply to all players
+    for _, player in pairs(Players:GetPlayers()) do
+        customizePlayerCar(player)
+    end
+    
+    -- Apply to new players
+    Players.PlayerAdded:Connect(customizePlayerCar)
+end
+
+-- ===== MAIN UI =====
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "ItemHunterUI"
+ScreenGui.Name = "VisualUnlockerUI"
 ScreenGui.Parent = Player:WaitForChild("PlayerGui")
 
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 450, 0, 500)
-MainFrame.Position = UDim2.new(0.5, -225, 0.5, -250)
+MainFrame.Size = UDim2.new(0, 400, 0, 300)
+MainFrame.Position = UDim2.new(0.5, -200, 0.5, -150)
 MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 40)
 
 local Title = Instance.new("TextLabel")
-Title.Text = "🔍 ITEM HUNTER - FIND REAL ITEM IDs"
+Title.Text = "🌈 VISUAL UNLOCKER"
 Title.Size = UDim2.new(1, 0, 0, 50)
 Title.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.Font = Enum.Font.GothamBold
 
 local Status = Instance.new("TextLabel")
-Status.Text = "Ready...\n"
-Status.Size = UDim2.new(1, -20, 0, 300)
+Status.Text = "Ready to apply visual unlocks!\n"
+Status.Size = UDim2.new(1, -20, 0, 150)
 Status.Position = UDim2.new(0, 10, 0, 60)
 Status.BackgroundTransparency = 1
 Status.TextColor3 = Color3.fromRGB(255, 255, 255)
-Status.TextXAlignment = Enum.TextXAlignment.Left
-Status.TextYAlignment = Enum.TextYAlignment.Top
 Status.TextWrapped = true
 
-local ScanItemsBtn = Instance.new("TextButton")
-ScanItemsBtn.Text = "🔍 SCAN FOR ITEM IDs"
-ScanItemsBtn.Size = UDim2.new(1, -20, 0, 40)
-ScanItemsBtn.Position = UDim2.new(0, 10, 0, 370)
-ScanItemsBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+local UnlockBtn = Instance.new("TextButton")
+UnlockBtn.Text = "🌈 APPLY VISUAL UNLOCKS"
+UnlockBtn.Size = UDim2.new(1, -20, 0, 40)
+UnlockBtn.Position = UDim2.new(0, 10, 0, 220)
+UnlockBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 200)
+UnlockBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+UnlockBtn.Font = Enum.Font.GothamBold
 
-local TestPurchaseBtn = Instance.new("TextButton")
-TestPurchaseBtn.Text = "💰 TEST PURCHASE"
-TestPurchaseBtn.Size = UDim2.new(1, -20, 0, 40)
-TestPurchaseBtn.Position = UDim2.new(0, 10, 0, 420)
-TestPurchaseBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
+local AllPlayersBtn = Instance.new("TextButton")
+AllPlayersBtn.Text = "👥 ALL PLAYERS EFFECT"
+AllPlayersBtn.Size = UDim2.new(1, -20, 0, 40)
+AllPlayersBtn.Position = UDim2.new(0, 10, 0, 270)
+AllPlayersBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 200)
+AllPlayersBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+AllPlayersBtn.Font = Enum.Font.GothamBold
 
 -- Add corners
 local function addCorner(obj)
@@ -55,14 +251,14 @@ end
 
 addCorner(MainFrame)
 addCorner(Title)
-addCorner(ScanItemsBtn)
-addCorner(TestPurchaseBtn)
+addCorner(UnlockBtn)
+addCorner(AllPlayersBtn)
 
 -- Parent
 Title.Parent = MainFrame
 Status.Parent = MainFrame
-ScanItemsBtn.Parent = MainFrame
-TestPurchaseBtn.Parent = MainFrame
+UnlockBtn.Parent = MainFrame
+AllPlayersBtn.Parent = MainFrame
 MainFrame.Parent = ScreenGui
 
 -- Update status
@@ -70,240 +266,56 @@ local function updateStatus(text)
     Status.Text = Status.Text .. text .. "\n"
 end
 
-local function clearStatus()
-    Status.Text = ""
-end
-
--- ===== ITEM ID DETECTION =====
-local function findRealItemIDs()
-    clearStatus()
-    updateStatus("🔍 Hunting for real item IDs...")
-    
-    local foundItems = {}
-    local PlayerGui = Player:WaitForChild("PlayerGui")
-    
-    -- METHOD 1: Look for hidden data in cosmetic buttons
-    updateStatus("\n📦 METHOD 1: Checking cosmetic buttons...")
-    
-    for _, gui in pairs(PlayerGui:GetDescendants()) do
-        if gui:IsA("TextButton") or gui:IsA("ImageButton") then
-            -- Check the button itself
-            local buttonInfo = {
-                Name = gui.Name,
-                Text = gui:IsA("TextButton") and gui.Text or "",
-                ClassName = gui.ClassName
-            }
-            
-            -- Check for IntValues, StringValues, etc. (common for storing item IDs)
-            for _, child in pairs(gui:GetDescendants()) do
-                if child:IsA("IntValue") or child:IsA("StringValue") 
-                   or child:IsA("NumberValue") or child:IsA("ObjectValue") then
-                    
-                    buttonInfo[child.Name] = child.Value
-                end
-            end
-            
-            -- Check if this looks like a cosmetic item
-            if gui.Name:lower():find("wrap") or gui.Name:lower():find("kit")
-               or gui.Name:lower():find("wheel") or gui.Name:lower():find("neon") then
-                
-                table.insert(foundItems, buttonInfo)
-                updateStatus("✅ Found: " .. gui.Name)
-                for k, v in pairs(buttonInfo) do
-                    if k ~= "ClassName" then
-                        updateStatus("   " .. k .. ": " .. tostring(v))
-                    end
-                end
-            end
-        end
-    end
-    
-    -- METHOD 2: Look for ModuleScripts that might contain item data
-    updateStatus("\n📦 METHOD 2: Checking game modules...")
-    
-    for _, obj in pairs(game:GetDescendants()) do
-        if obj:IsA("ModuleScript") then
-            local name = obj.Name:lower()
-            if name:find("item") or name:find("shop") 
-               or name:find("cosmetic") or name:find("catalog") then
-                
-                updateStatus("📁 Found module: " .. obj.Name)
-                
-                -- Try to get its contents
-                local success, module = pcall(require, obj)
-                if success and type(module) == "table" then
-                    -- Look for item data in the module
-                    for key, value in pairs(module) do
-                        if type(value) == "table" and (value.Name or value.Id or value.ItemId) then
-                            updateStatus("   📝 Found item data in module")
-                            if value.Name then updateStatus("      Name: " .. value.Name) end
-                            if value.Id then updateStatus("      Id: " .. value.Id) end
-                            if value.ItemId then updateStatus("      ItemId: " .. value.ItemId) end
-                            if value.Price then updateStatus("      Price: " .. value.Price) end
-                        end
-                    end
-                end
-            end
-        end
-    end
-    
-    -- METHOD 3: Monitor network traffic (what the game actually sends)
-    updateStatus("\n📦 METHOD 3: Setting up network monitor...")
-    
-    -- Find the purchase remote that's giving the error
-    local purchaseRemote = nil
-    for _, obj in pairs(RS:GetDescendants()) do
-        if obj:IsA("RemoteFunction") or obj:IsA("RemoteEvent") then
-            local name = obj.Name:lower()
-            if name:find("purchase") or name:find("buy") then
-                purchaseRemote = obj
-                updateStatus("🎯 Found purchase remote: " .. obj.Name)
-                break
-            end
-        end
-    end
-    
-    if purchaseRemote then
-        updateStatus("\n🎯 Now click on a cosmetic in-game to see what data is sent!")
-        updateStatus("💡 Click a wrap/kit/wheel in the shop UI")
-        
-        -- Hook into the remote to see what data is sent
-        local originalFunction
-        if purchaseRemote:IsA("RemoteFunction") then
-            originalFunction = purchaseRemote.InvokeServer
-            purchaseRemote.InvokeServer = function(self, ...)
-                local args = {...}
-                updateStatus("\n📡 PURCHASE DATA CAPTURED:")
-                updateStatus("Remote: " .. purchaseRemote.Name)
-                for i, arg in ipairs(args) do
-                    updateStatus("  Arg " .. i .. ": " .. tostring(arg))
-                    if type(arg) == "table" then
-                        for k, v in pairs(arg) do
-                            updateStatus("    " .. k .. " = " .. tostring(v))
-                        end
-                    end
-                end
-                return originalFunction(self, ...)
-            end
-        end
-    end
-    
-    return foundItems
-end
-
--- ===== INTELLIGENT PURCHASE TESTER =====
-local function testIntelligentPurchase()
-    clearStatus()
-    updateStatus("💰 Testing purchase with captured data...")
-    
-    -- First, let the user manually click an item
-    updateStatus("\n🎯 STEP 1: Manually click a cosmetic in the shop")
-    updateStatus("Wait for it to show 'CAPTURED DATA' above")
-    updateStatus("Then click TEST PURCHASE again")
-    
-    -- Look for the purchase remote
-    local purchaseRemote = nil
-    for _, obj in pairs(RS:GetDescendants()) do
-        if (obj:IsA("RemoteFunction") or obj:IsA("RemoteEvent")) 
-           and obj.Name:lower():find("purchase") then
-            purchaseRemote = obj
-            break
-        end
-    end
-    
-    if not purchaseRemote then
-        updateStatus("❌ No purchase remote found")
-        return
-    end
-    
-    updateStatus("✅ Found remote: " .. purchaseRemote.Name)
-    
-    -- Common item IDs from your game (you'll need to fill these)
-    local possibleItemIDs = {
-        -- Pagani Huayra R cosmetics
-        "Pagani_HuayraR_Wrap_1",
-        "Pagani_HuayraR_Kit_1", 
-        "Pagani_HuayraR_Wheels_1",
-        "HuayraR_Wrap_01",
-        "HuayraR_BodyKit_01",
-        -- Try numeric IDs
-        "1001", "1002", "1003", "1004",
-        -- Try with underscores
-        "pagani_huayra_r_wrap",
-        "huayra_r_kit",
-    }
-    
-    updateStatus("\n🔄 Testing different item IDs...")
-    
-    local successCount = 0
-    for _, itemId in ipairs(possibleItemIDs) do
-        updateStatus("Testing: " .. itemId)
-        
-        -- Try different formats
-        local formats = {
-            itemId,
-            {ItemId = itemId},
-            {id = itemId},
-            {item = itemId},
-            {Item = itemId, Vehicle = "Pagani Huayra R"},
-            {productId = itemId, carModel = "HuayraR"}
-        }
-        
-        for i, data in ipairs(formats) do
-            local success, result = pcall(function()
-                if purchaseRemote:IsA("RemoteFunction") then
-                    return purchaseRemote:InvokeServer(data)
-                else
-                    purchaseRemote:FireServer(data)
-                    return "FireServer called"
-                end
-            end)
-            
-            if success then
-                updateStatus("  ✅ Format " .. i .. " - Success!")
-                updateStatus("  Result: " .. tostring(result))
-                successCount = successCount + 1
-                break
-            else
-                updateStatus("  ❌ Format " .. i .. " - Failed: " .. tostring(result))
-            end
-            
-            task.wait(0.2)
-        end
-    end
-    
-    updateStatus("\n📊 Test complete: " .. successCount .. " successful attempts")
-    
-    if successCount == 0 then
-        updateStatus("💡 TIP: Manually click a cosmetic first")
-        updateStatus("The script will capture the REAL item data")
-        updateStatus("Then we can use that exact data!")
-    end
-end
-
 -- Connect buttons
-ScanItemsBtn.MouseButton1Click:Connect(function()
-    ScanItemsBtn.Text = "SCANNING..."
-    findRealItemIDs()
-    ScanItemsBtn.Text = "🔍 SCAN FOR ITEM IDs"
+UnlockBtn.MouseButton1Click:Connect(function()
+    UnlockBtn.Text = "APPLYING..."
+    
+    updateStatus("\n🎨 Applying shop unlocks...")
+    local shopMods = ApplyVisualUnlocks()
+    updateStatus("✅ Modified " .. shopMods .. " shop elements")
+    
+    updateStatus("💻 Hijacking purchase system...")
+    HijackShopUI()
+    
+    UnlockBtn.Text = "✅ APPLIED!"
+    task.wait(2)
+    UnlockBtn.Text = "🌈 APPLY VISUAL UNLOCKS"
 end)
 
-TestPurchaseBtn.MouseButton1Click:Connect(function()
-    TestPurchaseBtn.Text = "TESTING..."
-    testIntelligentPurchase()
-    TestPurchaseBtn.Text = "💰 TEST PURCHASE"
+AllPlayersBtn.MouseButton1Click:Connect(function()
+    AllPlayersBtn.Text = "APPLYING..."
+    
+    updateStatus("\n👥 Applying effects to all players...")
+    ApplyEffectsToAllPlayers()
+    updateStatus("✅ All player cars now look customized!")
+    
+    AllPlayersBtn.Text = "✅ APPLIED!"
+    task.wait(2)
+    AllPlayersBtn.Text = "👥 ALL PLAYERS EFFECT"
 end)
 
--- Initial instructions
-clearStatus()
-updateStatus("🎯 ITEM HUNTER - HOW TO USE:")
+-- Initial message
+updateStatus("🌈 VISUAL UNLOCKER ACTIVE")
 updateStatus("=" .. string.rep("=", 40))
-updateStatus("1. Open car customization shop")
-updateStatus("2. Select Pagani Huayra R")
-updateStatus("3. Click 'SCAN FOR ITEM IDs'")
-updateStatus("4. Manually click a cosmetic in-game")
-updateStatus("5. Watch the captured data appear above")
-updateStatus("6. Click 'TEST PURCHASE' with that data")
+updateStatus("This makes cosmetics APPEAR unlocked")
+updateStatus("• Shop buttons show 'EQUIP'")
+updateStatus("• Prices show 'UNLOCKED'")
+updateStatus("• Lock icons are hidden")
+updateStatus("• Cars get cool visual effects")
 updateStatus("=" .. string.rep("=", 40))
-updateStatus("\nThe error you got means we have the RIGHT remote,")
-updateStatus("but the WRONG item data. This tool will find the real data!")
+updateStatus("NOTE: This is CLIENT-SIDE only")
+updateStatus("Effects disappear when you rejoin")
+
+-- Auto-apply after 5 seconds
+task.wait(5)
+updateStatus("\n⏰ Auto-applying in 3 seconds...")
+for i = 3, 1, -1 do
+    updateStatus(i .. "...")
+    task.wait(1)
+end
+
+UnlockBtn.Text = "APPLYING..."
+updateStatus("\n🎨 Auto-applying visual unlocks...")
+ApplyVisualUnlocks()
+HijackShopUI()
+UnlockBtn.Text = "✅ APPLIED!"
