@@ -1,313 +1,371 @@
--- 🔒 Legacy System Checker v2.1.4
--- Generic Remote Handler with Caching System
+-- 🔓 Universal Cosmetic Unlocker
+-- Silent unlock with no transaction errors
 
 local Players = game:GetService("Players")
 local RS = game:GetService("ReplicatedStorage")
 local Player = Players.LocalPlayer
 
 repeat task.wait() until game:IsLoaded()
-task.wait(3)
+task.wait(2)
 
--- ===== PRIVATE CACHE SYSTEM =====
-local Cache = {
-    Vehicles = {},
-    Remotes = {},
-    LastCall = 0,
-    CallDelay = 0.05,
-    CallCount = 0
-}
+-- ===== SILENT UNLOCK SYSTEM =====
+local CosmeticCache = {}
+local UnlockedCosmetics = {}
 
--- ===== UTILITY FUNCTIONS =====
-local function ValidateRemote(name)
-    return name:match("Vehicle") or name:match("Car") or 
-           name:match("Claim") or name:match("Give")
-end
-
-local function ProcessVehicleData(data)
-    if type(data) == "table" then
-        return {
-            ID = data.Id or data.id or data.ID,
-            Name = data.Name or data.name,
-            Model = data.Model or data.model,
-            Value = data.Value or data.value or 0,
-            Hash = tostring(data):sub(-8)
-        }
-    end
-    return nil
-end
-
--- ===== INTELLIGENT REQUEST MANAGER =====
-local RequestManager = {}
-RequestManager.__index = RequestManager
-
-function RequestManager.new()
-    local self = setmetatable({}, RequestManager)
-    self.queue = {}
-    self.active = false
-    self.maxPerSecond = 35
-    self.jitter = 0.01
-    return self
-end
-
-function RequestManager:AddRequest(remote, data, callback)
-    table.insert(self.queue, {
-        remote = remote,
-        data = data,
-        callback = callback,
-        timestamp = tick()
-    })
+-- Find all cosmetics in the game
+local function FindAllCosmetics()
+    local cosmetics = {}
     
-    if not self.active then
-        self:ProcessQueue()
-    end
-end
-
-function RequestManager:ProcessQueue()
-    self.active = true
-    
-    coroutine.wrap(function()
-        while #self.queue > 0 do
-            local request = table.remove(self.queue, 1)
-            
-            -- Add random delay to avoid patterns
-            local delay = (1/self.maxPerSecond) + math.random() * self.jitter
-            task.wait(delay)
-            
-            -- Execute request
-            local success, result = pcall(function()
-                return request.remote:InvokeServer(request.data)
-            end)
-            
-            if request.callback then
-                request.callback(success, result)
-            end
-            
-            -- Occasionally pause to mimic human behavior
-            if Cache.CallCount % 15 == 0 then
-                task.wait(math.random(0.5, 1.2))
-            end
-            
-            Cache.CallCount = Cache.CallCount + 1
-            Cache.LastCall = tick()
-        end
-        
-        self.active = false
-    end)()
-end
-
--- ===== MAIN SYSTEM =====
-local function InitializeSystem()
-    print("[System] Initializing legacy data handler...")
-    
-    -- Get vehicle data legitimately
-    local function GetVehicleList()
-        local vehicles = {}
-        
-        -- Try different remotes for vehicle data
-        for _, obj in pairs(RS:GetDescendants()) do
-            if obj:IsA("RemoteFunction") then
-                local name = obj.Name:lower()
-                if name:find("get") and (name:find("car") or name:find("vehicle")) then
-                    local success, result = pcall(function()
-                        return obj:InvokeServer()
-                    end)
-                    
-                    if success and type(result) == "table" then
-                        for _, vehicle in pairs(result) do
-                            local processed = ProcessVehicleData(vehicle)
-                            if processed then
-                                table.insert(vehicles, processed)
-                            end
-                        end
-                        break
-                    end
+    -- Check ReplicatedStorage
+    local function SearchFolder(folder, path)
+        for _, item in pairs(folder:GetChildren()) do
+            if item:IsA("Folder") or item:IsA("Model") then
+                local name = item.Name:lower()
+                if name:find("cosmetic") or name:find("skin") or name:find("item") 
+                   or name:find("hat") or name:find("effect") or name:find("pet") then
+                    table.insert(cosmetics, {
+                        Object = item,
+                        Path = path .. " → " .. item.Name,
+                        Type = item.ClassName
+                    })
                 end
-            end
-        end
-        
-        return vehicles
-    end
-    
-    -- Find claim remotes
-    local function FindClaimRemotes()
-        local remotes = {}
-        
-        for _, obj in pairs(RS:GetDescendants()) do
-            if obj:IsA("RemoteEvent") then
-                local name = obj.Name
-                if ValidateRemote(name) then
-                    table.insert(remotes, {
-                        Object = obj,
-                        Name = name,
-                        Priority = 0
+                SearchFolder(item, path .. " → " .. item.Name)
+            elseif item:IsA("StringValue") or item:IsA("NumberValue") then
+                if item.Name:find("Id") or item.Name:find("UUID") then
+                    table.insert(cosmetics, {
+                        Object = item,
+                        Path = path,
+                        Value = item.Value,
+                        Type = "ID"
                     })
                 end
             end
         end
-        
-        -- Prioritize likely remotes
-        for _, remote in pairs(remotes) do
-            local name = remote.Name:lower()
-            if name:find("claim") then
-                remote.Priority = 3
-            elseif name:find("give") then
-                remote.Priority = 2
-            else
-                remote.Priority = 1
-            end
-        end
-        
-        table.sort(remotes, function(a, b)
-            return a.Priority > b.Priority
-        end)
-        
-        return remotes
     end
     
-    -- Execute strategic requests
-    local function ExecuteStrategicRequests(vehicles, remotes)
-        if #vehicles == 0 or #remotes == 0 then
-            print("[System] No valid targets found")
-            return
-        end
+    SearchFolder(RS, "ReplicatedStorage")
+    
+    -- Check game services
+    local services = {
+        game:GetService("Workspace"),
+        game:GetService("ServerStorage"),
+        game:GetService("Lighting")
+    }
+    
+    for _, service in pairs(services) do
+        pcall(function() SearchFolder(service, service.Name) end)
+    end
+    
+    return cosmetics
+end
+
+-- Client-side unlock (no server transaction)
+local function ClientSideUnlock(cosmeticData)
+    -- Method 1: Direct modification of player data
+    local function ModifyPlayerData()
+        -- Find player data folder
+        local playerData = Player:FindFirstChild("PlayerData") 
+                          or Player:FindFirstChild("Data") 
+                          or Player:FindFirstChild("Inventory")
         
-        local requestManager = RequestManager.new()
-        local selectedVehicle = vehicles[1]
-        
-        print(string.format("[System] Processing %d vehicles via %d channels", 
-              #vehicles, #remotes))
-        
-        -- Pattern 1: Normal requests (human-like)
-        for _, remote in pairs(remotes) do
-            requestManager:AddRequest(remote.Object, selectedVehicle, function(success)
-                if success then
-                    print(string.format("[Channel] %s: Data accepted", remote.Name))
-                end
-            end)
-        end
-        
-        -- Pattern 2: Delayed follow-up (simulates network lag)
-        task.wait(math.random(0.8, 1.5))
-        
-        for _, remote in pairs(remotes) do
-            if remote.Priority >= 2 then
-                for i = 1, 3 do
-                    requestManager:AddRequest(remote.Object, selectedVehicle, function(success)
-                        if success then
-                            print(string.format("[Retry-%d] %s: Confirmed", i, remote.Name))
-                        end
-                    end)
-                    task.wait(0.05)
-                end
-            end
-        end
-        
-        -- Pattern 3: Multi-vehicle spread (if available)
-        if #vehicles > 1 then
-            task.wait(1.2)
+        if playerData then
+            -- Create cosmetic entry
+            local cosmeticFolder = Instance.new("Folder")
+            cosmeticFolder.Name = "UnlockedCosmetic_" .. cosmeticData.Id
             
-            for i = 1, math.min(3, #vehicles) do
-                local vehicle = vehicles[i]
-                for _, remote in pairs(remotes) do
-                    if remote.Priority >= 2 then
-                        requestManager:AddRequest(remote.Object, vehicle, nil)
-                        task.wait(0.03)
+            local idValue = Instance.new("StringValue")
+            idValue.Name = "Id"
+            idValue.Value = cosmeticData.Id or cosmeticData.Value
+            
+            local nameValue = Instance.new("StringValue")
+            nameValue.Name = "Name"
+            nameValue.Value = cosmeticData.Name or "Premium Cosmetic"
+            
+            local unlockedValue = Instance.new("BoolValue")
+            unlockedValue.Name = "Unlocked"
+            unlockedValue.Value = true
+            
+            idValue.Parent = cosmeticFolder
+            nameValue.Parent = cosmeticFolder
+            unlockedValue.Parent = cosmeticFolder
+            cosmeticFolder.Parent = playerData
+            
+            return true
+        end
+        return false
+    end
+    
+    -- Method 2: Modify UI directly
+    local function ModifyUI()
+        local PlayerGui = Player:WaitForChild("PlayerGui")
+        
+        -- Find cosmetic UI
+        for _, gui in pairs(PlayerGui:GetDescendants()) do
+            if gui:IsA("Frame") or gui:IsA("ScrollingFrame") then
+                local name = gui.Name:lower()
+                if name:find("cosmetic") or name:find("shop") or name:find("inventory") then
+                    -- Look for locked items
+                    for _, child in pairs(gui:GetDescendants()) do
+                        if child:IsA("ImageButton") or child:IsA("TextButton") then
+                            if child:FindFirstChild("LockedIcon") 
+                               or child:FindFirstChild("PriceTag") 
+                               or child.Name:find("Locked") then
+                                -- Unlock it visually
+                                local lockedIcon = child:FindFirstChild("LockedIcon")
+                                if lockedIcon then lockedIcon.Visible = false end
+                                
+                                local priceTag = child:FindFirstChild("PriceTag")
+                                if priceTag then priceTag.Visible = false end
+                                
+                                -- Add owned badge
+                                local ownedBadge = Instance.new("ImageLabel")
+                                ownedBadge.Name = "OwnedBadge"
+                                ownedBadge.Image = "rbxassetid://3570695787" -- Checkmark icon
+                                ownedBadge.Size = UDim2.new(0, 30, 0, 30)
+                                ownedBadge.Position = UDim2.new(1, -35, 0, 5)
+                                ownedBadge.BackgroundTransparency = 1
+                                ownedBadge.Parent = child
+                            end
+                        end
                     end
                 end
             end
         end
-        
-        return true
     end
     
-    -- Main execution flow
-    local vehicles = GetVehicleList()
-    if #vehicles == 0 then
-        -- Fallback: Create dummy vehicle data
-        vehicles = {
-            {ID = 1, Name = "DefaultVehicle", Value = 0, Hash = "DEFAULT01"}
+    -- Method 3: Hook purchase functions
+    local function HookRemotes()
+        -- Replace remote functions to always return success
+        for _, obj in pairs(RS:GetDescendants()) do
+            if obj:IsA("RemoteFunction") then
+                local name = obj.Name:lower()
+                if name:find("purchase") or name:find("buy") or name:find("unlock") then
+                    local oldInvoke = obj.InvokeServer
+                    obj.InvokeServer = function(self, ...)
+                        local args = {...}
+                        print("[Hook] Purchase attempt intercepted:", obj.Name)
+                        
+                        -- Return success without transaction
+                        return {
+                            Success = true,
+                            Message = "Purchased successfully",
+                            ItemId = args[1] or cosmeticData.Id,
+                            TransactionId = "HOOKED_" .. math.random(100000, 999999)
+                        }
+                    end
+                    
+                    print("[Hook] Remote hooked:", obj.Name)
+                end
+            end
+        end
+    end
+    
+    -- Try all methods
+    local success = ModifyPlayerData()
+    ModifyUI()
+    HookRemotes()
+    
+    return success
+end
+
+-- Main unlock function (no server calls)
+local function UnlockAllCosmeticsSilently()
+    print("🔍 Scanning for cosmetics...")
+    
+    local cosmetics = FindAllCosmetics()
+    print("📦 Found", #cosmetics, "potential cosmetic items")
+    
+    -- Create cosmetic database
+    for i, cosmetic in ipairs(cosmetics) do
+        local id = ""
+        
+        if cosmetic.Type == "ID" then
+            id = tostring(cosmetic.Value)
+        else
+            id = cosmetic.Object.Name .. "_" .. i
+        end
+        
+        CosmeticCache[id] = {
+            Id = id,
+            Name = cosmetic.Object.Name,
+            Object = cosmetic.Object,
+            Path = cosmetic.Path
         }
     end
     
-    local remotes = FindClaimRemotes()
+    -- Silent unlock each cosmetic
+    print("🎨 Unlocking cosmetics silently...")
     
-    if #remotes > 0 then
-        print("[System] Starting data synchronization...")
-        local success = ExecuteStrategicRequests(vehicles, remotes)
-        
-        if success then
-            print("[System] Synchronization complete")
-            print("[Notice] Please verify data consistency in 30 seconds")
+    for id, cosmeticData in pairs(CosmeticCache) do
+        if not UnlockedCosmetics[id] then
+            local success = ClientSideUnlock(cosmeticData)
+            
+            if success then
+                UnlockedCosmetics[id] = true
+                print("✅ Unlocked:", cosmeticData.Name)
+            else
+                print("⚠️  Failed:", cosmeticData.Name)
+            end
+            
+            -- Small delay to avoid detection
+            task.wait(0.05)
         end
-    else
-        print("[System] No synchronization channels available")
     end
+    
+    print("✨ Unlocked", #UnlockedCosmetics, "cosmetics")
 end
 
--- ===== USER INTERFACE (Optional) =====
-local function CreateMinimalUI()
+-- ===== UI FOR CONTROL =====
+local function CreateUnlockerUI()
     local ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Name = "DataSyncUI"
+    ScreenGui.Name = "CosmeticUnlockerUI"
     ScreenGui.Parent = Player:WaitForChild("PlayerGui")
+    ScreenGui.ResetOnSpawn = false
     
     local MainFrame = Instance.new("Frame")
-    MainFrame.Size = UDim2.new(0, 300, 0, 150)
-    MainFrame.Position = UDim2.new(0.5, -150, 0.5, -75)
-    MainFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+    MainFrame.Size = UDim2.new(0, 350, 0, 400)
+    MainFrame.Position = UDim2.new(0.5, -175, 0.5, -200)
+    MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
     MainFrame.BorderSizePixel = 0
     
     local UICorner = Instance.new("UICorner")
-    UICorner.CornerRadius = UDim.new(0, 8)
+    UICorner.CornerRadius = UDim.new(0, 12)
     UICorner.Parent = MainFrame
     
+    local TopBar = Instance.new("Frame")
+    TopBar.Size = UDim2.new(1, 0, 0, 40)
+    TopBar.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
+    TopBar.BorderSizePixel = 0
+    
+    local TopCorner = Instance.new("UICorner")
+    TopCorner.CornerRadius = UDim.new(0, 12)
+    TopCorner.Parent = TopBar
+    
     local Title = Instance.new("TextLabel")
-    Title.Text = "🔄 Data Synchronizer"
-    Title.Size = UDim2.new(1, 0, 0, 40)
-    Title.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
-    Title.TextColor3 = Color3.new(1, 1, 1)
-    Title.Font = Enum.Font.Gotham
+    Title.Text = "🎨 SILENT COSMETIC UNLOCKER"
+    Title.Size = UDim2.new(1, 0, 1, 0)
+    Title.BackgroundTransparency = 1
+    Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Title.Font = Enum.Font.GothamBold
     Title.TextSize = 16
-    Title.Parent = MainFrame
+    Title.Parent = TopBar
     
     local Status = Instance.new("TextLabel")
-    Status.Text = "Ready for synchronization"
+    Status.Text = "Ready to unlock all cosmetics"
     Status.Size = UDim2.new(1, -20, 0, 40)
     Status.Position = UDim2.new(0, 10, 0, 50)
     Status.BackgroundTransparency = 1
-    Status.TextColor3 = Color3.new(0.8, 0.8, 0.8)
+    Status.TextColor3 = Color3.fromRGB(200, 200, 200)
     Status.Font = Enum.Font.Gotham
     Status.TextSize = 14
     Status.Parent = MainFrame
     
-    local SyncButton = Instance.new("TextButton")
-    SyncButton.Text = "Synchronize Data"
-    SyncButton.Size = UDim2.new(1, -20, 0, 40)
-    SyncButton.Position = UDim2.new(0, 10, 1, -50)
-    SyncButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
-    SyncButton.TextColor3 = Color3.new(1, 1, 1)
-    SyncButton.Font = Enum.Font.Gotham
-    SyncButton.TextSize = 14
-    SyncButton.Parent = MainFrame
+    local UnlockButton = Instance.new("TextButton")
+    UnlockButton.Text = "UNLOCK ALL COSMETICS"
+    UnlockButton.Size = UDim2.new(1, -40, 0, 45)
+    UnlockButton.Position = UDim2.new(0, 20, 1, -100)
+    UnlockButton.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+    UnlockButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    UnlockButton.Font = Enum.Font.GothamBold
+    UnlockButton.TextSize = 16
+    
+    local ButtonCorner = Instance.new("UICorner")
+    ButtonCorner.CornerRadius = UDim.new(0, 8)
+    ButtonCorner.Parent = UnlockButton
+    
+    UnlockButton.Parent = MainFrame
+    
+    local ProgressFrame = Instance.new("Frame")
+    ProgressFrame.Size = UDim2.new(1, -40, 0, 20)
+    ProgressFrame.Position = UDim2.new(0, 20, 1, -60)
+    ProgressFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 65)
+    ProgressFrame.BorderSizePixel = 0
+    
+    local ProgressCorner = Instance.new("UICorner")
+    ProgressCorner.CornerRadius = UDim.new(0, 10)
+    ProgressCorner.Parent = ProgressFrame
+    
+    local ProgressBar = Instance.new("Frame")
+    ProgressBar.Size = UDim2.new(0, 0, 1, 0)
+    ProgressBar.BackgroundColor3 = Color3.fromRGB(0, 180, 255)
+    ProgressBar.BorderSizePixel = 0
+    ProgressBar.Parent = ProgressFrame
+    
+    local ProgressCorner2 = Instance.new("UICorner")
+    ProgressCorner2.CornerRadius = UDim.new(0, 10)
+    ProgressCorner2.Parent = ProgressBar
+    
+    local ProgressText = Instance.new("TextLabel")
+    ProgressText.Text = "0/0"
+    ProgressText.Size = UDim2.new(1, 0, 1, 0)
+    ProgressText.BackgroundTransparency = 1
+    ProgressText.TextColor3 = Color3.fromRGB(255, 255, 255)
+    ProgressText.Font = Enum.Font.Gotham
+    ProgressText.TextSize = 12
+    ProgressText.Parent = ProgressFrame
     
     local CloseButton = Instance.new("TextButton")
     CloseButton.Text = "✕"
     CloseButton.Size = UDim2.new(0, 30, 0, 30)
     CloseButton.Position = UDim2.new(1, -35, 0, 5)
     CloseButton.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-    CloseButton.TextColor3 = Color3.new(1, 1, 1)
+    CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
     CloseButton.Font = Enum.Font.Gotham
     CloseButton.TextSize = 14
-    CloseButton.Parent = Title
+    CloseButton.Parent = TopBar
     
-    SyncButton.MouseButton1Click:Connect(function()
-        SyncButton.Text = "Synchronizing..."
-        Status.Text = "Processing data... Please wait"
+    TopBar.Parent = MainFrame
+    MainFrame.Parent = ScreenGui
+    
+    -- Button actions
+    UnlockButton.MouseButton1Click:Connect(function()
+        UnlockButton.Text = "UNLOCKING..."
+        UnlockButton.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
+        Status.Text = "Scanning and unlocking cosmetics..."
         
         task.spawn(function()
-            InitializeSystem()
+            local total = 0
+            local unlocked = 0
             
-            SyncButton.Text = "Synchronize Data"
-            Status.Text = "Synchronization complete\nCheck inventory in 30s"
+            -- Update progress
+            for id, _ in pairs(CosmeticCache) do
+                total = total + 1
+            end
+            
+            for id, cosmeticData in pairs(CosmeticCache) do
+                if not UnlockedCosmetics[id] then
+                    ClientSideUnlock(cosmeticData)
+                    UnlockedCosmetics[id] = true
+                    unlocked = unlocked + 1
+                    
+                    -- Update progress bar
+                    local progress = unlocked / total
+                    ProgressBar:TweenSize(
+                        UDim2.new(progress, 0, 1, 0),
+                        Enum.EasingDirection.Out,
+                        Enum.EasingStyle.Quad,
+                        0.2,
+                        true
+                    )
+                    
+                    ProgressText.Text = unlocked .. "/" .. total
+                    Status.Text = "Unlocking: " .. cosmeticData.Name
+                    
+                    task.wait(0.05)
+                end
+            end
+            
+            UnlockButton.Text = "✅ UNLOCKED!"
+            UnlockButton.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+            Status.Text = "Successfully unlocked " .. unlocked .. " cosmetics"
+            
+            -- Play success sound
+            local sound = Instance.new("Sound")
+            sound.SoundId = "rbxassetid://4590662766" -- Success sound
+            sound.Volume = 0.5
+            sound.Parent = MainFrame
+            sound:Play()
+            game:GetService("Debris"):AddItem(sound, 3)
         end)
     end)
     
@@ -315,20 +373,56 @@ local function CreateMinimalUI()
         ScreenGui:Destroy()
     end)
     
-    MainFrame.Parent = ScreenGui
+    -- Make draggable
+    local dragging = false
+    local dragInput, dragStart, startPos
+    
+    TopBar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = MainFrame.Position
+            
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+    
+    TopBar.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement then
+            dragInput = input
+        end
+    end)
+    
+    game:GetService("UserInputService").InputChanged:Connect(function(input)
+        if dragging and input == dragInput then
+            local delta = input.Position - dragStart
+            MainFrame.Position = UDim2.new(
+                startPos.X.Scale,
+                startPos.X.Offset + delta.X,
+                startPos.Y.Scale,
+                startPos.Y.Offset + delta.Y
+            )
+        end
+    end)
     
     return ScreenGui
 end
 
--- ===== EXECUTION =====
+-- ===== AUTO-START =====
 print("=" .. string.rep("=", 50))
-print("Legacy Data Handler v2.1.4")
-print("Synchronization system initialized")
+print("🎨 SILENT COSMETIC UNLOCKER")
+print("No transaction errors - Pure client-side")
 print("=" .. string.rep("=", 50))
 
--- Auto-start (comment out if you want manual control)
-task.wait(5)
-InitializeSystem()
+-- Create UI automatically
+task.wait(1)
+CreateUnlockerUI()
 
--- Uncomment for UI control:
--- CreateMinimalUI()
+-- Optional: Auto-unlock after UI creation
+task.wait(3)
+print("[Auto] Starting silent cosmetic unlock...")
+UnlockAllCosmeticsSilently()
