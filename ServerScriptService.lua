@@ -385,4 +385,183 @@ local function CreateManualUnlocker()
     Title.Size = UDim2.new(1, 0, 0, 50)
     Title.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
     Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-    Title.Font = Enum.Font
+    Title.Font = Enum.Font.GothamBold
+    Title.TextSize = 18
+    
+    local TitleCorner = Instance.new("UICorner")
+    TitleCorner.CornerRadius = UDim.new(0, 15)
+    TitleCorner.Parent = Title
+    
+    -- Instructions
+    local Instructions = Instance.new("TextLabel")
+    Instructions.Text = "INSTRUCTIONS:\n1. Open car customization shop\n2. Find item ID (hover over items)\n3. Enter ID below\n4. Click PURCHASE"
+    Instructions.Size = UDim2.new(1, -20, 0, 80)
+    Instructions.Position = UDim2.new(0, 10, 0, 60)
+    Instructions.BackgroundTransparency = 1
+    Instructions.TextColor3 = Color3.fromRGB(200, 220, 255)
+    Instructions.Font = Enum.Font.Gotham
+    Instructions.TextSize = 13
+    Instructions.TextWrapped = true
+    
+    -- Item ID Input
+    local InputFrame = Instance.new("Frame")
+    InputFrame.Size = UDim2.new(1, -20, 0, 40)
+    InputFrame.Position = UDim2.new(0, 10, 0, 150)
+    InputFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 50)
+    
+    local InputCorner = Instance.new("UICorner")
+    InputCorner.CornerRadius = UDim.new(0, 8)
+    InputCorner.Parent = InputFrame
+    
+    local TextBox = Instance.new("TextBox")
+    TextBox.PlaceholderText = "Enter Cosmetic Item ID here..."
+    TextBox.Size = UDim2.new(1, -20, 1, -10)
+    TextBox.Position = UDim2.new(0, 10, 0, 5)
+    TextBox.BackgroundTransparency = 1
+    TextBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+    TextBox.Font = Enum.Font.Gotham
+    TextBox.TextSize = 14
+    TextBox.Text = ""
+    
+    -- Purchase Button
+    local PurchaseBtn = Instance.new("TextButton")
+    PurchaseBtn.Text = "🛒 PURCHASE ITEM"
+    PurchaseBtn.Size = UDim2.new(1, -20, 0, 45)
+    PurchaseBtn.Position = UDim2.new(0, 10, 0, 200)
+    PurchaseBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
+    PurchaseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    PurchaseBtn.Font = Enum.Font.GothamBold
+    PurchaseBtn.TextSize = 16
+    
+    local BtnCorner = Instance.new("UICorner")
+    BtnCorner.CornerRadius = UDim.new(0, 10)
+    BtnCorner.Parent = PurchaseBtn
+    
+    -- Status
+    local Status = Instance.new("TextLabel")
+    Status.Text = "Ready"
+    Status.Size = UDim2.new(1, -20, 0, 100)
+    Status.Position = UDim2.new(0, 10, 0, 260)
+    Status.BackgroundColor3 = Color3.fromRGB(35, 35, 50)
+    Status.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Status.Font = Enum.Font.Gotham
+    Status.TextSize = 12
+    Status.TextWrapped = true
+    
+    local StatusCorner = Instance.new("UICorner")
+    StatusCorner.CornerRadius = UDim.new(0, 10)
+    StatusCorner.Parent = Status
+    
+    -- Close Button
+    local CloseBtn = Instance.new("TextButton")
+    CloseBtn.Text = "✕"
+    CloseBtn.Size = UDim2.new(0, 30, 0, 30)
+    CloseBtn.Position = UDim2.new(1, -35, 0, 10)
+    CloseBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+    CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    CloseBtn.Font = Enum.Font.GothamBold
+    CloseBtn.TextSize = 14
+    
+    local CloseCorner = Instance.new("UICorner")
+    CloseCorner.CornerRadius = UDim.new(0, 6)
+    CloseCorner.Parent = CloseBtn
+    
+    -- Parent everything
+    Title.Parent = MainFrame
+    Instructions.Parent = MainFrame
+    InputFrame.Parent = MainFrame
+    TextBox.Parent = InputFrame
+    PurchaseBtn.Parent = MainFrame
+    Status.Parent = MainFrame
+    CloseBtn.Parent = Title
+    MainFrame.Parent = ScreenGui
+    
+    -- Purchase function
+    local function ManualPurchase(itemId)
+        if itemId == "" then
+            Status.Text = "Please enter an Item ID"
+            return
+        end
+        
+        PurchaseBtn.Text = "PROCESSING..."
+        PurchaseBtn.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
+        Status.Text = "Attempting to purchase: " .. itemId
+        
+        -- Find all purchase remotes
+        local purchaseRemotes = FindPurchaseRemotes()
+        local success = false
+        
+        for _, remote in ipairs(purchaseRemotes) do
+            -- Try different formats
+            local formats = {
+                itemId,
+                {ItemId = itemId},
+                {id = itemId},
+                {Name = itemId},
+                {productId = itemId}
+            }
+            
+            for _, data in ipairs(formats) do
+                local ok, result = pcall(function()
+                    return remote.Object:InvokeServer(data)
+                end)
+                
+                if ok then
+                    Status.Text = "✅ Success!\nItem: " .. itemId .. "\nResult: " .. tostring(result)
+                    success = true
+                    break
+                end
+            end
+            
+            if success then break end
+        end
+        
+        if success then
+            PurchaseBtn.Text = "✅ PURCHASED!"
+            PurchaseBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+        else
+            PurchaseBtn.Text = "🛒 PURCHASE ITEM"
+            PurchaseBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+            Status.Text = "❌ Failed to purchase\nTry different item ID\nor find correct ID in shop"
+        end
+    end
+    
+    -- Connect events
+    PurchaseBtn.MouseButton1Click:Connect(function()
+        ManualPurchase(TextBox.Text)
+    end)
+    
+    TextBox.FocusLost:Connect(function(enterPressed)
+        if enterPressed then
+            ManualPurchase(TextBox.Text)
+        end
+    end)
+    
+    CloseBtn.MouseButton1Click:Connect(function()
+        ScreenGui:Destroy()
+    end)
+    
+    -- Pre-fill with example IDs
+    TextBox.Text = "Wrap_Red"
+    
+    return ScreenGui
+end
+
+-- ===== AUTO-START =====
+print("=" .. string.rep("=", 50))
+print("🛠️ ROBUST CAR COSMETIC UNLOCKER")
+print("=" .. string.rep("=", 50))
+print("METHODS:")
+print("1. Direct purchase attempts")
+print("2. Manual item ID entry")
+print("3. UI modification")
+print("=" .. string.rep("=", 50))
+
+-- Create manual unlocker UI
+task.wait(2)
+CreateManualUnlocker()
+
+-- Try auto-unlock after delay
+task.wait(5)
+print("[System] Manual unlocker UI created!")
+print("[System] Enter cosmetic item IDs to purchase them.")
