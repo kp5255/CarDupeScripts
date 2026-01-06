@@ -1,207 +1,67 @@
--- 🔓 LOCKED VALUE UNLOCKER
--- Changes "locked" or "Locked" values to 0 to unlock items
+-- 🔍 DEBUG SCRIPT - SEE WHAT'S REALLY HAPPENING
+-- Shows all values in real-time as you click around
 
 local Players = game:GetService("Players")
 local Player = Players.LocalPlayer
 
 -- Wait for game
 repeat task.wait() until game:IsLoaded()
-task.wait(3)
+task.wait(2)
 
-print("🔓 LOCKED VALUE UNLOCKER LOADED")
+print("🔍 DEBUG SCRIPT LOADED")
 
--- ===== FIND AND UNLOCK ITEMS =====
-local function UnlockAllLockedValues()
-    print("🔍 Searching for locked values...")
-    
-    local PlayerGui = Player:WaitForChild("PlayerGui")
-    local unlockedCount = 0
-    
-    -- Look for ALL values in the UI
-    for _, obj in pairs(PlayerGui:GetDescendants()) do
-        -- Check IntValues, NumberValues, StringValues, BoolValues
-        if obj:IsA("IntValue") or obj:IsA("NumberValue") 
-           or obj:IsA("StringValue") or obj:IsA("BoolValue") then
-            
-            local valueName = obj.Name:lower()
-            
-            -- Check if this looks like a lock/unlock value
-            if valueName:find("lock") or valueName:find("owned")
-               or valueName:find("purchased") or valueName:find("unlocked")
-               or valueName:find("equipped") or valueName:find("bought") then
-                
-                print("🔓 Found value: " .. obj.Name .. " = " .. tostring(obj.Value))
-                
-                -- Try to unlock it
-                local originalValue = obj.Value
-                
-                if obj:IsA("IntValue") or obj:IsA("NumberValue") then
-                    -- For numeric values, change to 1 (unlocked) or 0 if it's > 0
-                    if tonumber(obj.Value) == 0 then
-                        obj.Value = 1  -- 0 = locked, 1 = unlocked
-                        unlockedCount = unlockedCount + 1
-                        print("   ✅ Changed from " .. originalValue .. " to 1")
-                    elseif tonumber(obj.Value) > 1 then
-                        obj.Value = 1
-                        unlockedCount = unlockedCount + 1
-                        print("   ✅ Changed from " .. originalValue .. " to 1")
-                    end
-                elseif obj:IsA("StringValue") then
-                    -- For string values, change "false" to "true", "locked" to "unlocked"
-                    local lowerValue = tostring(obj.Value):lower()
-                    if lowerValue == "false" or lowerValue == "locked" 
-                       or lowerValue == "no" or lowerValue == "0" then
-                        obj.Value = "true"
-                        unlockedCount = unlockedCount + 1
-                        print("   ✅ Changed from '" .. originalValue .. "' to 'true'")
-                    end
-                elseif obj:IsA("BoolValue") then
-                    -- For boolean values, change false to true
-                    if obj.Value == false then
-                        obj.Value = true
-                        unlockedCount = unlockedCount + 1
-                        print("   ✅ Changed from false to true")
-                    end
-                end
-            end
-        end
-        
-        -- Also check TextLabels/TextButtons that might show locked status
-        if obj:IsA("TextLabel") or obj:IsA("TextButton") then
-            local text = obj.Text:lower()
-            if text:find("locked") or text:find("not owned") 
-               or text:find("purchase") or text:find("buy") then
-                
-                -- Change the text to show unlocked
-                if text:find("locked") then
-                    obj.Text = "UNLOCKED"
-                    obj.TextColor3 = Color3.fromRGB(0, 255, 0)
-                    unlockedCount = unlockedCount + 1
-                    print("✅ Changed text from 'locked' to 'UNLOCKED'")
-                elseif text:find("buy") or text:find("purchase") then
-                    obj.Text = "EQUIP"
-                    obj.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
-                    unlockedCount = unlockedCount + 1
-                    print("✅ Changed button from 'buy' to 'EQUIP'")
-                end
-            end
-        end
-    end
-    
-    -- Also look for specific patterns like "locked = 1" in properties
-    for _, obj in pairs(PlayerGui:GetDescendants()) do
-        if obj:IsA("Frame") or obj:IsA("ScrollingFrame") then
-            -- Check for common property names
-            for _, child in pairs(obj:GetChildren()) do
-                if child.Name:lower():find("lock") and (child:IsA("IntValue") or child:IsA("BoolValue")) then
-                    print("🔓 Found lock property: " .. child.Name)
-                    
-                    if child:IsA("IntValue") then
-                        if child.Value == 0 then
-                            child.Value = 1
-                            unlockedCount = unlockedCount + 1
-                            print("   ✅ Set " .. child.Name .. " from 0 to 1")
-                        end
-                    elseif child:IsA("BoolValue") and child.Value == false then
-                        child.Value = true
-                        unlockedCount = unlockedCount + 1
-                        print("   ✅ Set " .. child.Name .. " from false to true")
-                    end
-                end
-            end
-        end
-    end
-    
-    return unlockedCount
-end
-
--- ===== REAL-TIME MONITOR =====
-local function StartRealTimeUnlockMonitor()
-    print("👁️ Starting real-time unlock monitor...")
-    
-    local PlayerGui = Player:WaitForChild("PlayerGui")
-    
-    -- Monitor for new UI elements
-    local connection = PlayerGui.DescendantAdded:Connect(function(obj)
-        task.wait(0.1)  -- Wait for properties to load
-        
-        -- Check if this is a lock-related value
-        if obj:IsA("IntValue") or obj:IsA("BoolValue") then
-            local name = obj.Name:lower()
-            if name:find("lock") or name:find("owned") then
-                print("👁️ New lock value detected: " .. obj.Name)
-                
-                -- Try to unlock it
-                if obj:IsA("IntValue") and obj.Value == 0 then
-                    obj.Value = 1
-                    print("   ✅ Auto-unlocked: " .. obj.Name .. " (0 → 1)")
-                elseif obj:IsA("BoolValue") and obj.Value == false then
-                    obj.Value = true
-                    print("   ✅ Auto-unlocked: " .. obj.Name .. " (false → true)")
-                end
-            end
-        end
-        
-        -- Check for locked text
-        if obj:IsA("TextLabel") then
-            local text = obj.Text:lower()
-            if text:find("locked") or text:find("not owned") then
-                obj.Text = "UNLOCKED"
-                obj.TextColor3 = Color3.fromRGB(0, 255, 0)
-                print("✅ Auto-changed text to UNLOCKED")
-            end
-        end
-    end)
-    
-    return connection
-end
-
--- ===== SIMPLE UI =====
+-- Create debug UI
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "LockedValueUnlockerUI"
+ScreenGui.Name = "DebugUI"
 ScreenGui.Parent = Player:WaitForChild("PlayerGui")
 
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 350, 0, 250)
-MainFrame.Position = UDim2.new(0.5, -175, 0, 20)
-MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 40)
+MainFrame.Size = UDim2.new(0, 500, 0, 600)
+MainFrame.Position = UDim2.new(0.5, -250, 0.5, -300)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
 
 local Title = Instance.new("TextLabel")
-Title.Text = "🔓 LOCKED VALUE UNLOCKER"
+Title.Text = "🔍 REAL-TIME DEBUGGER"
 Title.Size = UDim2.new(1, 0, 0, 40)
 Title.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.Font = Enum.Font.GothamBold
-Title.TextSize = 16
 
-local Status = Instance.new("TextLabel")
-Status.Name = "StatusLabel"
-Status.Text = "Ready...\n"
-Status.Size = UDim2.new(1, -20, 0, 130)
-Status.Position = UDim2.new(0, 10, 0, 50)
-Status.BackgroundTransparency = 1
-Status.TextColor3 = Color3.fromRGB(255, 255, 255)
-Status.Font = Enum.Font.Code
-Status.TextSize = 12
-Status.TextXAlignment = Enum.TextXAlignment.Left
-Status.TextYAlignment = Enum.TextYAlignment.Top
-Status.TextWrapped = true
+-- Scrollable log area
+local ScrollingFrame = Instance.new("ScrollingFrame")
+ScrollingFrame.Name = "LogFrame"
+ScrollingFrame.Size = UDim2.new(1, -20, 0, 500)
+ScrollingFrame.Position = UDim2.new(0, 10, 0, 50)
+ScrollingFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
+ScrollingFrame.ScrollBarThickness = 8
+ScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
 
-local UnlockBtn = Instance.new("TextButton")
-UnlockBtn.Text = "🔓 UNLOCK ALL VALUES"
-UnlockBtn.Size = UDim2.new(1, -20, 0, 35)
-UnlockBtn.Position = UDim2.new(0, 10, 0, 190)
-UnlockBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
-UnlockBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-UnlockBtn.Font = Enum.Font.GothamBold
+local LogLabel = Instance.new("TextLabel")
+LogLabel.Name = "LogLabel"
+LogLabel.Text = "DEBUGGER READY\n" .. string.rep("=", 60) .. "\n"
+LogLabel.Size = UDim2.new(1, -10, 0, 0)
+LogLabel.Position = UDim2.new(0, 5, 0, 5)
+LogLabel.BackgroundTransparency = 1
+LogLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+LogLabel.Font = Enum.Font.Code
+LogLabel.TextSize = 12
+LogLabel.TextXAlignment = Enum.TextXAlignment.Left
+LogLabel.TextYAlignment = Enum.TextYAlignment.Top
+LogLabel.TextWrapped = true
+LogLabel.AutomaticSize = Enum.AutomaticSize.Y
 
-local MonitorBtn = Instance.new("TextButton")
-MonitorBtn.Text = "👁️ ENABLE AUTO-MONITOR"
-MonitorBtn.Size = UDim2.new(1, -20, 0, 35)
-MonitorBtn.Position = UDim2.new(0, 10, 0, 235)
-MonitorBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
-MonitorBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-MonitorBtn.Font = Enum.Font.GothamBold
+-- Buttons
+local ScanBtn = Instance.new("TextButton")
+ScanBtn.Text = "🔍 SCAN CURRENT UI"
+ScanBtn.Size = UDim2.new(1, -20, 0, 35)
+ScanBtn.Position = UDim2.new(0, 10, 0, 560)
+ScanBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+
+local ClearBtn = Instance.new("TextButton")
+ClearBtn.Text = "🗑️ CLEAR LOG"
+ClearBtn.Size = UDim2.new(1, -20, 0, 35)
+ClearBtn.Position = UDim2.new(0, 10, 0, 600)
+ClearBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 
 -- Add corners
 local function addCorner(obj)
@@ -212,119 +72,296 @@ end
 
 addCorner(MainFrame)
 addCorner(Title)
-addCorner(UnlockBtn)
-addCorner(MonitorBtn)
+addCorner(ScrollingFrame)
+addCorner(ScanBtn)
+addCorner(ClearBtn)
 
--- Parent
+-- Parent everything
+LogLabel.Parent = ScrollingFrame
 Title.Parent = MainFrame
-Status.Parent = MainFrame
-UnlockBtn.Parent = MainFrame
-MonitorBtn.Parent = MainFrame
+ScrollingFrame.Parent = MainFrame
+ScanBtn.Parent = MainFrame
+ClearBtn.Parent = MainFrame
 MainFrame.Parent = ScreenGui
 
--- Update status (FIXED VERSION)
-local function updateStatus(text)
-    Status.Text = Status.Text .. text .. "\n"
+-- Update log
+local function addLog(text, color)
+    color = color or Color3.fromRGB(255, 255, 255)
     
-    -- Calculate text height and update canvas size if in a ScrollingFrame
-    if Status.Parent:IsA("ScrollingFrame") then
-        local textHeight = #Status.Text:split("\n") * 15
-        Status.Parent.CanvasSize = UDim2.new(0, 0, 0, textHeight + 20)
+    local timestamp = os.date("%H:%M:%S")
+    LogLabel.Text = LogLabel.Text .. string.format("[%s] ", timestamp) .. text .. "\n"
+    
+    -- Auto-scroll
+    ScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, LogLabel.TextBounds.Y + 20)
+    ScrollingFrame.CanvasPosition = Vector2.new(0, LogLabel.TextBounds.Y)
+    
+    -- Also print to console
+    print(text)
+end
+
+local function clearLog()
+    LogLabel.Text = "LOG CLEARED\n" .. string.rep("=", 60) .. "\n"
+    ScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 100)
+end
+
+-- ===== DEEP SCAN FUNCTION =====
+local function deepScanCurrentUI()
+    addLog("\n🔍 DEEP SCAN STARTED", Color3.fromRGB(255, 200, 0))
+    
+    local PlayerGui = Player:WaitForChild("PlayerGui")
+    local foundValues = {}
+    
+    -- Scan all descendant objects
+    for _, obj in pairs(PlayerGui:GetDescendants()) do
+        local objName = obj.Name
+        local objType = obj.ClassName
+        
+        -- Check for values that might indicate lock status
+        if obj:IsA("IntValue") or obj:IsA("BoolValue") 
+           or obj:IsA("StringValue") or obj:IsA("NumberValue")
+           or obj:IsA("ObjectValue") then
+            
+            local isInteresting = objName:lower():find("lock") 
+                               or objName:lower():find("owned")
+                               or objName:lower():find("purchased")
+                               or objName:lower():find("unlocked")
+                               or objName:lower():find("bought")
+                               or objName:lower():find("equipped")
+            
+            if isInteresting then
+                local valueType = obj.ClassName
+                local value = obj.Value
+                
+                addLog(string.format("📊 %s (%s) = %s", 
+                    objName, valueType, tostring(value)), Color3.fromRGB(200, 220, 255))
+                
+                -- Store for summary
+                table.insert(foundValues, {
+                    name = objName,
+                    type = valueType,
+                    value = value,
+                    path = obj:GetFullName()
+                })
+            end
+        end
+        
+        -- Also check TextLabels/Buttons that show status
+        if obj:IsA("TextLabel") or obj:IsA("TextButton") then
+            local text = obj.Text
+            if text and (text:lower():find("locked") 
+               or text:lower():find("buy") 
+               or text:lower():find("purchase")
+               or text:lower():find("equip")) then
+                
+                addLog(string.format("📝 %s: \"%s\"", objName, text), Color3.fromRGB(255, 255, 200))
+            end
+        end
+    end
+    
+    -- Summary
+    addLog("\n📊 SCAN SUMMARY:", Color3.fromRGB(255, 200, 0))
+    addLog("Found " .. #foundValues .. " interesting values")
+    
+    -- Group by type
+    local byType = {}
+    for _, v in ipairs(foundValues) do
+        byType[v.type] = (byType[v.type] or 0) + 1
+    end
+    
+    for typeName, count in pairs(byType) do
+        addLog(string.format("  %s: %d", typeName, count), Color3.fromRGB(200, 200, 255))
+    end
+    
+    -- Show most promising values to modify
+    addLog("\n🎯 RECOMMENDED MODIFICATIONS:", Color3.fromRGB(255, 200, 0))
+    for _, v in ipairs(foundValues) do
+        if v.type == "IntValue" and tonumber(v.value) == 0 then
+            addLog(string.format("  Change %s from 0 to 1", v.name), Color3.fromRGB(0, 255, 0))
+        elseif v.type == "BoolValue" and v.value == false then
+            addLog(string.format("  Change %s from false to true", v.name), Color3.fromRGB(0, 255, 0))
+        elseif v.type == "StringValue" and tostring(v.value):lower() == "locked" then
+            addLog(string.format("  Change %s from '%s' to 'unlocked'", v.name, v.value), Color3.fromRGB(0, 255, 0))
+        end
+    end
+    
+    return foundValues
+end
+
+-- ===== MONITOR CLICKS =====
+local function monitorClicks()
+    addLog("\n🖱️ CLICK MONITOR ENABLED", Color3.fromRGB(255, 200, 0))
+    addLog("Click any button in the shop to see what happens", Color3.fromRGB(255, 255, 200))
+    
+    local PlayerGui = Player:WaitForChild("PlayerGui")
+    
+    -- Hook into all buttons
+    for _, button in pairs(PlayerGui:GetDescendants()) do
+        if button:IsA("TextButton") or button:IsA("ImageButton") then
+            local originalClick = button.MouseButton1Click
+            
+            button.MouseButton1Click:Connect(function()
+                addLog("\n🖱️ BUTTON CLICKED:", Color3.fromRGB(255, 100, 255))
+                addLog("  Button: " .. button.Name, Color3.fromRGB(255, 200, 255))
+                if button:IsA("TextButton") then
+                    addLog("  Text: " .. button.Text, Color3.fromRGB(255, 200, 255))
+                end
+                addLog("  Path: " .. button:GetFullName(), Color3.fromRGB(255, 200, 255))
+                
+                -- Show parent hierarchy
+                local parent = button.Parent
+                local depth = 0
+                while parent and depth < 5 do
+                    addLog("  Parent " .. depth .. ": " .. parent.Name, Color3.fromRGB(200, 200, 200))
+                    
+                    -- Check for values in parent
+                    for _, child in pairs(parent:GetChildren()) do
+                        if child:IsA("IntValue") or child:IsA("BoolValue") 
+                           or child:IsA("StringValue") then
+                            addLog(string.format("    📊 %s = %s", 
+                                child.Name, tostring(child.Value)), Color3.fromRGB(150, 200, 255))
+                        end
+                    end
+                    
+                    parent = parent.Parent
+                    depth = depth + 1
+                end
+                
+                -- Call original click if it exists
+                if originalClick then
+                    originalClick()
+                end
+            end)
+        end
     end
 end
 
-local function clearStatus()
-    Status.Text = ""
+-- ===== MONITOR VALUE CHANGES =====
+local function monitorValueChanges()
+    addLog("\n📈 VALUE CHANGE MONITOR ENABLED", Color3.fromRGB(255, 200, 0))
+    
+    local PlayerGui = Player:WaitForChild("PlayerGui")
+    
+    -- Monitor all value changes
+    for _, obj in pairs(PlayerGui:GetDescendants()) do
+        if obj:IsA("IntValue") or obj:IsA("BoolValue") 
+           or obj:IsA("StringValue") or obj:IsA("NumberValue") then
+            
+            -- Hook the Value property
+            local originalValue = obj.Value
+            
+            local mt = getrawmetatable(obj)
+            local oldIndex = mt.__index
+            
+            mt.__index = newcclosure(function(self, key)
+                if key == "Value" then
+                    local currentValue = oldIndex(self, key)
+                    if currentValue ~= originalValue then
+                        addLog(string.format("🔄 %s changed: %s → %s", 
+                            obj.Name, tostring(originalValue), tostring(currentValue)), 
+                            Color3.fromRGB(0, 255, 255))
+                        originalValue = currentValue
+                    end
+                end
+                return oldIndex(self, key)
+            end)
+        end
+    end
 end
 
--- Variables
-local monitorConnection = nil
-local isMonitoring = false
-
--- Unlock button
-UnlockBtn.MouseButton1Click:Connect(function()
-    UnlockBtn.Text = "UNLOCKING..."
-    clearStatus()
+-- ===== QUICK MODIFY FUNCTION =====
+local function quickModifyAll()
+    addLog("\n⚡ QUICK MODIFY ATTEMPT", Color3.fromRGB(255, 200, 0))
     
-    updateStatus("🔍 Searching for locked values...")
+    local PlayerGui = Player:WaitForChild("PlayerGui")
+    local modified = 0
     
-    local unlocked = UnlockAllLockedValues()
+    for _, obj in pairs(PlayerGui:GetDescendants()) do
+        if obj:IsA("IntValue") and obj.Name:lower():find("lock") then
+            if obj.Value == 0 then
+                obj.Value = 1
+                addLog("✅ Changed " .. obj.Name .. " from 0 to 1", Color3.fromRGB(0, 255, 0))
+                modified = modified + 1
+            end
+        elseif obj:IsA("BoolValue") and obj.Name:lower():find("lock") then
+            if obj.Value == false then
+                obj.Value = true
+                addLog("✅ Changed " .. obj.Name .. " from false to true", Color3.fromRGB(0, 255, 0))
+                modified = modified + 1
+            end
+        elseif obj:IsA("TextButton") then
+            local text = obj.Text:lower()
+            if text:find("buy") or text:find("purchase") then
+                obj.Text = "EQUIP"
+                obj.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+                addLog("✅ Changed button text to EQUIP", Color3.fromRGB(0, 255, 0))
+                modified = modified + 1
+            end
+        end
+    end
     
-    updateStatus("\n📊 RESULTS:")
-    updateStatus("✅ Unlocked " .. unlocked .. " values")
+    addLog("📊 Modified " .. modified .. " items", Color3.fromRGB(255, 200, 0))
     
-    if unlocked > 0 then
-        updateStatus("🎉 Items should now appear unlocked!")
-        updateStatus("Check the shop - buttons should say 'EQUIP'")
-        
-        UnlockBtn.Text = "✅ UNLOCKED!"
-        UnlockBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+    if modified > 0 then
+        addLog("🎉 Try clicking EQUIP buttons now!", Color3.fromRGB(0, 255, 0))
     else
-        updateStatus("❌ No locked values found")
-        updateStatus("\n💡 Try:")
-        updateStatus("1. Open the car shop")
-        updateStatus("2. Browse different cosmetics")
-        updateStatus("3. Click UNLOCK again")
-        
-        UnlockBtn.Text = "🔓 UNLOCK ALL VALUES"
+        addLog("❌ No items to modify - open the shop first", Color3.fromRGB(255, 100, 100))
     end
+end
+
+-- Connect buttons
+ScanBtn.MouseButton1Click:Connect(function()
+    ScanBtn.Text = "SCANNING..."
+    deepScanCurrentUI()
+    ScanBtn.Text = "🔍 SCAN CURRENT UI"
 end)
 
--- Monitor button
-MonitorBtn.MouseButton1Click:Connect(function()
-    if isMonitoring then
-        -- Stop monitoring
-        if monitorConnection then
-            monitorConnection:Disconnect()
-            monitorConnection = nil
-        end
-        isMonitoring = false
-        MonitorBtn.Text = "👁️ ENABLE AUTO-MONITOR"
-        MonitorBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
-        updateStatus("\n⏹️ Auto-monitor stopped")
-    else
-        -- Start monitoring
-        monitorConnection = StartRealTimeUnlockMonitor()
-        isMonitoring = true
-        MonitorBtn.Text = "⏹️ DISABLE AUTO-MONITOR"
-        MonitorBtn.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
-        updateStatus("\n👁️ Auto-monitor enabled")
-        updateStatus("Will auto-unlock new items as they appear")
-    end
+ClearBtn.MouseButton1Click:Connect(function()
+    clearLog()
+end)
+
+-- Add a quick modify button
+local ModifyBtn = Instance.new("TextButton")
+ModifyBtn.Text = "⚡ QUICK MODIFY"
+ModifyBtn.Size = UDim2.new(1, -20, 0, 35)
+ModifyBtn.Position = UDim2.new(0, 10, 0, 635)
+ModifyBtn.BackgroundColor3 = Color3.fromRGB(200, 150, 0)
+addCorner(ModifyBtn)
+ModifyBtn.Parent = MainFrame
+
+ModifyBtn.MouseButton1Click:Connect(function()
+    ModifyBtn.Text = "MODIFYING..."
+    quickModifyAll()
+    ModifyBtn.Text = "⚡ QUICK MODIFY"
 end)
 
 -- Initial instructions
-clearStatus()
-updateStatus("🔓 LOCKED VALUE UNLOCKER")
-updateStatus("=" .. string.rep("=", 30))
-updateStatus("Changes 'locked' values to 0/1")
-updateStatus("to unlock items temporarily")
-updateStatus("=" .. string.rep("=", 30))
-updateStatus("HOW TO USE:")
-updateStatus("1. Open car shop")
-updateStatus("2. Browse cosmetics")
-updateStatus("3. Click UNLOCK ALL VALUES")
-updateStatus("4. Enable auto-monitor")
-updateStatus("=" .. string.rep("=", 30))
+addLog("🔍 DEBUGGER READY", Color3.fromRGB(0, 200, 255))
+addLog(string.rep("=", 60), Color3.fromRGB(100, 100, 100))
+addLog("INSTRUCTIONS:", Color3.fromRGB(200, 220, 255))
+addLog("1. Open car customization shop", Color3.fromRGB(255, 255, 200))
+addLog("2. Browse different cosmetics", Color3.fromRGB(255, 255, 200))
+addLog("3. Click SCAN to see current values", Color3.fromRGB(255, 255, 200))
+addLog("4. Click buttons in shop to monitor", Color3.fromRGB(255, 255, 200))
+addLog("5. Click QUICK MODIFY to try unlocking", Color3.fromRGB(255, 255, 200))
+addLog(string.rep("=", 60), Color3.fromRGB(100, 100, 100))
+
+-- Start monitors
+task.wait(1)
+monitorClicks()
+monitorValueChanges()
 
 -- Auto-scan after 3 seconds
 task.wait(3)
-updateStatus("\n⏰ Auto-scanning in 2 seconds...")
+addLog("\n⏰ Auto-scanning UI in 2 seconds...", Color3.fromRGB(255, 200, 0))
 task.wait(2)
 
-UnlockBtn.Text = "UNLOCKING..."
-clearStatus()
-updateStatus("🔍 Auto-scanning for locked values...")
+ScanBtn.Text = "SCANNING..."
+deepScanCurrentUI()
+ScanBtn.Text = "🔍 SCAN CURRENT UI"
 
-local unlocked = UnlockAllLockedValues()
-
-if unlocked > 0 then
-    updateStatus("✅ Auto-unlocked " .. unlocked .. " values")
-    updateStatus("Items should now appear unlocked!")
-    UnlockBtn.Text = "✅ UNLOCKED!"
-    UnlockBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
-else
-    updateStatus("❌ No locked values found")
-    updateStatus("Open the shop and click UNLOCK")
-    UnlockBtn.Text = "🔓 UNLOCK ALL VALUES"
-end
+-- Auto-modify after scan
+task.wait(1)
+addLog("\n⏰ Attempting auto-modify...", Color3.fromRGB(255, 200, 0))
+ModifyBtn.Text = "MODIFYING..."
+quickModifyAll()
+ModifyBtn.Text = "⚡ QUICK MODIFY"
