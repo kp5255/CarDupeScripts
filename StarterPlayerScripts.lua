@@ -1,265 +1,89 @@
--- 🎯 CAR DEALERSHIP TYCOON - REAL UNLOCK SCRIPT
--- Finds and uses the ACTUAL unlock method
+-- 🏎️ CAR DEALERSHIP UNLOCKER - DRAGABLE UI
+-- Fixed version with dragable interface
 
 local Players = game:GetService("Players")
-local RS = game:GetService("ReplicatedStorage")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Player = Players.LocalPlayer
 
+-- Wait for game
 repeat task.wait() until game:IsLoaded()
-task.wait(3)
+task.wait(2)
 
-print("=" .. string.rep("=", 70))
-print("🎯 REAL UNLOCK SCRIPT v2.0")
-print("=" .. string.rep("=", 70))
+print("🚗 CAR UNLOCKER LOADED")
 
--- ===== FIND ALL ITEM GUIDs =====
-local function FindAllItemGUIDs()
-    print("🔍 Searching for ALL GUIDs in the game...")
+-- ===== FIND ALL ITEMS =====
+local function FindAllItems()
+    print("🔍 Scanning for items...")
     
-    local allGUIDs = {}
-    local guiGUIDs = {}
-    local workspaceGUIDs = {}
-    
-    -- Pattern for GUID: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-    local guidPattern = "%x%x%x%x%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x"
-    
-    -- 1. Search PlayerGui (where cosmetics are shown)
+    local items = {}
     local PlayerGui = Player:WaitForChild("PlayerGui")
+    
+    -- Look for cosmetic buttons
     for _, obj in pairs(PlayerGui:GetDescendants()) do
-        if obj:IsA("StringValue") then
-            local value = tostring(obj.Value)
-            for guid in value:gmatch(guidPattern) do
-                if not table.find(guiGUIDs, guid) then
-                    table.insert(guiGUIDs, guid)
-                    print("🎯 Found GUI GUID: " .. guid .. " in " .. obj.Name)
-                end
-            end
-        end
-        
-        -- Also check TextLabels (sometimes GUIDs are displayed)
-        if obj:IsA("TextLabel") or obj:IsA("TextButton") then
-            local text = obj.Text
-            for guid in text:gmatch(guidPattern) do
-                if not table.find(guiGUIDs, guid) then
-                    table.insert(guiGUIDs, guid)
-                    print("🎯 Found GUI GUID in text: " .. guid)
-                end
+        if obj:IsA("TextButton") then
+            local text = obj.Text:lower()
+            local name = obj.Name:lower()
+            
+            if text:find("buy") or text:find("purchase") 
+               or text:find("$") or name:find("wrap")
+               or name:find("kit") or name:find("wheel")
+               or name:find("neon") or name:find("paint") then
+                
+                table.insert(items, {
+                    button = obj,
+                    name = obj.Name,
+                    text = obj.Text,
+                    path = obj:GetFullName()
+                })
             end
         end
     end
     
-    -- 2. Search workspace for car models (might have GUIDs)
-    for _, obj in pairs(workspace:GetDescendants()) do
-        if obj:IsA("StringValue") then
-            local value = tostring(obj.Value)
-            for guid in value:gmatch(guidPattern) do
-                if not table.find(workspaceGUIDs, guid) then
-                    table.insert(workspaceGUIDs, guid)
-                end
-            end
-        end
-    end
-    
-    -- 3. Search ReplicatedStorage for item catalogs
-    local catalogGUIDs = {}
-    for _, obj in pairs(RS:GetDescendants()) do
-        if obj:IsA("StringValue") or obj:IsA("ModuleScript") then
-            if obj:IsA("StringValue") then
-                local value = tostring(obj.Value)
-                for guid in value:gmatch(guidPattern) do
-                    if not table.find(catalogGUIDs, guid) then
-                        table.insert(catalogGUIDs, guid)
-                        print("🎯 Found RS GUID: " .. guid .. " in " .. obj.Name)
-                    end
-                end
-            elseif obj:IsA("ModuleScript") then
-                -- Try to require module scripts to find GUIDs
-                local success, module = pcall(require, obj)
-                if success and type(module) == "table" then
-                    -- Convert table to string and search for GUIDs
-                    local tableStr = tostring(module)
-                    for guid in tableStr:gmatch(guidPattern) do
-                        if not table.find(catalogGUIDs, guid) then
-                            table.insert(catalogGUIDs, guid)
-                            print("🎯 Found Module GUID: " .. guid .. " in " .. obj.Name)
-                        end
-                    end
-                end
-            end
-        end
-    end
-    
-    -- Combine all GUIDs
-    for _, guid in ipairs(guiGUIDs) do
-        if not table.find(allGUIDs, guid) then
-            table.insert(allGUIDs, guid)
-        end
-    end
-    
-    for _, guid in ipairs(workspaceGUIDs) do
-        if not table.find(allGUIDs, guid) then
-            table.insert(allGUIDs, guid)
-        end
-    end
-    
-    for _, guid in ipairs(catalogGUIDs) do
-        if not table.find(allGUIDs, guid) then
-            table.insert(allGUIDs, guid)
-        end
-    end
-    
-    print("\n📊 GUID SEARCH RESULTS:")
-    print("PlayerGui GUIDs: " .. #guiGUIDs)
-    print("Workspace GUIDs: " .. #workspaceGUIDs)
-    print("Catalog GUIDs: " .. #catalogGUIDs)
-    print("TOTAL UNIQUE GUIDs: " .. #allGUIDs)
-    
-    if #allGUIDs > 0 then
-        print("\n🎯 FOUND GUIDs:")
-        for i, guid in ipairs(allGUIDs) do
-            print(i .. ". " .. guid)
-        end
-    end
-    
-    return allGUIDs
+    print("✅ Found " .. #items .. " items")
+    return items
 end
 
--- ===== FIND UNLOCK REMOTE =====
-local function FindUnlockRemote()
-    print("\n📡 Searching for unlock remote...")
+-- ===== FIND ALL REMOTES =====
+local function FindAllRemotes()
+    print("📡 Searching for remotes...")
     
-    local possibleRemotes = {}
+    local remotes = {}
     
-    -- Common remote names for unlocking
-    local remoteNamesToTry = {
-        -- Purchase related
-        "PurchaseItem", "BuyItem", "PurchaseProduct", "BuyProduct",
-        "PurchaseVehicle", "BuyVehicle", "PurchaseCosmetic", "BuyCosmetic",
-        -- Unlock related
-        "UnlockItem", "UnlockProduct", "UnlockCosmetic", "UnlockVehicle",
-        "AddToInventory", "GrantItem", "GiveItem", "GetItem",
-        -- Generic
-        "RemoteEvent", "RemoteFunction", "Function", "Event",
-        "Server", "Client", "Request", "Call",
-        -- Game specific (common in tycoons)
-        "TycoonPurchase", "TycoonBuy", "ShopPurchase", "ShopBuy",
-        "VehicleShop", "CosmeticShop", "ItemShop"
-    }
-    
-    -- Search in ReplicatedStorage
-    for _, remoteName in ipairs(remoteNamesToTry) do
-        local remote = RS:FindFirstChild(remoteName)
-        if remote and (remote:IsA("RemoteFunction") or remote:IsA("RemoteEvent")) then
-            table.insert(possibleRemotes, {
-                object = remote,
-                name = remote.Name,
-                type = remote.ClassName,
-                source = "ReplicatedStorage"
-            })
-            print("✅ Found remote: " .. remote.Name .. " (" .. remote.ClassName .. ")")
-        end
-    end
-    
-    -- Search deeper in ReplicatedStorage
-    for _, obj in pairs(RS:GetDescendants()) do
+    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
         if obj:IsA("RemoteFunction") or obj:IsA("RemoteEvent") then
-            local alreadyFound = false
-            for _, foundRemote in ipairs(possibleRemotes) do
-                if foundRemote.object == obj then
-                    alreadyFound = true
-                    break
-                end
-            end
-            
-            if not alreadyFound then
-                table.insert(possibleRemotes, {
-                    object = obj,
-                    name = obj.Name,
-                    type = obj.ClassName,
-                    source = obj:GetFullName()
-                })
-                print("✅ Found hidden remote: " .. obj.Name .. " (" .. obj.ClassName .. ")")
-            end
+            table.insert(remotes, {
+                object = obj,
+                name = obj.Name,
+                type = obj.ClassName
+            })
         end
     end
     
-    -- Search in Network folder (common location)
-    local networkFolder = RS:FindFirstChild("Network")
-    if networkFolder then
-        for _, obj in pairs(networkFolder:GetDescendants()) do
-            if obj:IsA("RemoteFunction") or obj:IsA("RemoteEvent") then
-                table.insert(possibleRemotes, {
-                    object = obj,
-                    name = obj.Name,
-                    type = obj.ClassName,
-                    source = "Network"
-                })
-                print("✅ Found network remote: " .. obj.Name)
-            end
-        end
-    end
-    
-    print("\n📊 REMOTE SEARCH RESULTS:")
-    print("Found " .. #possibleRemotes .. " possible remotes")
-    
-    return possibleRemotes
+    print("✅ Found " .. #remotes .. " remotes")
+    return remotes
 end
 
--- ===== TEST UNLOCK WITH GUI =====
-local function TestUnlockWithGUI(guids, remotes)
-    print("\n🔓 Testing unlock with GUI...")
+-- ===== TRY UNLOCK =====
+local function TryUnlock(items, remotes)
+    print("🔓 Attempting unlock...")
     
-    local results = {
-        tested = 0,
-        successful = 0,
-        failed = 0,
-        workingRemotes = {}
-    }
+    local successCount = 0
     
-    -- First, let user manually click an item to see what happens
-    print("🎯 STEP 1: Manually click a cosmetic in the shop")
-    print("   This helps us see what data the game sends")
-    
-    -- Monitor the console for when user clicks
-    print("\n🎯 STEP 2: The script will monitor for GUIDs being sent")
-    print("   After you click, check the output for captured data")
-    
-    -- Try each remote with each GUID
-    for _, remote in ipairs(remotes) do
-        print("\n🔄 Testing remote: " .. remote.name .. " (" .. remote.type .. ")")
+    for _, item in ipairs(items) do
+        print("🔄 Trying: " .. item.name)
         
-        for _, guid in ipairs(guids) do
-            results.tested = results.tested + 1
-            
-            -- Try different data formats
+        for _, remote in ipairs(remotes) do
+            -- Try different formats
             local formats = {
-                -- Format 1: Just the GUID
-                guid,
-                -- Format 2: With ItemId key
-                {ItemId = guid},
-                -- Format 3: With id key
-                {id = guid},
-                -- Format 4: With productId key
-                {productId = guid},
-                -- Format 5: With GUID key
-                {GUID = guid},
-                -- Format 6: With UUID key
-                {UUID = guid},
-                -- Format 7: With item key
-                {item = guid},
-                -- Format 8: With additional data
-                {ItemId = guid, Player = Player, Price = 0},
-                -- Format 9: Different case
-                {itemId = guid},
-                -- Format 10: For vehicle cosmetics
-                {VehiclePart = guid, Player = Player}
+                item.name,
+                {Item = item.name},
+                {Name = item.name},
+                {ItemId = item.name},
+                {id = item.name},
+                {product = item.name}
             }
             
-            local successForThisGuid = false
-            
-            for formatIndex, data in ipairs(formats) do
-                print("   Trying format " .. formatIndex .. " with GUID: " .. string.sub(guid, 1, 8) .. "...")
-                
+            for _, data in ipairs(formats) do
                 local success, result = pcall(function()
                     if remote.type == "RemoteFunction" then
                         return remote.object:InvokeServer(data)
@@ -270,372 +94,467 @@ local function TestUnlockWithGUI(guids, remotes)
                 end)
                 
                 if success then
-                    print("      ✅ SUCCESS!")
-                    print("      Result: " .. tostring(result))
+                    print("   ✅ Success with " .. remote.name)
+                    successCount = successCount + 1
                     
-                    results.successful = results.successful + 1
-                    successForThisGuid = true
-                    
-                    -- Record working remote
-                    if not results.workingRemotes[remote.name] then
-                        results.workingRemotes[remote.name] = {
-                            remote = remote.object,
-                            guid = guid,
-                            format = formatIndex,
-                            result = result
-                        }
+                    -- Update button
+                    if item.button:IsA("TextButton") then
+                        item.button.Text = "EQUIP"
+                        item.button.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
                     end
                     
-                    break  -- Stop trying other formats for this GUID
-                else
-                    -- Don't show every error to avoid spam
-                    if formatIndex == 1 then
-                        -- print("      ❌ Failed: " .. tostring(result))
-                    end
+                    break
                 end
-                
-                task.wait(0.05)  -- Small delay
             end
-            
-            if successForThisGuid then
-                print("   🎉 GUID " .. string.sub(guid, 1, 8) .. " unlocked successfully!")
-                break  -- Move to next remote
-            end
-            
-            task.wait(0.1)  -- Small delay between GUIDs
-        end
-        
-        -- If we found a working remote, try it with ALL GUIDs
-        if results.workingRemotes[remote.name] then
-            print("\n💡 Found working remote: " .. remote.name)
-            print("   Trying to unlock ALL GUIDs with this remote...")
-            
-            local workingRemote = remote.object
-            local workingFormat = results.workingRemotes[remote.name].format
-            
-            for _, guid in ipairs(guids) do
-                -- Use the format that worked
-                local data
-                if workingFormat == 1 then
-                    data = guid
-                elseif workingFormat == 2 then
-                    data = {ItemId = guid}
-                elseif workingFormat == 3 then
-                    data = {id = guid}
-                elseif workingFormat == 4 then
-                    data = {productId = guid}
-                elseif workingFormat == 5 then
-                    data = {GUID = guid}
-                elseif workingFormat == 6 then
-                    data = {UUID = guid}
-                elseif workingFormat == 7 then
-                    data = {item = guid}
-                elseif workingFormat == 8 then
-                    data = {ItemId = guid, Player = Player, Price = 0}
-                elseif workingFormat == 9 then
-                    data = {itemId = guid}
-                else
-                    data = {VehiclePart = guid, Player = Player}
-                end
-                
-                local success, result = pcall(function()
-                    if remote.type == "RemoteFunction" then
-                        return remote.object:InvokeServer(data)
-                    else
-                        remote.object:FireServer(data)
-                        return "FireServer called"
-                    end
-                })
-                
-                if success then
-                    print("   ✅ Unlocked: " .. string.sub(guid, 1, 8))
-                end
-                
-                task.wait(0.05)
-            end
-            
-            break  -- Stop testing other remotes since we found a working one
         end
     end
     
-    print("\n📊 TEST RESULTS:")
-    print("Total tests: " .. results.tested)
-    print("Successful unlocks: " .. results.successful)
-    print("Failed: " .. results.failed)
-    
-    if results.successful > 0 then
-        print("\n🎉 SUCCESS! Found working unlock method!")
-        print("Working remotes:")
-        for remoteName, info in pairs(results.workingRemotes) do
-            print("  ✅ " .. remoteName)
-            print("     GUID: " .. string.sub(info.guid, 1, 8) + "...")
-            print("     Format: " .. info.format)
-        end
-    else
-        print("\n❌ No successful unlocks")
-        print("💡 Try manually clicking a cosmetic first")
-        print("   Then run the script again")
-    end
-    
-    return results
+    print("📊 Unlocked: " .. successCount .. "/" .. #items)
+    return successCount
 end
 
--- ===== REAL-TIME CLICK MONITOR =====
-local function SetupClickMonitor()
-    print("\n🖱️ Setting up click monitor...")
-    print("Click on cosmetics in the shop to capture real data")
-    
-    local PlayerGui = Player:WaitForChild("PlayerGui")
-    local capturedClicks = {}
-    
-    -- Hook into all TextButtons
-    for _, button in pairs(PlayerGui:GetDescendants()) do
-        if button:IsA("TextButton") then
-            local originalClick = button.MouseButton1Click
-            
-            button.MouseButton1Click = function(...)
-                print("\n🎯 BUTTON CLICKED:")
-                print("   Button: " .. button.Name)
-                print("   Text: " .. button.Text)
-                print("   Path: " .. button:GetFullName())
-                
-                -- Look for GUIDs near this button
-                local parent = button.Parent
-                for i = 1, 5 do  -- Check 5 levels up
-                    if parent then
-                        for _, child in pairs(parent:GetDescendants()) do
-                            if child:IsA("StringValue") then
-                                local value = tostring(child.Value)
-                                if value:match("^%x%x%x%x%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x$") then
-                                    print("   📦 Nearby GUID: " .. value)
-                                    table.insert(capturedClicks, {
-                                        button = button.Name,
-                                        guid = value,
-                                        path = child:GetFullName()
-                                    })
-                                end
-                            end
-                        end
-                        parent = parent.Parent
-                    end
-                end
-                
-                -- Call original function
-                if originalClick then
-                    return originalClick(...)
-                end
-            end
-        end
-    end
-    
-    print("✅ Click monitor ready")
-    print("💡 Click cosmetics to see their GUIDs")
-    
-    return capturedClicks
-end
-
--- ===== CREATE SIMPLE WORKING UI =====
-local function CreateWorkingUI()
+-- ===== CREATE DRAGABLE UI =====
+local function CreateDragableUI()
     local ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Name = "WorkingUnlockerUI"
+    ScreenGui.Name = "DragUnlockerUI"
     ScreenGui.Parent = Player:WaitForChild("PlayerGui")
+    ScreenGui.ResetOnSpawn = false
     
+    -- Main Frame (Dragable)
     local MainFrame = Instance.new("Frame")
-    MainFrame.Size = UDim2.new(0, 400, 0, 500)
-    MainFrame.Position = UDim2.new(0.5, -200, 0.5, -250)
-    MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 35)
+    MainFrame.Size = UDim2.new(0, 400, 0, 450)
+    MainFrame.Position = UDim2.new(0.5, -200, 0.5, -225)
+    MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
+    MainFrame.Active = true
+    MainFrame.Draggable = true
+    
+    -- Title Bar (Drag handle)
+    local TitleBar = Instance.new("Frame")
+    TitleBar.Size = UDim2.new(1, 0, 0, 40)
+    TitleBar.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+    TitleBar.BorderSizePixel = 0
     
     local Title = Instance.new("TextLabel")
-    Title.Text = "🎯 REAL UNLOCKER v2"
-    Title.Size = UDim2.new(1, 0, 0, 50)
-    Title.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+    Title.Text = "🚗 DRAGABLE UNLOCKER"
+    Title.Size = UDim2.new(1, -40, 1, 0)
+    Title.Position = UDim2.new(0, 10, 0, 0)
+    Title.BackgroundTransparency = 1
     Title.TextColor3 = Color3.fromRGB(255, 255, 255)
     Title.Font = Enum.Font.GothamBold
+    Title.TextSize = 16
     
-    local Status = Instance.new("TextLabel")
-    Status.Text = "Ready to find real unlock method\n"
-    Status.Size = UDim2.new(1, -20, 0, 300)
-    Status.Position = UDim2.new(0, 10, 0, 60)
-    Status.BackgroundTransparency = 1
-    Status.TextColor3 = Color3.fromRGB(255, 255, 255)
-    Status.TextWrapped = true
-    Status.TextXAlignment = Enum.TextXAlignment.Left
+    local CloseBtn = Instance.new("TextButton")
+    CloseBtn.Text = "✕"
+    CloseBtn.Size = UDim2.new(0, 30, 0, 30)
+    CloseBtn.Position = UDim2.new(1, -35, 0, 5)
+    CloseBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    CloseBtn.Font = Enum.Font.GothamBold
     
+    -- Status Display
+    local StatusFrame = Instance.new("ScrollingFrame")
+    StatusFrame.Size = UDim2.new(1, -20, 0, 250)
+    StatusFrame.Position = UDim2.new(0, 10, 0, 50)
+    StatusFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
+    StatusFrame.ScrollBarThickness = 6
+    StatusFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+    
+    local StatusLabel = Instance.new("TextLabel")
+    StatusLabel.Name = "StatusLabel"
+    StatusLabel.Text = "DRAGABLE UNLOCKER READY\n" .. string.rep("=", 40) .. "\n"
+    StatusLabel.Size = UDim2.new(1, -10, 0, 0)
+    StatusLabel.Position = UDim2.new(0, 5, 0, 5)
+    StatusLabel.BackgroundTransparency = 1
+    StatusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    StatusLabel.Font = Enum.Font.Code
+    StatusLabel.TextSize = 12
+    StatusLabel.TextXAlignment = Enum.TextXAlignment.Left
+    StatusLabel.TextYAlignment = Enum.TextYAlignment.Top
+    StatusLabel.TextWrapped = true
+    StatusLabel.AutomaticSize = Enum.AutomaticSize.Y
+    
+    -- Control Panel
+    local ControlFrame = Instance.new("Frame")
+    ControlFrame.Size = UDim2.new(1, -20, 0, 140)
+    ControlFrame.Position = UDim2.new(0, 10, 0, 310)
+    ControlFrame.BackgroundTransparency = 1
+    
+    -- Buttons
     local ScanBtn = Instance.new("TextButton")
-    ScanBtn.Text = "🔍 FIND GUIDs & REMOTES"
-    ScanBtn.Size = UDim2.new(1, -20, 0, 40)
-    ScanBtn.Position = UDim2.new(0, 10, 0, 370)
+    ScanBtn.Name = "ScanBtn"
+    ScanBtn.Text = "🔍 SCAN ITEMS"
+    ScanBtn.Size = UDim2.new(1, 0, 0, 35)
+    ScanBtn.Position = UDim2.new(0, 0, 0, 0)
     ScanBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+    ScanBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    ScanBtn.Font = Enum.Font.GothamBold
     
     local UnlockBtn = Instance.new("TextButton")
-    UnlockBtn.Text = "🔓 TEST UNLOCK"
-    UnlockBtn.Size = UDim2.new(1, -20, 0, 40)
-    UnlockBtn.Position = UDim2.new(0, 10, 0, 420)
+    UnlockBtn.Name = "UnlockBtn"
+    UnlockBtn.Text = "🔓 UNLOCK ALL"
+    UnlockBtn.Size = UDim2.new(1, 0, 0, 35)
+    UnlockBtn.Position = UDim2.new(0, 0, 0, 45)
     UnlockBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
+    UnlockBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    UnlockBtn.Font = Enum.Font.GothamBold
     UnlockBtn.Visible = false
     
-    local MonitorBtn = Instance.new("TextButton")
-    MonitorBtn.Text = "🖱️ ENABLE CLICK MONITOR"
-    MonitorBtn.Size = UDim2.new(1, -20, 0, 40)
-    MonitorBtn.Position = UDim2.new(0, 10, 0, 470)
-    MonitorBtn.BackgroundColor3 = Color3.fromRGB(150, 0, 200)
+    local VisualBtn = Instance.new("TextButton")
+    VisualBtn.Name = "VisualBtn"
+    VisualBtn.Text = "🎨 VISUAL MODE"
+    VisualBtn.Size = UDim2.new(1, 0, 0, 35)
+    VisualBtn.Position = UDim2.new(0, 0, 0, 90)
+    VisualBtn.BackgroundColor3 = Color3.fromRGB(200, 100, 0)
+    VisualBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    VisualBtn.Font = Enum.Font.GothamBold
+    
+    -- Progress Bar
+    local ProgressFrame = Instance.new("Frame")
+    ProgressFrame.Size = UDim2.new(1, -20, 0, 20)
+    ProgressFrame.Position = UDim2.new(0, 10, 0, 460)
+    ProgressFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
+    
+    local ProgressBar = Instance.new("Frame")
+    ProgressBar.Name = "ProgressBar"
+    ProgressBar.Size = UDim2.new(0, 0, 1, 0)
+    ProgressBar.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+    ProgressBar.BorderSizePixel = 0
     
     -- Add corners
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 8)
+    local function AddCorner(obj, radius)
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, radius or 8)
+        corner.Parent = obj
+        return corner
+    end
     
-    corner:Clone().Parent = MainFrame
-    corner:Clone().Parent = Title
-    corner:Clone().Parent = ScanBtn
-    corner:Clone().Parent = UnlockBtn
-    corner:Clone().Parent = MonitorBtn
+    AddCorner(MainFrame, 10)
+    AddCorner(TitleBar, 10)
+    AddCorner(CloseBtn, 6)
+    AddCorner(StatusFrame, 8)
+    AddCorner(ScanBtn)
+    AddCorner(UnlockBtn)
+    AddCorner(VisualBtn)
+    AddCorner(ProgressFrame, 10)
+    AddCorner(ProgressBar, 10)
     
-    -- Parent
-    Title.Parent = MainFrame
-    Status.Parent = MainFrame
-    ScanBtn.Parent = MainFrame
-    UnlockBtn.Parent = MainFrame
-    MonitorBtn.Parent = MainFrame
+    -- Add stroke to main frame
+    local Stroke = Instance.new("UIStroke")
+    Stroke.Color = Color3.fromRGB(0, 150, 255)
+    Stroke.Thickness = 2
+    Stroke.Parent = MainFrame
+    
+    -- Parent everything
+    StatusLabel.Parent = StatusFrame
+    ProgressBar.Parent = ProgressFrame
+    
+    Title.Parent = TitleBar
+    CloseBtn.Parent = TitleBar
+    TitleBar.Parent = MainFrame
+    StatusFrame.Parent = MainFrame
+    ControlFrame.Parent = MainFrame
+    ProgressFrame.Parent = MainFrame
+    
+    ScanBtn.Parent = ControlFrame
+    UnlockBtn.Parent = ControlFrame
+    VisualBtn.Parent = ControlFrame
+    
     MainFrame.Parent = ScreenGui
     
     -- Variables
-    local foundGUIDs = {}
+    local foundItems = {}
     local foundRemotes = {}
-    local isMonitoring = false
+    local isProcessing = false
     
-    -- Update status
-    local function updateStatus(text)
-        Status.Text = Status.Text .. text .. "\n"
+    -- Update status function
+    local function UpdateStatus(text, color)
+        color = color or Color3.fromRGB(255, 255, 255)
+        StatusLabel.Text = StatusLabel.Text .. text .. "\n"
+        StatusFrame.CanvasSize = UDim2.new(0, 0, 0, StatusLabel.TextBounds.Y + 20)
+        StatusFrame.CanvasPosition = Vector2.new(0, StatusLabel.TextBounds.Y)
+        
+        -- Also print to console
+        print(text)
     end
     
-    local function clearStatus()
-        Status.Text = ""
+    local function ClearStatus()
+        StatusLabel.Text = ""
     end
     
-    -- Scan button
+    -- Update progress bar
+    local function UpdateProgress(percent)
+        ProgressBar:TweenSize(
+            UDim2.new(percent / 100, 0, 1, 0),
+            Enum.EasingDirection.Out,
+            Enum.EasingStyle.Quad,
+            0.3,
+            true
+        )
+    end
+    
+    -- Scan function
     ScanBtn.MouseButton1Click:Connect(function()
+        if isProcessing then return end
+        isProcessing = true
+        
         ScanBtn.Text = "SCANNING..."
-        clearStatus()
+        ClearStatus()
+        UpdateStatus("🔍 Scanning for items...", Color3.fromRGB(255, 200, 0))
+        UpdateProgress(25)
         
-        updateStatus("🔍 Step 1: Searching for GUIDs...")
-        foundGUIDs = FindAllItemGUIDs()
+        task.wait(0.5)
         
-        updateStatus("\n📡 Step 2: Searching for remotes...")
-        foundRemotes = FindUnlockRemote()
+        -- Find items
+        UpdateStatus("Looking for cosmetic items...")
+        foundItems = FindAllItems()
+        UpdateProgress(50)
         
-        if #foundGUIDs > 0 and #foundRemotes > 0 then
-            updateStatus("\n✅ READY TO TEST!")
-            updateStatus("Found " .. #foundGUIDs .. " GUIDs")
-            updateStatus("Found " .. #foundRemotes .. " remotes")
-            updateStatus("\nClick TEST UNLOCK to try unlocking")
+        task.wait(0.5)
+        
+        -- Find remotes
+        UpdateStatus("Looking for remotes...")
+        foundRemotes = FindAllRemotes()
+        UpdateProgress(75)
+        
+        task.wait(0.5)
+        
+        if #foundItems > 0 and #foundRemotes > 0 then
+            UpdateStatus("✅ Found " .. #foundItems .. " items", Color3.fromRGB(0, 255, 0))
+            UpdateStatus("✅ Found " .. #foundRemotes .. " remotes", Color3.fromRGB(0, 255, 0))
+            UpdateStatus("\n🎯 Ready to unlock!", Color3.fromRGB(200, 220, 255))
             
             UnlockBtn.Visible = true
-            UnlockBtn.Text = "🔓 TEST " .. #foundGUIDs .. " GUIDs"
+            UnlockBtn.Text = "🔓 UNLOCK " .. #foundItems .. " ITEMS"
             ScanBtn.Text = "✅ SCAN COMPLETE"
+            ScanBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
         else
-            updateStatus("\n❌ Scan incomplete")
-            updateStatus("GUIDs found: " .. #foundGUIDs)
-            updateStatus("Remotes found: " .. #foundRemotes)
-            updateStatus("\n💡 Open the shop first!")
+            UpdateStatus("❌ Scan incomplete", Color3.fromRGB(255, 100, 100))
+            UpdateStatus("Items: " .. #foundItems, Color3.fromRGB(255, 200, 100))
+            UpdateStatus("Remotes: " .. #foundRemotes, Color3.fromRGB(255, 200, 100))
+            UpdateStatus("\n💡 Open the car shop first!", Color3.fromRGB(255, 255, 200))
             
-            ScanBtn.Text = "🔍 FIND GUIDs & REMOTES"
+            ScanBtn.Text = "🔍 SCAN ITEMS"
+            ScanBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
         end
+        
+        UpdateProgress(100)
+        isProcessing = false
     end)
     
-    -- Unlock button
+    -- Unlock function
     UnlockBtn.MouseButton1Click:Connect(function()
-        UnlockBtn.Text = "TESTING..."
-        updateStatus("\n🔓 Testing unlock methods...")
+        if isProcessing then return end
+        if #foundItems == 0 then
+            UpdateStatus("❌ Scan first!", Color3.fromRGB(255, 100, 100))
+            return
+        end
         
-        local results = TestUnlockWithGUI(foundGUIDs, foundRemotes)
+        isProcessing = true
+        UnlockBtn.Text = "UNLOCKING..."
+        ClearStatus()
+        UpdateStatus("🔓 Attempting unlock...", Color3.fromRGB(255, 200, 0))
+        UpdateProgress(0)
         
-        updateStatus("\n📊 RESULTS:")
-        updateStatus("Successful: " .. results.successful)
-        updateStatus("Failed: " .. results.failed)
+        local totalItems = #foundItems
+        local unlocked = 0
         
-        if results.successful > 0 then
-            updateStatus("🎉 Found working method!")
-            updateStatus("Check console for details")
+        for i, item in ipairs(foundItems) do
+            UpdateStatus("Processing: " .. item.name .. " (" .. i .. "/" .. totalItems .. ")")
             
-            UnlockBtn.Text = "✅ SUCCESS!"
+            -- Try to unlock this item
+            for _, remote in ipairs(foundRemotes) do
+                local formats = {
+                    item.name,
+                    {Item = item.name},
+                    {Name = item.name},
+                    {ItemId = item.name}
+                }
+                
+                for _, data in ipairs(formats) do
+                    local success, result = pcall(function()
+                        if remote.type == "RemoteFunction" then
+                            return remote.object:InvokeServer(data)
+                        else
+                            remote.object:FireServer(data)
+                            return "FireServer called"
+                        end
+                    })
+                    
+                    if success then
+                        UpdateStatus("   ✅ Success with " .. remote.name, Color3.fromRGB(0, 255, 0))
+                        unlocked = unlocked + 1
+                        
+                        -- Update button
+                        if item.button:IsA("TextButton") then
+                            item.button.Text = "EQUIP"
+                            item.button.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+                        end
+                        
+                        break
+                    end
+                end
+            end
+            
+            -- Update progress
+            local progress = (i / totalItems) * 100
+            UpdateProgress(progress)
+            task.wait(0.1)
+        end
+        
+        UpdateStatus("\n📊 UNLOCK RESULTS:", Color3.fromRGB(200, 220, 255))
+        UpdateStatus("Successfully unlocked: " .. unlocked .. "/" .. totalItems, Color3.fromRGB(0, 255, 0))
+        
+        if unlocked > 0 then
+            UpdateStatus("🎉 Some items may be unlocked!", Color3.fromRGB(0, 255, 0))
+            UpdateStatus("💡 Check if buttons say 'EQUIP'", Color3.fromRGB(200, 255, 200))
+            
+            UnlockBtn.Text = "✅ " .. unlocked .. " UNLOCKED"
             UnlockBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
         else
-            updateStatus("❌ No working method found")
-            updateStatus("💡 Enable click monitor and click cosmetics")
+            UpdateStatus("❌ No items unlocked", Color3.fromRGB(255, 100, 100))
+            UpdateStatus("💡 Try visual mode instead", Color3.fromRGB(255, 200, 100))
             
-            UnlockBtn.Text = "🔓 TEST UNLOCK"
+            UnlockBtn.Text = "🔓 UNLOCK ALL"
         end
+        
+        UpdateProgress(100)
+        isProcessing = false
     end)
     
-    -- Monitor button
-    MonitorBtn.MouseButton1Click:Connect(function()
-        if not isMonitoring then
-            updateStatus("\n🖱️ Click monitor ENABLED")
-            updateStatus("Click cosmetics in the shop")
-            updateStatus("Check OUTPUT for GUIDs")
+    -- Visual mode function
+    VisualBtn.MouseButton1Click:Connect(function()
+        if isProcessing then return end
+        isProcessing = true
+        
+        VisualBtn.Text = "MODIFYING..."
+        ClearStatus()
+        UpdateStatus("🎨 Applying visual modifications...", Color3.fromRGB(255, 200, 0))
+        UpdateProgress(0)
+        
+        local modified = 0
+        local PlayerGui = Player:WaitForChild("PlayerGui")
+        
+        -- Find and modify all buy buttons
+        for _, obj in pairs(PlayerGui:GetDescendants()) do
+            if obj:IsA("TextButton") then
+                local text = obj.Text:lower()
+                if text:find("buy") or text:find("purchase") 
+                   or text:find("$") or text:find("%d%d%d") then
+                    
+                    obj.Text = "EQUIP"
+                    obj.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
+                    obj.TextColor3 = Color3.fromRGB(255, 255, 255)
+                    modified = modified + 1
+                end
+            elseif obj:IsA("TextLabel") then
+                local text = obj.Text:lower()
+                if text:find("locked") or text:find("not owned") then
+                    obj.Text = "UNLOCKED"
+                    obj.TextColor3 = Color3.fromRGB(0, 255, 0)
+                    modified = modified + 1
+                end
+            end
+        end
+        
+        UpdateStatus("\n🛍️ VISUAL RESULTS:", Color3.fromRGB(200, 220, 255))
+        UpdateStatus("Modified elements: " .. modified, Color3.fromRGB(255, 255, 200))
+        
+        if modified > 0 then
+            UpdateStatus("✅ Shop should now show 'EQUIP' buttons", Color3.fromRGB(0, 255, 0))
+            UpdateStatus("💡 This is visual only - items aren't really unlocked", Color3.fromRGB(200, 200, 255))
             
-            SetupClickMonitor()
-            MonitorBtn.Text = "🖱️ MONITOR ACTIVE"
-            MonitorBtn.BackgroundColor3 = Color3.fromRGB(200, 100, 0)
-            isMonitoring = true
+            VisualBtn.Text = "✅ VISUAL DONE"
+            VisualBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
         else
-            updateStatus("\n🖱️ Click monitor DISABLED")
-            MonitorBtn.Text = "🖱️ ENABLE CLICK MONITOR"
-            MonitorBtn.BackgroundColor3 = Color3.fromRGB(150, 0, 200)
-            isMonitoring = false
+            UpdateStatus("❌ No elements modified", Color3.fromRGB(255, 100, 100))
+            UpdateStatus("💡 Open the shop first!", Color3.fromRGB(255, 200, 100))
+            
+            VisualBtn.Text = "🎨 VISUAL MODE"
+        end
+        
+        UpdateProgress(100)
+        isProcessing = false
+    end)
+    
+    -- Close button
+    CloseBtn.MouseButton1Click:Connect(function()
+        ScreenGui:Destroy()
+    end)
+    
+    -- Minimize on title bar click (optional)
+    local isMinimized = false
+    TitleBar.MouseButton1Click:Connect(function()
+        if not isMinimized then
+            StatusFrame.Visible = false
+            ControlFrame.Visible = false
+            ProgressFrame.Visible = false
+            MainFrame.Size = UDim2.new(0, 400, 0, 40)
+            isMinimized = true
+        else
+            StatusFrame.Visible = true
+            ControlFrame.Visible = true
+            ProgressFrame.Visible = true
+            MainFrame.Size = UDim2.new(0, 400, 0, 450)
+            isMinimized = false
         end
     end)
     
     -- Initial message
-    clearStatus()
-    updateStatus("🎯 REAL UNLOCKER v2")
-    updateStatus(string.rep("=", 40))
-    updateStatus("FINDS REAL UNLOCK METHOD")
-    updateStatus(string.rep("=", 40))
-    updateStatus("HOW TO USE:")
-    updateStatus("1. Open car shop")
-    updateStatus("2. Browse cosmetics")
-    updateStatus("3. Click FIND GUIDs & REMOTES")
-    updateStatus("4. Click TEST UNLOCK")
-    updateStatus("5. Enable click monitor for help")
-    updateStatus(string.rep("=", 40))
-    updateStatus("NOTE: This finds REAL server unlock")
-    updateStatus("Not just visual changes!")
+    ClearStatus()
+    UpdateStatus("🚗 DRAGABLE CAR UNLOCKER", Color3.fromRGB(0, 200, 255))
+    UpdateStatus(string.rep("=", 40), Color3.fromRGB(100, 100, 100))
+    UpdateStatus("DRAG the title bar to move window", Color3.fromRGB(255, 255, 200))
+    UpdateStatus("Click title bar to minimize/maximize", Color3.fromRGB(255, 255, 200))
+    UpdateStatus(string.rep("=", 40), Color3.fromRGB(100, 100, 100))
+    UpdateStatus("INSTRUCTIONS:", Color3.fromRGB(200, 220, 255))
+    UpdateStatus("1. Open car customization shop", Color3.fromRGB(255, 255, 200))
+    UpdateStatus("2. Browse wraps/kits/wheels", Color3.fromRGB(255, 255, 200))
+    UpdateStatus("3. Click SCAN ITEMS", Color3.fromRGB(255, 255, 200))
+    UpdateStatus("4. Click UNLOCK ALL", Color3.fromRGB(255, 255, 200))
+    UpdateStatus("5. Use VISUAL MODE for UI changes", Color3.fromRGB(255, 255, 200))
+    UpdateStatus(string.rep("=", 40), Color3.fromRGB(100, 100, 100))
+    
+    -- Auto-scan after 3 seconds
+    task.wait(3)
+    UpdateStatus("\n⏰ Auto-scanning in 2 seconds...", Color3.fromRGB(255, 200, 0))
+    task.wait(2)
+    
+    ScanBtn.Text = "SCANNING..."
+    ClearStatus()
+    UpdateStatus("🔍 Auto-scanning...", Color3.fromRGB(255, 200, 0))
+    
+    foundItems = FindAllItems()
+    foundRemotes = FindAllRemotes()
+    
+    if #foundItems > 0 and #foundRemotes > 0 then
+        UpdateStatus("✅ Auto-found " .. #foundItems .. " items", Color3.fromRGB(0, 255, 0))
+        UpdateStatus("✅ Auto-found " .. #foundRemotes .. " remotes", Color3.fromRGB(0, 255, 0))
+        UpdateStatus("💡 Click UNLOCK ALL to try", Color3.fromRGB(200, 220, 255))
+        
+        UnlockBtn.Visible = true
+        UnlockBtn.Text = "🔓 UNLOCK " .. #foundItems .. " ITEMS"
+        ScanBtn.Text = "✅ AUTO-SCANNED"
+        ScanBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+    else
+        UpdateStatus("❌ Auto-scan found nothing", Color3.fromRGB(255, 100, 100))
+        UpdateStatus("💡 Open the shop and click SCAN", Color3.fromRGB(255, 200, 100))
+        
+        ScanBtn.Text = "🔍 SCAN ITEMS"
+    end
     
     return ScreenGui
 end
 
--- ===== MAIN EXECUTION =====
-print("\n🎯 INITIALIZING REAL UNLOCKER...")
+-- ===== MAIN =====
+print("\n" .. string.rep("=", 60))
+print("🚗 DRAGABLE CAR UNLOCKER v1.0")
+print(string.rep("=", 60))
+
 task.wait(2)
+CreateDragableUI()
 
-CreateWorkingUI()
-
--- Auto-scan after 5 seconds
-task.wait(5)
-print("\n⏰ Auto-scanning in 3 seconds...")
-for i = 3, 1, -1 do
-    print(i .. "...")
-    task.wait(1)
-end
-
-print("🔍 Performing initial scan...")
-local initialGUIDs = FindAllItemGUIDs()
-local initialRemotes = FindUnlockRemote()
-
-if #initialGUIDs > 0 and #initialRemotes > 0 then
-    print("\n✅ Initial scan successful!")
-    print("Found " .. #initialGUIDs .. " GUIDs")
-    print("Found " .. #initialRemotes .. " remotes")
-    print("💡 Open the UI and click TEST UNLOCK")
-else
-    print("\n❌ Initial scan incomplete")
-    print("💡 Open the car shop first, then scan from UI")
-end
-
-print("\n" .. string.rep("=", 70))
-print("✅ REAL UNLOCKER READY")
-print("📍 Look for 'REAL UNLOCKER v2' window")
-print("🎯 This finds ACTUAL server unlock method")
-print("💡 Not just visual changes!")
-print(string.rep("=", 70))
+print("\n✅ UI Created Successfully!")
+print("📍 Look for the dragable window in-game")
+print("🎯 Drag the title bar to move it")
+print("💡 Follow the instructions in the UI")
+print(string.rep("=", 60))
