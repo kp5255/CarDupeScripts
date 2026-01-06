@@ -1,5 +1,5 @@
--- 🎯 TARGETED CAR COSMETIC UNLOCKER
--- Only hooks cosmetic remotes, no errors
+-- 🛠️ ROBUST CAR COSMETIC UNLOCKER
+-- No hooking, direct purchase attempts only
 
 local Players = game:GetService("Players")
 local RS = game:GetService("ReplicatedStorage")
@@ -8,213 +8,151 @@ local Player = Players.LocalPlayer
 repeat task.wait() until game:IsLoaded()
 task.wait(3)
 
--- ===== SAFE REMOTE HOOKING =====
-local function SafeHookRemote(remote)
-    -- Only hook specific cosmetic remotes
-    local cosmeticKeywords = {
-        "purchase", "buy", "unlock", "equip", "select", "apply",
-        "wrap", "paint", "color", "kit", "wheel", "neon", "spoiler",
-        "exhaust", "hood", "window", "tint", "custom", "upgrade"
+-- ===== DIRECT PURCHASE SYSTEM =====
+local function FindPurchaseRemotes()
+    print("🔍 Finding purchase remotes...")
+    
+    local remotes = {}
+    
+    -- Search in common locations
+    local locations = {
+        RS,
+        RS:FindFirstChild("Network"),
+        RS:FindFirstChild("Remotes"),
+        RS:FindFirstChild("Events"),
+        RS:FindFirstChild("Functions")
     }
     
-    local name = remote.Name:lower()
-    local shouldHook = false
-    
-    for _, keyword in ipairs(cosmeticKeywords) do
-        if name:find(keyword) then
-            shouldHook = true
-            break
-        end
-    end
-    
-    if not shouldHook then
-        return false
-    end
-    
-    -- Safe hooking based on remote type
-    if remote:IsA("RemoteFunction") then
-        local oldInvoke = remote.InvokeServer
-        
-        remote.InvokeServer = function(self, ...)
-            local args = {...}
-            local itemId = "CosmeticItem"
-            
-            -- Extract item ID from args
-            if #args > 0 then
-                if type(args[1]) == "string" then
-                    itemId = args[1]
-                elseif type(args[1]) == "table" then
-                    itemId = args[1].ItemId or args[1].id or args[1].Name or "CosmeticItem"
+    for _, location in pairs(locations) do
+        if location then
+            for _, obj in pairs(location:GetDescendants()) do
+                if obj:IsA("RemoteFunction") then
+                    local name = obj.Name:lower()
+                    if name:find("purchase") or name:find("buy") then
+                        table.insert(remotes, {
+                            Object = obj,
+                            Name = obj.Name,
+                            Path = obj:GetFullName()
+                        })
+                    end
                 end
             end
-            
-            print("[Hook] " .. remote.Name .. " -> " .. itemId)
-            
-            -- Return success
-            return {
-                Success = true,
-                Purchased = true,
-                ItemId = itemId,
-                Message = "Successfully purchased"
-            }
-        end
-        
-        return true
-        
-    elseif remote:IsA("RemoteEvent") then
-        -- Only hook if it's definitely a purchase event
-        if name:find("purchase") or name:find("buy") then
-            local oldFire = remote.FireServer
-            
-            remote.FireServer = function(self, ...)
-                local args = {...}
-                print("[Hook] Event: " .. remote.Name)
-                -- Don't actually fire, just pretend
-                return true
-            end
-            
-            return true
         end
     end
     
-    return false
+    print("💰 Found", #remotes, "purchase remotes")
+    for i, remote in ipairs(remotes) do
+        print("  [" .. i .. "] " .. remote.Name .. " -> " .. remote.Path)
+    end
+    
+    return remotes
 end
 
--- ===== TARGET SPECIFIC COSMETIC REMOTES =====
-local function FindAndHookCosmeticRemotes()
-    print("🎯 Finding cosmetic remotes only...")
+local function TryPurchaseItems(purchaseRemote)
+    print("🛒 Attempting purchases with: " .. purchaseRemote.Name)
     
-    -- From your console output, these are the important ones:
-    local targetRemotes = {
-        -- Purchase related
-        "PurchaseShopItem",
-        "PurchaseLimited",
-        "PurchaseReflectance",
-        "PurchaseGlobalReflectance",
-        "Purchase",
+    -- Common cosmetic item IDs based on your game
+    local cosmeticItems = {
+        -- Wraps
+        "Wrap_Red", "Wrap_Blue", "Wrap_Black", "Wrap_White",
+        "Wrap_Gold", "Wrap_Silver", "Wrap_Chrome", "Wrap_Matte",
+        "Wrap_Rainbow", "Wrap_Galaxy", "Wrap_Carbon",
         
-        -- Equip related  
-        "Equip",
-        "GetEquipped",
-        "GetAllEquipped",
+        -- Body Kits
+        "BodyKit_Sport", "BodyKit_Racing", "BodyKit_Drift",
+        "BodyKit_Offroad", "BodyKit_Widebody",
+        "Spoiler_Sport", "Spoiler_Big", "Spoiler_Wing",
         
-        -- Customization related
-        "OnCustomizationEquipped",
-        "OnCustomizationPurchased",
+        -- Wheels
+        "Wheel_Sport", "Wheel_Racing", "Wheel_Offroad",
+        "Wheel_Chrome", "Wheel_Spinner", "Wheel_White",
+        "Wheel_Black", "Wheel_Gold",
         
-        -- Car specific
-        "CarUpgrade"
+        -- Neons
+        "Neon_Red", "Neon_Blue", "Neon_Green", "Neon_Purple",
+        "Neon_White", "Neon_Rainbow", "Neon_Pink",
+        
+        -- Other
+        "Exhaust_Sport", "Exhaust_Racing",
+        "Hood_Scoop", "Hood_Vented",
+        "Window_Tint_Dark", "Window_Tint_Light",
+        "Brake_Caliper_Red", "Brake_Caliper_Blue"
     }
     
-    local hookedCount = 0
+    local purchased = 0
     
-    for _, remoteName in ipairs(targetRemotes) do
-        local remote = RS:FindFirstChild(remoteName, true)
-        if remote and (remote:IsA("RemoteFunction") or remote:IsA("RemoteEvent")) then
-            if SafeHookRemote(remote) then
-                hookedCount = hookedCount + 1
-                print("✅ Hooked: " .. remoteName)
-            end
-        end
-    end
-    
-    print("🔧 Successfully hooked", hookedCount, "cosmetic remotes")
-    return hookedCount
-end
-
--- ===== DIRECT COSMETIC PURCHASE =====
-local function PurchaseAllCosmetics()
-    print("🛒 Purchasing all cosmetics...")
-    
-    -- Find the main purchase remote from your console
-    local purchaseRemote = RS:FindFirstChild("PurchaseShopItem", true)
-    if not purchaseRemote or not purchaseRemote:IsA("RemoteFunction") then
-        purchaseRemote = RS:FindFirstChild("Purchase", true)
-    end
-    
-    if purchaseRemote and purchaseRemote:IsA("RemoteFunction") then
-        print("💰 Found purchase remote: " .. purchaseRemote.Name)
-        
-        -- Try to purchase common cosmetic IDs
-        local cosmeticIds = {
-            -- Wraps
-            "Wrap_Red", "Wrap_Blue", "Wrap_Black", "Wrap_White", "Wrap_Gold",
-            "Wrap_Chrome", "Wrap_Matte", "Wrap_Carbon", "Wrap_Rainbow",
-            
-            -- Body Kits
-            "Kit_Sport", "Kit_Racing", "Kit_Drift", "Kit_Offroad",
-            "Kit_Widebody", "Spoiler_Big", "Spoiler_Racing",
-            
-            -- Wheels
-            "Wheel_Sport", "Wheel_Racing", "Wheel_Offroad",
-            "Wheel_Chrome", "Wheel_Spinner",
-            
-            -- Neons
-            "Neon_Red", "Neon_Blue", "Neon_Green", "Neon_Purple",
-            "Neon_Rainbow", "Neon_White",
-            
-            -- Other
-            "Exhaust_Sport", "Hood_Scoop", "Window_Tint_Dark"
+    for _, itemId in ipairs(cosmeticItems) do
+        -- Try different data formats
+        local formats = {
+            itemId,  -- Just the ID
+            {ItemId = itemId},  -- Table with ItemId
+            {id = itemId},  -- Table with id
+            {Name = itemId},  -- Table with Name
+            {item = itemId},  -- Table with item
+            {productId = itemId},  -- Table with productId
+            {ProductId = itemId}  -- Table with ProductId
         }
         
-        local purchased = 0
-        
-        for _, itemId in ipairs(cosmeticIds) do
+        for _, data in ipairs(formats) do
             local success, result = pcall(function()
-                return purchaseRemote:InvokeServer(itemId)
+                return purchaseRemote:InvokeServer(data)
             end)
             
             if success then
-                print("✅ Purchased: " .. itemId)
+                print("✅ Purchase attempt: " .. itemId .. " -> " .. tostring(result))
                 purchased = purchased + 1
+                break
             end
-            
-            task.wait(0.05)
         end
         
-        print("🛍️ Purchased", purchased, "cosmetics")
-        return purchased
-    else
-        print("❌ No purchase remote found")
-        return 0
+        task.wait(0.03) -- Small delay
     end
+    
+    return purchased
 end
 
--- ===== EQUIP ALL COSMETICS =====
-local function EquipAllCosmetics()
-    print("⚙️ Equipping cosmetics...")
+-- ===== EQUIP SYSTEM =====
+local function FindEquipRemotes()
+    print("🔍 Finding equip remotes...")
     
-    -- Find equip remote
-    local equipRemote = RS:FindFirstChild("Equip", true)
-    if not equipRemote or not equipRemote:IsA("RemoteFunction") then
-        print("❌ No equip remote found")
-        return 0
+    local remotes = {}
+    
+    for _, obj in pairs(RS:GetDescendants()) do
+        if obj:IsA("RemoteFunction") then
+            local name = obj.Name:lower()
+            if name:find("equip") or name:find("apply") or name:find("select") then
+                table.insert(remotes, obj)
+            end
+        end
     end
     
-    print("🔧 Found equip remote: " .. equipRemote.Name)
+    return remotes
+end
+
+local function TryEquipCosmetics(equipRemote)
+    print("⚙️ Attempting to equip with: " .. equipRemote.Name)
     
-    -- Cosmetic categories and items
+    -- Cosmetic types
     local cosmetics = {
-        Wrap = {"Red", "Blue", "Black", "White", "Gold", "Chrome"},
-        Kit = {"Sport", "Racing", "Drift", "Offroad"},
-        Wheel = {"Sport", "Racing", "Offroad", "Chrome"},
-        Neon = {"Red", "Blue", "Green", "Purple"},
-        Exhaust = {"Sport", "Racing"},
-        Hood = {"Scoop", "Vented"},
-        Window = {"Tint_Dark", "Tint_Light"}
+        {type = "Wrap", items = {"Red", "Blue", "Black", "White", "Gold"}},
+        {type = "BodyKit", items = {"Sport", "Racing", "Drift"}},
+        {type = "Wheel", items = {"Sport", "Racing", "Chrome"}},
+        {type = "Neon", items = {"Red", "Blue", "Green", "Rainbow"}}
     }
     
     local equipped = 0
     
-    for category, items in pairs(cosmetics) do
-        for _, item in ipairs(items) do
-            local itemId = category .. "_" .. item
+    for _, category in ipairs(cosmetics) do
+        for _, item in ipairs(category.items) do
+            local itemId = category.type .. "_" .. item
             
-            -- Try different data formats
+            -- Try different formats
             local formats = {
                 itemId,
-                {ItemId = itemId, Category = category},
-                {id = itemId, type = category}
+                {ItemId = itemId},
+                {id = itemId, type = category.type},
+                {Name = itemId, Category = category.type},
+                {cosmetic = itemId}
             }
             
             for _, data in ipairs(formats) do
@@ -223,249 +161,228 @@ local function EquipAllCosmetics()
                 end)
                 
                 if success then
-                    print("✅ Equipped: " .. itemId)
+                    print("✅ Equip attempt: " .. itemId)
                     equipped = equipped + 1
                     break
                 end
             end
             
-            task.wait(0.03)
+            task.wait(0.02)
         end
     end
     
-    print("🎮 Equipped", equipped, "cosmetics")
     return equipped
 end
 
--- ===== MODIFY PLAYER DATA =====
-local function ModifyPlayerCosmeticData()
-    print("💾 Modifying player data...")
+-- ===== DIRECT CUSTOMIZATION ACCESS =====
+local function AccessCustomizationData()
+    print("💾 Accessing customization data...")
     
-    -- Find or create player data
-    local playerData = Player:FindFirstChild("PlayerData")
-    if not playerData then
-        playerData = Instance.new("Folder")
-        playerData.Name = "PlayerData"
-        playerData.Parent = Player
-    end
+    -- Try to find and modify customization data
+    local success = false
     
-    -- Create cosmetics folder
-    local cosmeticsFolder = playerData:FindFirstChild("Cosmetics")
-    if not cosmeticsFolder then
-        cosmeticsFolder = Instance.new("Folder")
-        cosmeticsFolder.Name = "Cosmetics"
-        cosmeticsFolder.Parent = playerData
-    end
+    -- Method 1: Check for player customization folder
+    local playerData = Player:FindFirstChild("PlayerData") 
+                      or Player:FindFirstChild("Data")
     
-    -- Add all cosmetics as unlocked
-    local categories = {"Wraps", "Kits", "Wheels", "Neons", "Exhausts", "Hoods", "Windows"}
-    
-    for _, category in ipairs(categories) do
-        local categoryFolder = cosmeticsFolder:FindFirstChild(category)
-        if not categoryFolder then
-            categoryFolder = Instance.new("Folder")
-            categoryFolder.Name = category
-            categoryFolder.Parent = cosmeticsFolder
+    if playerData then
+        -- Create cosmetics folder
+        local cosmeticsFolder = playerData:FindFirstChild("Cosmetics")
+        if not cosmeticsFolder then
+            cosmeticsFolder = Instance.new("Folder")
+            cosmeticsFolder.Name = "Cosmetics"
+            cosmeticsFolder.Parent = playerData
         end
         
-        -- Mark all as unlocked
-        for i = 1, 10 do
-            local itemName = "Item_" .. i
-            if not categoryFolder:FindFirstChild(itemName) then
-                local item = Instance.new("BoolValue")
-                item.Name = itemName
-                item.Value = true
-                item.Parent = categoryFolder
+        -- Mark all as owned
+        local ownedValue = Instance.new("BoolValue")
+        ownedValue.Name = "AllOwned"
+        ownedValue.Value = true
+        ownedValue.Parent = cosmeticsFolder
+        
+        print("✅ Created cosmetic data")
+        success = true
+    end
+    
+    -- Method 2: Try to access car data directly
+    local carReplication = Player.PlayerGui:FindFirstChild("CarReplication")
+    if carReplication then
+        for _, car in pairs(carReplication:GetChildren()) do
+            if car:IsA("Model") then
+                -- Add cosmetic properties
+                local wrap = Instance.new("StringValue")
+                wrap.Name = "CurrentWrap"
+                wrap.Value = "PremiumWrap"
+                wrap.Parent = car
+                
+                local kit = Instance.new("StringValue")
+                kit.Name = "CurrentKit"
+                kit.Value = "SportKit"
+                kit.Parent = car
+                
+                success = true
             end
         end
     end
     
-    print("📁 Modified player cosmetic data")
-    return true
+    return success
+end
+
+-- ===== SHOP UI MODIFICATION =====
+local function ModifyShopInterface()
+    print("🏪 Modifying shop interface...")
+    
+    local PlayerGui = Player:WaitForChild("PlayerGui")
+    local modified = 0
+    
+    local function ProcessItem(item)
+        if not item:IsA("GuiObject") then return end
+        
+        local name = item.Name:lower()
+        
+        -- Check if it's a cosmetic item
+        if name:find("wrap") or name:find("paint") or name:find("kit") 
+           or name:find("wheel") or name:find("neon") then
+            
+            -- Remove lock visuals
+            for _, child in pairs(item:GetDescendants()) do
+                if child:IsA("ImageLabel") then
+                    if child.Name:lower():find("lock") then
+                        child.Visible = false
+                        modified = modified + 1
+                    end
+                end
+                
+                if child:IsA("TextLabel") then
+                    local text = child.Text:lower()
+                    if text:find("locked") or text:find("$") 
+                       or text:find("buy") or text:find("purchase") then
+                        child.Text = "UNLOCKED"
+                        child.TextColor3 = Color3.fromRGB(0, 255, 0)
+                        modified = modified + 1
+                    end
+                end
+            end
+            
+            -- Make button green if it's a button
+            if item:IsA("TextButton") then
+                item.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+                item.Text = "EQUIP"
+                modified = modified + 1
+            end
+        end
+    end
+    
+    -- Process existing items
+    for _, item in pairs(PlayerGui:GetDescendants()) do
+        ProcessItem(item)
+    end
+    
+    -- Monitor for new items
+    PlayerGui.DescendantAdded:Connect(ProcessItem)
+    
+    print("🖌️ Modified", modified, "UI elements")
+    return modified
 end
 
 -- ===== MAIN UNLOCK FUNCTION =====
-local function UnlockCarCosmetics()
-    print("🚀 Starting targeted cosmetic unlock...")
+local function UnlockCarCustomization()
+    print("🚀 Starting direct cosmetic unlock...")
     
     local results = {
-        hooked = 0,
         purchased = 0,
         equipped = 0,
-        modified = false
+        modifiedUI = 0,
+        dataAccessed = false
     }
     
-    -- Step 1: Hook cosmetic remotes (SAFELY)
-    results.hooked = FindAndHookCosmeticRemotes()
+    -- Step 1: Try direct purchases
+    local purchaseRemotes = FindPurchaseRemotes()
+    if #purchaseRemotes > 0 then
+        for _, remote in ipairs(purchaseRemotes) do
+            results.purchased = results.purchased + TryPurchaseItems(remote.Object)
+            task.wait(0.5)
+        end
+    else
+        print("⚠️ No purchase remotes found")
+    end
     
-    -- Step 2: Purchase cosmetics
-    results.purchased = PurchaseAllCosmetics()
-    
-    -- Step 3: Equip cosmetics
+    -- Step 2: Try to equip
     task.wait(1)
-    results.equipped = EquipAllCosmetics()
+    local equipRemotes = FindEquipRemotes()
+    if #equipRemotes > 0 then
+        for _, remote in ipairs(equipRemotes) do
+            results.equipped = results.equipped + TryEquipCosmetics(remote)
+            task.wait(0.5)
+        end
+    else
+        print("⚠️ No equip remotes found")
+    end
     
-    -- Step 4: Modify player data
-    results.modified = ModifyPlayerCosmeticData()
+    -- Step 3: Access/modify data
+    task.wait(1)
+    results.dataAccessed = AccessCustomizationData()
     
-    -- Step 5: Update UI
-    task.wait(0.5)
+    -- Step 4: Modify shop UI
+    task.wait(1)
+    results.modifiedUI = ModifyShopInterface()
     
+    -- Display results
     print("=" .. string.rep("=", 40))
     print("📊 UNLOCK RESULTS:")
-    print("• Hooked " .. results.hooked .. " remotes")
-    print("• Purchased " .. results.purchased .. " items")
-    print("• Equipped " .. results.equipped .. " items")
-    print("• Modified player data: " .. (results.modified and "Yes" or "No"))
+    if results.purchased > 0 then
+        print("✅ Purchased " .. results.purchased .. " items")
+    end
+    
+    if results.equipped > 0 then
+        print("✅ Equipped " .. results.equipped .. " items")
+    end
+    
+    if results.modifiedUI > 0 then
+        print("✅ Modified " .. results.modifiedUI .. " UI elements")
+    end
+    
+    if results.dataAccessed then
+        print("✅ Accessed customization data")
+    end
+    
+    if results.purchased == 0 and results.equipped == 0 then
+        print("⚠️ Limited success - Try manual method below")
+    end
+    
     print("=" .. string.rep("=", 40))
     
     return results
 end
 
--- ===== SIMPLE UI =====
-local function CreateSimpleUI()
+-- ===== MANUAL UNLOCK METHOD =====
+local function CreateManualUnlocker()
+    print("🛠️ Creating manual unlock interface...")
+    
     local ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Name = "CosmeticUnlockUI"
+    ScreenGui.Name = "ManualUnlockerUI"
     ScreenGui.Parent = Player:WaitForChild("PlayerGui")
-    ScreenGui.ResetOnSpawn = false
     
-    -- Main Button
-    local MainButton = Instance.new("TextButton")
-    MainButton.Text = "🎨 UNLOCK COSMETICS"
-    MainButton.Size = UDim2.new(0, 160, 0, 50)
-    MainButton.Position = UDim2.new(1, -170, 0, 20)
-    MainButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
-    MainButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    MainButton.Font = Enum.Font.GothamBold
-    MainButton.TextSize = 14
+    -- Control Panel
+    local MainFrame = Instance.new("Frame")
+    MainFrame.Size = UDim2.new(0, 400, 0, 500)
+    MainFrame.Position = UDim2.new(0.5, -200, 0.5, -250)
+    MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 40)
+    MainFrame.BorderSizePixel = 0
     
-    local ButtonCorner = Instance.new("UICorner")
-    ButtonCorner.CornerRadius = UDim.new(0, 10)
-    ButtonCorner.Parent = MainButton
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 15)
+    Corner.Parent = MainFrame
     
-    local ButtonStroke = Instance.new("UIStroke")
-    ButtonStroke.Color = Color3.fromRGB(255, 255, 255)
-    ButtonStroke.Thickness = 2
-    ButtonStroke.Parent = MainButton
+    local Stroke = Instance.new("UIStroke")
+    Stroke.Color = Color3.fromRGB(0, 150, 255)
+    Stroke.Thickness = 2
+    Stroke.Parent = MainFrame
     
-    -- Status Label
-    local StatusLabel = Instance.new("TextLabel")
-    StatusLabel.Text = "Ready"
-    StatusLabel.Size = UDim2.new(0, 200, 0, 80)
-    StatusLabel.Position = UDim2.new(1, -210, 0, 80)
-    StatusLabel.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
-    StatusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    StatusLabel.Font = Enum.Font.Gotham
-    StatusLabel.TextSize = 12
-    StatusLabel.TextWrapped = true
-    StatusLabel.Visible = false
-    
-    local StatusCorner = Instance.new("UICorner")
-    StatusCorner.CornerRadius = UDim.new(0, 8)
-    StatusCorner.Parent = StatusLabel
-    
-    -- Parent
-    MainButton.Parent = ScreenGui
-    StatusLabel.Parent = ScreenGui
-    
-    -- Button action
-    MainButton.MouseButton1Click:Connect(function()
-        MainButton.Text = "WORKING..."
-        MainButton.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
-        StatusLabel.Visible = true
-        StatusLabel.Text = "Unlocking cosmetics...\nPlease wait."
-        
-        task.spawn(function()
-            local results = UnlockCarCosmetics()
-            
-            if results.purchased > 0 or results.equipped > 0 then
-                MainButton.Text = "✅ UNLOCKED!"
-                MainButton.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
-                StatusLabel.Text = "Success!\n\n" ..
-                                 "Purchased: " .. results.purchased .. "\n" ..
-                                 "Equipped: " .. results.equipped .. "\n" ..
-                                 "Try equipping in-game!"
-            else
-                MainButton.Text = "🎨 UNLOCK COSMETICS"
-                MainButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-                StatusLabel.Text = "Limited success.\nTry:\n1. Open customization\n2. Click again\n3. Restart game"
-            end
-            
-            -- Hide status after 10 seconds
-            task.wait(10)
-            StatusLabel.Visible = false
-        end)
-    end)
-    
-    -- Show status on hover
-    MainButton.MouseEnter:Connect(function()
-        StatusLabel.Visible = true
-    end)
-    
-    StatusLabel.MouseEnter:Connect(function()
-        StatusLabel.Visible = true
-    end)
-    
-    StatusLabel.MouseLeave:Connect(function()
-        if MainButton.Text ~= "WORKING..." then
-            StatusLabel.Visible = false
-        end
-    end)
-    
-    -- Make draggable
-    local dragging = false
-    local dragStart, startPos
-    
-    MainButton.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = true
-            dragStart = input.Position
-            startPos = MainButton.Position
-            
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then
-                    dragging = false
-                end
-            end)
-        end
-    end)
-    
-    game:GetService("UserInputService").InputChanged:Connect(function(input)
-        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-            local delta = input.Position - dragStart
-            MainButton.Position = UDim2.new(
-                startPos.X.Scale,
-                startPos.X.Offset + delta.X,
-                startPos.Y.Scale,
-                startPos.Y.Offset + delta.Y
-            )
-            
-            -- Move status with button
-            StatusLabel.Position = UDim2.new(
-                1, -210,
-                0, MainButton.Position.Y.Offset + 60
-            )
-        end
-    end)
-    
-    return ScreenGui
-end
-
--- ===== AUTO-RUN =====
-print("=" .. string.rep("=", 50))
-print("🎯 TARGETED CAR COSMETIC UNLOCKER")
-print("=" .. string.rep("=", 50))
-print("FIXES from previous version:")
-print("• No more 'FireServer is not valid' errors")
-print("• Only hooks cosmetic remotes")
-print("• Targets specific remotes from your game")
-print("=" .. string.rep("=", 50))
-
--- Create UI
-task.wait(2)
-CreateSimpleUI()
-
--- Auto-run after delay
-task.wait(5)
-print("[System] Click the '🎨 UNLOCK COSMETICS' button!")
-print("[System] Works best when customization shop is open.")
+    -- Title
+    local Title = Instance.new("TextLabel")
+    Title.Text = "🎮 MANUAL COSMETIC UNLOCKER"
+    Title.Size = UDim2.new(1, 0, 0, 50)
+    Title.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+    Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Title.Font = Enum.Font
