@@ -1,166 +1,145 @@
--- 🎯 CAR UNLOCKER FOR DELTA EXECUTOR
--- Optimized for Delta with proper output
-
+-- 🎯 SMART CAR UNLOCKER - ITEM DETECTION EDITION
 local Players = game:GetService("Players")
 local RS = game:GetService("ReplicatedStorage")
 local Player = Players.LocalPlayer
 
--- Function to safely print (Delta compatible)
-local function safePrint(...)
-    local args = {...}
-    local message = ""
-    for i, v in ipairs(args) do
-        message = message .. tostring(v) .. (i < #args and " " or "")
-    end
-    
-    -- Multiple print methods for Delta
-    print(message)
-    rconsoleprint(message .. "\n")
-    
-    -- Also try to show in UI
-    if StatusLabel then
-        StatusLabel.Text = StatusLabel.Text .. "\n" .. message
-    end
-end
-
 -- Wait for game
 repeat task.wait() until game:IsLoaded()
-safePrint("✅ Game loaded")
-task.wait(2)
+task.wait(3)
 
--- Create simple UI that always shows status
+-- Create UI
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "DeltaUnlocker"
+ScreenGui.Name = "ItemHunterUI"
 ScreenGui.Parent = Player:WaitForChild("PlayerGui")
-ScreenGui.ResetOnSpawn = false
 
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 400, 0, 400)
-MainFrame.Position = UDim2.new(0.5, -200, 0.5, -200)
+MainFrame.Size = UDim2.new(0, 450, 0, 500)
+MainFrame.Position = UDim2.new(0.5, -225, 0.5, -250)
 MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 40)
-MainFrame.BorderSizePixel = 0
-
-local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(0, 15)
-UICorner.Parent = MainFrame
 
 local Title = Instance.new("TextLabel")
-Title.Text = "🚗 DELTA CAR UNLOCKER"
+Title.Text = "🔍 ITEM HUNTER - FIND REAL ITEM IDs"
 Title.Size = UDim2.new(1, 0, 0, 50)
 Title.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.Font = Enum.Font.GothamBold
-Title.TextSize = 18
 
-local TitleCorner = Instance.new("UICorner")
-TitleCorner.CornerRadius = UDim.new(0, 15)
-TitleCorner.Parent = Title
+local Status = Instance.new("TextLabel")
+Status.Text = "Ready...\n"
+Status.Size = UDim2.new(1, -20, 0, 300)
+Status.Position = UDim2.new(0, 10, 0, 60)
+Status.BackgroundTransparency = 1
+Status.TextColor3 = Color3.fromRGB(255, 255, 255)
+Status.TextXAlignment = Enum.TextXAlignment.Left
+Status.TextYAlignment = Enum.TextYAlignment.Top
+Status.TextWrapped = true
 
--- Status display
-local StatusFrame = Instance.new("ScrollingFrame")
-StatusFrame.Size = UDim2.new(1, -20, 0, 250)
-StatusFrame.Position = UDim2.new(0, 10, 0, 60)
-StatusFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 50)
-StatusFrame.ScrollBarThickness = 8
-StatusFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+local ScanItemsBtn = Instance.new("TextButton")
+ScanItemsBtn.Text = "🔍 SCAN FOR ITEM IDs"
+ScanItemsBtn.Size = UDim2.new(1, -20, 0, 40)
+ScanItemsBtn.Position = UDim2.new(0, 10, 0, 370)
+ScanItemsBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
 
-StatusLabel = Instance.new("TextLabel")
-StatusLabel.Name = "StatusLabel"
-StatusLabel.Text = "Ready...\n"
-StatusLabel.Size = UDim2.new(1, -10, 0, 0)
-StatusLabel.Position = UDim2.new(0, 5, 0, 5)
-StatusLabel.BackgroundTransparency = 1
-StatusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-StatusLabel.Font = Enum.Font.Code
-StatusLabel.TextSize = 11
-StatusLabel.TextXAlignment = Enum.TextXAlignment.Left
-StatusLabel.TextYAlignment = Enum.TextYAlignment.Top
-StatusLabel.TextWrapped = true
-StatusLabel.AutomaticSize = Enum.AutomaticSize.Y
+local TestPurchaseBtn = Instance.new("TextButton")
+TestPurchaseBtn.Text = "💰 TEST PURCHASE"
+TestPurchaseBtn.Size = UDim2.new(1, -20, 0, 40)
+TestPurchaseBtn.Position = UDim2.new(0, 10, 0, 420)
+TestPurchaseBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
 
-StatusLabel.Parent = StatusFrame
+-- Add corners
+local function addCorner(obj)
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = obj
+end
 
--- Buttons
-local ScanBtn = Instance.new("TextButton")
-ScanBtn.Text = "🔍 SCAN CAR"
-ScanBtn.Size = UDim2.new(1, -20, 0, 40)
-ScanBtn.Position = UDim2.new(0, 10, 0, 320)
-ScanBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
-ScanBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-ScanBtn.Font = Enum.Font.GothamBold
+addCorner(MainFrame)
+addCorner(Title)
+addCorner(ScanItemsBtn)
+addCorner(TestPurchaseBtn)
 
-local UnlockBtn = Instance.new("TextButton")
-UnlockBtn.Text = "🔓 UNLOCK ALL"
-UnlockBtn.Size = UDim2.new(1, -20, 0, 40)
-UnlockBtn.Position = UDim2.new(0, 10, 0, 370)
-UnlockBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
-UnlockBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-UnlockBtn.Font = Enum.Font.GothamBold
-
--- Add corners to buttons
-local btnCorner = Instance.new("UICorner")
-btnCorner.CornerRadius = UDim.new(0, 10)
-
-btnCorner:Clone().Parent = ScanBtn
-btnCorner:Clone().Parent = UnlockBtn
-
--- Parent everything
+-- Parent
 Title.Parent = MainFrame
-StatusFrame.Parent = MainFrame
-ScanBtn.Parent = MainFrame
-UnlockBtn.Parent = MainFrame
+Status.Parent = MainFrame
+ScanItemsBtn.Parent = MainFrame
+TestPurchaseBtn.Parent = MainFrame
 MainFrame.Parent = ScreenGui
 
--- Function to update status
-local function updateStatus(text, color)
-    if color then
-        StatusLabel.TextColor3 = color
-    end
-    StatusLabel.Text = StatusLabel.Text .. text .. "\n"
-    
-    -- Auto-scroll
-    StatusFrame.CanvasPosition = Vector2.new(0, StatusLabel.AbsoluteSize.Y)
-    
-    -- Also print to console for Delta
-    rconsoleprint(text .. "\n")
+-- Update status
+local function updateStatus(text)
+    Status.Text = Status.Text .. text .. "\n"
 end
 
--- Clear status
 local function clearStatus()
-    StatusLabel.Text = ""
+    Status.Text = ""
 end
 
--- SIMPLE CAR SCAN
-local function simpleCarScan()
+-- ===== ITEM ID DETECTION =====
+local function findRealItemIDs()
     clearStatus()
-    updateStatus("🔍 Scanning for car name...", Color3.fromRGB(255, 200, 0))
+    updateStatus("🔍 Hunting for real item IDs...")
     
+    local foundItems = {}
     local PlayerGui = Player:WaitForChild("PlayerGui")
-    local foundCar = nil
     
-    -- Look in common locations based on your screenshot
-    local pathsToCheck = {
-        "Menu.Inventory.Cars",
-        "Menu.Inventory.CarConfig",
-        "Customization",
-        "Shop"
-    }
+    -- METHOD 1: Look for hidden data in cosmetic buttons
+    updateStatus("\n📦 METHOD 1: Checking cosmetic buttons...")
     
-    for _, pathStart in ipairs(pathsToCheck) do
-        local obj = PlayerGui:FindFirstChild(pathStart, true)
-        if obj then
-            updateStatus("✅ Found: " .. obj:GetFullName())
+    for _, gui in pairs(PlayerGui:GetDescendants()) do
+        if gui:IsA("TextButton") or gui:IsA("ImageButton") then
+            -- Check the button itself
+            local buttonInfo = {
+                Name = gui.Name,
+                Text = gui:IsA("TextButton") and gui.Text or "",
+                ClassName = gui.ClassName
+            }
             
-            -- Look for text labels
-            for _, child in pairs(obj:GetDescendants()) do
-                if child:IsA("TextLabel") or child:IsA("TextButton") then
-                    local text = child.Text
-                    if text and text ~= "" and #text > 3 then
-                        updateStatus("📝 Text found: " .. text)
-                        if text:find("Pagani") or text:find("Huayra") then
-                            foundCar = text
-                            updateStatus("🎯 CAR FOUND: " .. text, Color3.fromRGB(0, 255, 0))
-                            break
+            -- Check for IntValues, StringValues, etc. (common for storing item IDs)
+            for _, child in pairs(gui:GetDescendants()) do
+                if child:IsA("IntValue") or child:IsA("StringValue") 
+                   or child:IsA("NumberValue") or child:IsA("ObjectValue") then
+                    
+                    buttonInfo[child.Name] = child.Value
+                end
+            end
+            
+            -- Check if this looks like a cosmetic item
+            if gui.Name:lower():find("wrap") or gui.Name:lower():find("kit")
+               or gui.Name:lower():find("wheel") or gui.Name:lower():find("neon") then
+                
+                table.insert(foundItems, buttonInfo)
+                updateStatus("✅ Found: " .. gui.Name)
+                for k, v in pairs(buttonInfo) do
+                    if k ~= "ClassName" then
+                        updateStatus("   " .. k .. ": " .. tostring(v))
+                    end
+                end
+            end
+        end
+    end
+    
+    -- METHOD 2: Look for ModuleScripts that might contain item data
+    updateStatus("\n📦 METHOD 2: Checking game modules...")
+    
+    for _, obj in pairs(game:GetDescendants()) do
+        if obj:IsA("ModuleScript") then
+            local name = obj.Name:lower()
+            if name:find("item") or name:find("shop") 
+               or name:find("cosmetic") or name:find("catalog") then
+                
+                updateStatus("📁 Found module: " .. obj.Name)
+                
+                -- Try to get its contents
+                local success, module = pcall(require, obj)
+                if success and type(module) == "table" then
+                    -- Look for item data in the module
+                    for key, value in pairs(module) do
+                        if type(value) == "table" and (value.Name or value.Id or value.ItemId) then
+                            updateStatus("   📝 Found item data in module")
+                            if value.Name then updateStatus("      Name: " .. value.Name) end
+                            if value.Id then updateStatus("      Id: " .. value.Id) end
+                            if value.ItemId then updateStatus("      ItemId: " .. value.ItemId) end
+                            if value.Price then updateStatus("      Price: " .. value.Price) end
                         end
                     end
                 end
@@ -168,151 +147,163 @@ local function simpleCarScan()
         end
     end
     
-    if not foundCar then
-        updateStatus("❌ Could not find car name", Color3.fromRGB(255, 100, 100))
-        updateStatus("💡 Make sure:", Color3.fromRGB(255, 200, 0))
-        updateStatus("   • You're viewing a car in shop", Color3.fromRGB(255, 255, 200))
-        updateStatus("   • The car name is visible", Color3.fromRGB(255, 255, 200))
-    end
+    -- METHOD 3: Monitor network traffic (what the game actually sends)
+    updateStatus("\n📦 METHOD 3: Setting up network monitor...")
     
-    return foundCar or "Unknown Car"
-end
-
--- SIMPLE COSMETIC SCAN
-local function simpleCosmeticScan()
-    updateStatus("\n🎨 Scanning for cosmetics...", Color3.fromRGB(255, 200, 0))
-    
-    local PlayerGui = Player:WaitForChild("PlayerGui")
-    local cosmetics = {}
-    
-    -- Look for cosmetic containers
-    for _, obj in pairs(PlayerGui:GetDescendants()) do
-        if obj:IsA("Frame") or obj:IsA("ScrollingFrame") then
-            local name = obj.Name:lower()
-            if name:find("wrap") or name:find("kit") 
-               or name:find("wheel") or name:find("neon")
-               or name:find("cosmetic") or name:find("custom") then
-                
-                updateStatus("📦 Found container: " .. obj.Name)
-                
-                -- Look for buttons
-                for _, btn in pairs(obj:GetDescendants()) do
-                    if btn:IsA("TextButton") or btn:IsA("ImageButton") then
-                        table.insert(cosmetics, {
-                            button = btn,
-                            name = btn.Name,
-                            path = btn:GetFullName()
-                        })
-                    end
-                end
-            end
-        end
-    end
-    
-    updateStatus("✅ Found " .. #cosmetics .. " cosmetic items", Color3.fromRGB(0, 255, 0))
-    return cosmetics
-end
-
--- SIMPLE UNLOCK ATTEMPT
-local function simpleUnlock()
-    updateStatus("\n🔓 Attempting to unlock...", Color3.fromRGB(255, 200, 0))
-    
-    -- Look for remotes
-    updateStatus("📡 Searching for remotes...")
-    
-    local foundRemotes = {}
-    
-    -- Check common remote locations
+    -- Find the purchase remote that's giving the error
+    local purchaseRemote = nil
     for _, obj in pairs(RS:GetDescendants()) do
         if obj:IsA("RemoteFunction") or obj:IsA("RemoteEvent") then
             local name = obj.Name:lower()
-            if name:find("purchase") or name:find("buy") 
-               or name:find("unlock") or name:find("equip") then
-                
-                table.insert(foundRemotes, {
-                    object = obj,
-                    name = obj.Name,
-                    type = obj.ClassName
-                })
-                updateStatus("✅ Found remote: " .. obj.Name .. " (" .. obj.ClassName .. ")")
+            if name:find("purchase") or name:find("buy") then
+                purchaseRemote = obj
+                updateStatus("🎯 Found purchase remote: " .. obj.Name)
+                break
             end
         end
     end
     
-    if #foundRemotes == 0 then
-        updateStatus("❌ No purchase remotes found!", Color3.fromRGB(255, 100, 100))
+    if purchaseRemote then
+        updateStatus("\n🎯 Now click on a cosmetic in-game to see what data is sent!")
+        updateStatus("💡 Click a wrap/kit/wheel in the shop UI")
+        
+        -- Hook into the remote to see what data is sent
+        local originalFunction
+        if purchaseRemote:IsA("RemoteFunction") then
+            originalFunction = purchaseRemote.InvokeServer
+            purchaseRemote.InvokeServer = function(self, ...)
+                local args = {...}
+                updateStatus("\n📡 PURCHASE DATA CAPTURED:")
+                updateStatus("Remote: " .. purchaseRemote.Name)
+                for i, arg in ipairs(args) do
+                    updateStatus("  Arg " .. i .. ": " .. tostring(arg))
+                    if type(arg) == "table" then
+                        for k, v in pairs(arg) do
+                            updateStatus("    " .. k .. " = " .. tostring(v))
+                        end
+                    end
+                end
+                return originalFunction(self, ...)
+            end
+        end
+    end
+    
+    return foundItems
+end
+
+-- ===== INTELLIGENT PURCHASE TESTER =====
+local function testIntelligentPurchase()
+    clearStatus()
+    updateStatus("💰 Testing purchase with captured data...")
+    
+    -- First, let the user manually click an item
+    updateStatus("\n🎯 STEP 1: Manually click a cosmetic in the shop")
+    updateStatus("Wait for it to show 'CAPTURED DATA' above")
+    updateStatus("Then click TEST PURCHASE again")
+    
+    -- Look for the purchase remote
+    local purchaseRemote = nil
+    for _, obj in pairs(RS:GetDescendants()) do
+        if (obj:IsA("RemoteFunction") or obj:IsA("RemoteEvent")) 
+           and obj.Name:lower():find("purchase") then
+            purchaseRemote = obj
+            break
+        end
+    end
+    
+    if not purchaseRemote then
+        updateStatus("❌ No purchase remote found")
         return
     end
     
-    -- Try each remote
-    updateStatus("\n🔄 Testing remotes...")
-    for _, remote in ipairs(foundRemotes) do
-        updateStatus("Testing: " .. remote.name)
+    updateStatus("✅ Found remote: " .. purchaseRemote.Name)
+    
+    -- Common item IDs from your game (you'll need to fill these)
+    local possibleItemIDs = {
+        -- Pagani Huayra R cosmetics
+        "Pagani_HuayraR_Wrap_1",
+        "Pagani_HuayraR_Kit_1", 
+        "Pagani_HuayraR_Wheels_1",
+        "HuayraR_Wrap_01",
+        "HuayraR_BodyKit_01",
+        -- Try numeric IDs
+        "1001", "1002", "1003", "1004",
+        -- Try with underscores
+        "pagani_huayra_r_wrap",
+        "huayra_r_kit",
+    }
+    
+    updateStatus("\n🔄 Testing different item IDs...")
+    
+    local successCount = 0
+    for _, itemId in ipairs(possibleItemIDs) do
+        updateStatus("Testing: " .. itemId)
         
-        -- Try different data formats
-        local testData = {
-            "TestItem",
-            {ItemId = "TestItem"},
-            {id = "TestItem"},
-            {Name = "TestItem", Category = "Wrap"}
+        -- Try different formats
+        local formats = {
+            itemId,
+            {ItemId = itemId},
+            {id = itemId},
+            {item = itemId},
+            {Item = itemId, Vehicle = "Pagani Huayra R"},
+            {productId = itemId, carModel = "HuayraR"}
         }
         
-        for i, data in ipairs(testData) do
+        for i, data in ipairs(formats) do
             local success, result = pcall(function()
-                if remote.type == "RemoteFunction" then
-                    return remote.object:InvokeServer(data)
+                if purchaseRemote:IsA("RemoteFunction") then
+                    return purchaseRemote:InvokeServer(data)
                 else
-                    remote.object:FireServer(data)
+                    purchaseRemote:FireServer(data)
                     return "FireServer called"
                 end
             end)
             
             if success then
-                updateStatus("  ✅ Format " .. i .. " worked!", Color3.fromRGB(0, 255, 0))
+                updateStatus("  ✅ Format " .. i .. " - Success!")
                 updateStatus("  Result: " .. tostring(result))
+                successCount = successCount + 1
+                break
             else
-                updateStatus("  ❌ Format " .. i .. " failed", Color3.fromRGB(255, 100, 100))
+                updateStatus("  ❌ Format " .. i .. " - Failed: " .. tostring(result))
             end
+            
+            task.wait(0.2)
         end
+    end
+    
+    updateStatus("\n📊 Test complete: " .. successCount .. " successful attempts")
+    
+    if successCount == 0 then
+        updateStatus("💡 TIP: Manually click a cosmetic first")
+        updateStatus("The script will capture the REAL item data")
+        updateStatus("Then we can use that exact data!")
     end
 end
 
 -- Connect buttons
-ScanBtn.MouseButton1Click:Connect(function()
-    ScanBtn.Text = "SCANNING..."
-    ScanBtn.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
-    
-    local carName = simpleCarScan()
-    simpleCosmeticScan()
-    
-    ScanBtn.Text = "🔍 SCAN CAR"
-    ScanBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+ScanItemsBtn.MouseButton1Click:Connect(function()
+    ScanItemsBtn.Text = "SCANNING..."
+    findRealItemIDs()
+    ScanItemsBtn.Text = "🔍 SCAN FOR ITEM IDs"
 end)
 
-UnlockBtn.MouseButton1Click:Connect(function()
-    UnlockBtn.Text = "UNLOCKING..."
-    UnlockBtn.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
-    
-    simpleUnlock()
-    
-    UnlockBtn.Text = "🔓 UNLOCK ALL"
-    UnlockBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
+TestPurchaseBtn.MouseButton1Click:Connect(function()
+    TestPurchaseBtn.Text = "TESTING..."
+    testIntelligentPurchase()
+    TestPurchaseBtn.Text = "💰 TEST PURCHASE"
 end)
 
--- Initial message
+-- Initial instructions
 clearStatus()
-updateStatus("🚗 DELTA CAR UNLOCKER READY", Color3.fromRGB(0, 200, 255))
+updateStatus("🎯 ITEM HUNTER - HOW TO USE:")
 updateStatus("=" .. string.rep("=", 40))
-updateStatus("HOW TO USE:", Color3.fromRGB(200, 220, 255))
-updateStatus("1. Open car shop/customization", Color3.fromRGB(255, 255, 200))
-updateStatus("2. Select the Pagani Huayra R", Color3.fromRGB(255, 255, 200))
-updateStatus("3. Open wraps/kits/wheels tabs", Color3.fromRGB(255, 255, 200))
-updateStatus("4. Click SCAN CAR", Color3.fromRGB(255, 255, 200))
-updateStatus("5. Click UNLOCK ALL", Color3.fromRGB(255, 255, 200))
+updateStatus("1. Open car customization shop")
+updateStatus("2. Select Pagani Huayra R")
+updateStatus("3. Click 'SCAN FOR ITEM IDs'")
+updateStatus("4. Manually click a cosmetic in-game")
+updateStatus("5. Watch the captured data appear above")
+updateStatus("6. Click 'TEST PURCHASE' with that data")
 updateStatus("=" .. string.rep("=", 40))
-
--- Also force Delta to show output
-rconsoleclear()
-rconsoleprint("🎯 DELTA CAR UNLOCKER LOADED\n")
-rconsoleprint("📍 Look for the UI window in-game\n")
-rconsoleprint("📝 All output will show here too\n")
+updateStatus("\nThe error you got means we have the RIGHT remote,")
+updateStatus("but the WRONG item data. This tool will find the real data!")
