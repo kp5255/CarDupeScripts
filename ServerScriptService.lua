@@ -1,531 +1,432 @@
--- 🔓 Universal Cosmetic Unlocker v2.0
--- Fixed for Knit services - No transaction errors
+-- 🎨 CAR CUSTOMIZATION UNLOCKER
+-- Unlocks wraps, bodykits, underglows, wheels, etc.
 
 local Players = game:GetService("Players")
-local RS = game:GetService("ReplicatedStorage")
 local Player = Players.LocalPlayer
 
 repeat task.wait() until game:IsLoaded()
-task.wait(2)
+task.wait(3)
 
--- ===== SILENT UNLOCK SYSTEM =====
-local CosmeticCache = {}
-local UnlockedCosmetics = {}
+-- ===== CONFIGURATION =====
+local TARGET_ITEMS = {
+    "wrap", "paint", "color", "skin", "vinyl",
+    "bodykit", "kit", "bumper", "spoiler", "wing",
+    "wheel", "rim", "tire", "brake",
+    "underglow", "neon", "light", "led",
+    "exhaust", "engine", "hood",
+    "window", "tint", "sticker", "decals"
+}
 
--- Find all cosmetics in the game
-local function FindAllCosmetics()
-    local cosmetics = {}
+local IGNORE_ITEMS = {
+    "car", "vehicle", "buy", "purchase", "shop", "store", 
+    "back", "close", "exit", "menu", "tab", "button"
+}
+
+-- ===== CORE UNLOCK FUNCTIONS =====
+local function IsCarCosmetic(item)
+    if not item then return false end
     
-    -- Check ReplicatedStorage
-    local function SearchFolder(folder, path)
-        for _, item in pairs(folder:GetChildren()) do
-            if item:IsA("Folder") or item:IsA("Model") then
-                local name = item.Name:lower()
-                if name:find("cosmetic") or name:find("skin") or name:find("item") 
-                   or name:find("hat") or name:find("effect") or name:find("pet")
-                   or name:find("car") or name:find("vehicle") then
-                    table.insert(cosmetics, {
-                        Object = item,
-                        Path = path .. " → " .. item.Name,
-                        Type = item.ClassName
-                    })
+    local name = item.Name:lower()
+    local text = ""
+    
+    -- Get text if available
+    if item:IsA("TextButton") or item:IsA("TextLabel") then
+        text = item.Text:lower()
+    elseif item:FindFirstChildWhichIsA("TextLabel") then
+        text = item:FindFirstChildWhichIsA("TextLabel").Text:lower()
+    end
+    
+    -- Check if this is a cosmetic item
+    for _, target in ipairs(TARGET_ITEMS) do
+        if name:find(target) or text:find(target) then
+            -- Make sure it's not in ignore list
+            local shouldIgnore = false
+            for _, ignore in ipairs(IGNORE_ITEMS) do
+                if name == ignore or text == ignore then
+                    shouldIgnore = true
+                    break
                 end
-                SearchFolder(item, path .. " → " .. item.Name)
-            elseif item:IsA("StringValue") or item:IsA("NumberValue") then
-                if item.Name:find("Id") or item.Name:find("UUID") or item.Name:find("Token") then
-                    table.insert(cosmetics, {
-                        Object = item,
-                        Path = path,
-                        Value = item.Value,
-                        Type = "ID"
-                    })
-                end
+            end
+            
+            if not shouldIgnore then
+                return true
             end
         end
     end
     
-    SearchFolder(RS, "ReplicatedStorage")
-    
-    -- Check game services
-    local services = {
-        game:GetService("Workspace"),
-        game:GetService("ServerStorage"),
-        game:GetService("Lighting")
-    }
-    
-    for _, service in pairs(services) do
-        pcall(function() SearchFolder(service, service.Name) end)
-    end
-    
-    return cosmetics
+    return false
 end
 
--- Client-side unlock (no server transaction)
-local function ClientSideUnlock(cosmeticData)
-    -- Method 1: Direct modification of player data
-    local function ModifyPlayerData()
-        -- Find player data folder
-        local playerData = Player:FindFirstChild("PlayerData") 
-                          or Player:FindFirstChild("Data") 
-                          or Player:FindFirstChild("Inventory")
-        
-        if playerData then
-            -- Create cosmetic entry
-            local cosmeticFolder = Instance.new("Folder")
-            cosmeticFolder.Name = "UnlockedCosmetic_" .. tostring(cosmeticData.Id or math.random(10000, 99999))
-            
-            local idValue = Instance.new("StringValue")
-            idValue.Name = "Id"
-            idValue.Value = cosmeticData.Id or cosmeticData.Value or cosmeticData.Name
-            
-            local nameValue = Instance.new("StringValue")
-            nameValue.Name = "Name"
-            nameValue.Value = cosmeticData.Name or "Premium Cosmetic"
-            
-            local unlockedValue = Instance.new("BoolValue")
-            unlockedValue.Name = "Unlocked"
-            unlockedValue.Value = true
-            
-            local timestampValue = Instance.new("NumberValue")
-            timestampValue.Name = "UnlockTime"
-            timestampValue.Value = os.time()
-            
-            idValue.Parent = cosmeticFolder
-            nameValue.Parent = cosmeticFolder
-            unlockedValue.Parent = cosmeticFolder
-            timestampValue.Parent = cosmeticFolder
-            cosmeticFolder.Parent = playerData
-            
-            print("📝 Added to player data:", cosmeticData.Name)
-            return true
-        end
-        return false
-    end
+local function UnlockSingleItem(item)
+    if not item or not item:IsDescendantOf(game) then return false end
     
-    -- Method 2: Modify UI directly (NO REMOTE HOOKING)
-    local function ModifyUI()
-        local PlayerGui = Player:WaitForChild("PlayerGui")
-        
-        -- Wait for UI to load
-        task.wait(0.5)
-        
-        -- Unlock UI elements
-        local function UnlockUIElement(element)
-            if not element then return end
+    local changesMade = 0
+    
+    -- 1. Remove all lock visuals
+    for _, child in pairs(item:GetDescendants()) do
+        -- Remove lock images
+        if child:IsA("ImageLabel") or child:IsA("ImageButton") then
+            local imgName = child.Name:lower()
+            local imgId = tostring(child.Image):lower()
             
-            -- Remove lock icons
-            for _, child in pairs(element:GetDescendants()) do
-                if child:IsA("ImageLabel") or child:IsA("ImageButton") then
-                    local name = child.Name:lower()
-                    if name:find("lock") or name:find("locked") then
-                        child.Visible = false
-                    end
+            if imgName:find("lock") or imgId:find("lock") 
+               or imgName:find("price") or imgId:find("price") then
+                child.Visible = false
+                changesMade = changesMade + 1
+            end
+        end
+        
+        -- Change locked text
+        if child:IsA("TextLabel") or child:IsA("TextButton") then
+            local text = child.Text:lower()
+            if text:find("locked") or text:find("lock") 
+               or text:find("purchase") or text:find("buy") 
+               or text:find("$") or text:match("%d+%s*[ckm]") then
+                
+                if text:find("locked") then
+                    child.Text = "UNLOCKED"
+                elseif text:find("purchase") or text:find("buy") then
+                    child.Text = "EQUIP"
+                elseif text:find("$") or text:match("%d+%s*[ckm]") then
+                    child.Text = "FREE"
                 end
                 
-                if child:IsA("TextLabel") or child:IsA("TextButton") then
-                    local text = child.Text:lower()
-                    if text:find("locked") or text:find("purchase") or text:find("buy") then
-                        child.Text = "UNLOCKED"
-                        child.TextColor3 = Color3.fromRGB(0, 255, 0)
+                child.TextColor3 = Color3.fromRGB(0, 255, 0)
+                changesMade = changesMade + 1
+            end
+        end
+    end
+    
+    -- 2. Add green border to show it's unlocked
+    if not item:FindFirstChild("UnlockedBorder") then
+        local border = Instance.new("UIStroke")
+        border.Name = "UnlockedBorder"
+        border.Color = Color3.fromRGB(0, 255, 0)
+        border.Thickness = 2
+        border.Parent = item
+        changesMade = changesMade + 1
+    end
+    
+    -- 3. Add "OWNED" text
+    if not item:FindFirstChild("OwnedLabel") then
+        local ownedLabel = Instance.new("TextLabel")
+        ownedLabel.Name = "OwnedLabel"
+        ownedLabel.Text = "✓ OWNED"
+        ownedLabel.Size = UDim2.new(1, 0, 0, 20)
+        ownedLabel.Position = UDim2.new(0, 0, 1, -20)
+        ownedLabel.BackgroundTransparency = 1
+        ownedLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+        ownedLabel.Font = Enum.Font.GothamBold
+        ownedLabel.TextSize = 12
+        ownedLabel.Parent = item
+        changesMade = changesMade + 1
+    end
+    
+    -- 4. Enable the button if it's disabled
+    if item:IsA("TextButton") or item:IsA("ImageButton") then
+        item.AutoButtonColor = true
+        item.Active = true
+        
+        -- Change button color to green
+        if item:IsA("TextButton") then
+            item.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+        end
+        
+        changesMade = changesMade + 1
+    end
+    
+    return changesMade > 0
+end
+
+local function FindAndUnlockAllCosmetics()
+    print("🎯 Searching for car customization items...")
+    
+    local PlayerGui = Player:WaitForChild("PlayerGui")
+    local unlockedCount = 0
+    local scannedItems = 0
+    
+    -- Look in all UI containers
+    local containers = {}
+    for _, gui in pairs(PlayerGui:GetDescendants()) do
+        if gui:IsA("ScrollingFrame") or gui:IsA("Frame") then
+            table.insert(containers, gui)
+        end
+    end
+    
+    print("📦 Scanning", #containers, "UI containers...")
+    
+    for _, container in pairs(containers) do
+        -- Find all potential cosmetic items
+        for _, item in pairs(container:GetDescendants()) do
+            scannedItems = scannedItems + 1
+            
+            -- Check if this is a cosmetic item
+            if IsCarCosmetic(item) then
+                print("🔓 Found cosmetic: " .. item.Name)
+                
+                -- Unlock it
+                if UnlockSingleItem(item) then
+                    unlockedCount = unlockedCount + 1
+                    
+                    -- Also check parent items
+                    local parent = item.Parent
+                    if parent and IsCarCosmetic(parent) then
+                        UnlockSingleItem(parent)
                     end
                 end
             end
-            
-            -- Add owned indicator
-            if not element:FindFirstChild("OwnedIndicator") then
-                local ownedBadge = Instance.new("Frame")
-                ownedBadge.Name = "OwnedIndicator"
-                ownedBadge.Size = UDim2.new(1, 0, 0, 5)
-                ownedBadge.Position = UDim2.new(0, 0, 0, 0)
-                ownedBadge.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
-                ownedBadge.BorderSizePixel = 0
-                ownedBadge.ZIndex = 100
-                ownedBadge.Parent = element
-            end
         end
+    end
+    
+    -- If we didn't find many, do a deeper search
+    if unlockedCount < 5 then
+        print("🔍 Doing deep search for customization items...")
         
-        -- Scan all UI
-        for _, gui in pairs(PlayerGui:GetDescendants()) do
-            if gui:IsA("Frame") or gui:IsA("ScrollingFrame") then
-                local name = gui.Name:lower()
-                if name:find("shop") or name:find("store") or name:find("market") 
-                   or name:find("inventory") or name:find("collection") 
-                   or name:find("cosmetic") or name:find("car") then
-                    UnlockUIElement(gui)
+        -- Look for any button with cosmetic-like names
+        for _, item in pairs(PlayerGui:GetDescendants()) do
+            if item:IsA("TextButton") or item:IsA("ImageButton") then
+                local name = item.Name:lower()
+                
+                for _, target in ipairs(TARGET_ITEMS) do
+                    if name:find(target) then
+                        if UnlockSingleItem(item) then
+                            unlockedCount = unlockedCount + 1
+                        end
+                        break
+                    end
                 end
             end
         end
-        
-        print("🎨 Modified UI elements")
     end
     
-    -- Method 3: Store cosmetics locally (persistent)
-    local function StoreLocally()
-        -- Use player's saved data
-        local success, saved = pcall(function()
-            return game:GetService("HttpService"):JSONDecode(
-                readfile("cosmetic_unlocks.json") or "{}"
-            )
-        end)
-        
-        if not success then saved = {} end
-        
-        -- Add new cosmetic
-        saved[cosmeticData.Id or cosmeticData.Name] = {
-            name = cosmeticData.Name,
-            unlocked = true,
-            timestamp = os.time(),
-            path = cosmeticData.Path
-        }
-        
-        -- Save to file
-        pcall(function()
-            writefile("cosmetic_unlocks.json", game:GetService("HttpService"):JSONEncode(saved))
-        end)
-        
-        print("💾 Saved locally:", cosmeticData.Name)
-    end
+    print("✅ Scanned", scannedItems, "items")
+    print("✨ Unlocked", unlockedCount, "car cosmetics")
     
-    -- Method 4: Add to backpack/inventory directly
-    local function AddToBackpack()
-        local backpack = Player:FindFirstChild("Backpack")
-        if backpack then
-            -- Create a tool/item representing the cosmetic
-            local tool = Instance.new("Tool")
-            tool.Name = cosmeticData.Name .. "_Cosmetic"
-            tool.ToolTip = "Unlocked Cosmetic: " .. cosmeticData.Name
-            
-            local handle = Instance.new("Part")
-            handle.Name = "Handle"
-            handle.Size = Vector3.new(0.5, 0.5, 0.5)
-            handle.Transparency = 1
-            handle.Parent = tool
-            
-            local stringValue = Instance.new("StringValue")
-            stringValue.Name = "CosmeticId"
-            stringValue.Value = cosmeticData.Id or cosmeticData.Name
-            stringValue.Parent = tool
-            
-            tool.Parent = backpack
-            print("🎒 Added to backpack:", cosmeticData.Name)
-        end
-    end
-    
-    -- Try all methods
-    local success1 = ModifyPlayerData()
-    ModifyUI()
-    StoreLocally()
-    AddToBackpack()
-    
-    return success1
-end
-
--- Main unlock function (NO REMOTE HOOKING)
-local function UnlockAllCosmeticsSilently()
-    print("🔍 Scanning for cosmetics...")
-    
-    local cosmetics = FindAllCosmetics()
-    print("📦 Found", #cosmetics, "potential cosmetic items")
-    
-    -- Create cosmetic database
-    for i, cosmetic in ipairs(cosmetics) do
-        local id = ""
-        
-        if cosmetic.Type == "ID" then
-            id = tostring(cosmetic.Value)
-        else
-            id = cosmetic.Object.Name .. "_" .. i
-        end
-        
-        CosmeticCache[id] = {
-            Id = id,
-            Name = cosmetic.Object.Name,
-            Object = cosmetic.Object,
-            Path = cosmetic.Path,
-            Value = cosmetic.Value
-        }
-    end
-    
-    -- Silent unlock each cosmetic
-    print("🎨 Unlocking cosmetics silently...")
-    
-    local unlockedCount = 0
-    for id, cosmeticData in pairs(CosmeticCache) do
-        if not UnlockedCosmetics[id] then
-            local success = ClientSideUnlock(cosmeticData)
-            
-            if success then
-                UnlockedCosmetics[id] = true
-                unlockedCount = unlockedCount + 1
-                print("✅ [" .. unlockedCount .. "] Unlocked:", cosmeticData.Name)
-            else
-                print("⚠️  Failed:", cosmeticData.Name)
-            end
-            
-            -- Small delay to avoid detection
-            task.wait(0.03)
-        end
-    end
-    
-    print("✨ Successfully unlocked", unlockedCount, "cosmetics")
     return unlockedCount
 end
 
--- ===== IMPROVED UI =====
-local function CreateUnlockerUI()
+-- ===== SHOP DETECTION =====
+local function WaitForShopToOpen()
+    print("🕐 Waiting for shop to open...")
+    
+    local PlayerGui = Player:WaitForChild("PlayerGui")
+    local maxAttempts = 50
+    local attempts = 0
+    
+    while attempts < maxAttempts do
+        -- Look for shop indicators
+        for _, gui in pairs(PlayerGui:GetDescendants()) do
+            if gui:IsA("TextLabel") then
+                local text = gui.Text:lower()
+                if text:find("shop") or text:find("store") 
+                   or text:find("custom") or text:find("cosmetic") then
+                    print("🏪 Shop detected!")
+                    return true
+                end
+            end
+        end
+        
+        attempts = attempts + 1
+        task.wait(0.5)
+    end
+    
+    print("⚠️ Shop not detected, trying anyway...")
+    return false
+end
+
+-- ===== AUTO-UNLOCK SYSTEM =====
+local function SetupAutoUnlock()
+    local PlayerGui = Player:WaitForChild("PlayerGui")
+    
+    -- Monitor for new UI elements
+    PlayerGui.DescendantAdded:Connect(function(item)
+        task.wait(0.1) -- Let it load
+        
+        if IsCarCosmetic(item) then
+            UnlockSingleItem(item)
+        end
+    end)
+    
+    -- Also monitor property changes (for when items become visible)
+    for _, item in pairs(PlayerGui:GetDescendants()) do
+        if item:IsA("GuiObject") then
+            item:GetPropertyChangedSignal("Visible"):Connect(function()
+                if item.Visible and IsCarCosmetic(item) then
+                    task.wait(0.2)
+                    UnlockSingleItem(item)
+                end
+            end)
+        end
+    end
+end
+
+-- ===== SIMPLE CONTROL UI =====
+local function CreateControlUI()
     local ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Name = "CosmeticUnlockerUI"
+    ScreenGui.Name = "CarCustomUnlocker"
     ScreenGui.Parent = Player:WaitForChild("PlayerGui")
     ScreenGui.ResetOnSpawn = false
-    ScreenGui.IgnoreGuiInset = true
     
-    -- Main Container
+    -- Main Control Panel
     local MainFrame = Instance.new("Frame")
-    MainFrame.Size = UDim2.new(0, 400, 0, 500)
-    MainFrame.Position = UDim2.new(0.5, -200, 0.5, -250)
-    MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+    MainFrame.Size = UDim2.new(0, 300, 0, 200)
+    MainFrame.Position = UDim2.new(1, -320, 0.5, -100)
+    MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
     MainFrame.BorderSizePixel = 0
     
-    local UICorner = Instance.new("UICorner")
-    UICorner.CornerRadius = UDim.new(0, 15)
-    UICorner.Parent = MainFrame
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 12)
+    Corner.Parent = MainFrame
     
-    -- Top Bar
-    local TopBar = Instance.new("Frame")
-    TopBar.Size = UDim2.new(1, 0, 0, 45)
-    TopBar.BackgroundColor3 = Color3.fromRGB(35, 35, 50)
-    TopBar.BorderSizePixel = 0
-    
-    local TopCorner = Instance.new("UICorner")
-    TopCorner.CornerRadius = UDim.new(0, 15)
-    TopCorner.Parent = TopBar
+    local Stroke = Instance.new("UIStroke")
+    Stroke.Color = Color3.fromRGB(0, 150, 255)
+    Stroke.Thickness = 2
+    Stroke.Parent = MainFrame
     
     -- Title
     local Title = Instance.new("TextLabel")
-    Title.Text = "🎨 SILENT COSMETIC UNLOCKER"
-    Title.Size = UDim2.new(1, -50, 1, 0)
-    Title.Position = UDim2.new(0, 15, 0, 0)
-    Title.BackgroundTransparency = 1
+    Title.Text = "🚗 CAR CUSTOMIZATION UNLOCKER"
+    Title.Size = UDim2.new(1, 0, 0, 40)
+    Title.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
     Title.TextColor3 = Color3.fromRGB(255, 255, 255)
     Title.Font = Enum.Font.GothamBold
-    Title.TextSize = 18
-    Title.TextXAlignment = Enum.TextXAlignment.Left
-    Title.Parent = TopBar
+    Title.TextSize = 14
+    
+    local TitleCorner = Instance.new("UICorner")
+    TitleCorner.CornerRadius = UDim.new(0, 12)
+    TitleCorner.Parent = Title
+    
+    -- Status
+    local Status = Instance.new("TextLabel")
+    Status.Text = "Open car customization shop\nand click UNLOCK"
+    Status.Size = UDim2.new(1, -20, 0, 60)
+    Status.Position = UDim2.new(0, 10, 0, 50)
+    Status.BackgroundTransparency = 1
+    Status.TextColor3 = Color3.fromRGB(200, 200, 220)
+    Status.Font = Enum.Font.Gotham
+    Status.TextSize = 12
+    Status.TextWrapped = true
+    
+    -- Unlock Button
+    local UnlockBtn = Instance.new("TextButton")
+    UnlockBtn.Text = "🔓 UNLOCK ALL ITEMS"
+    UnlockBtn.Size = UDim2.new(1, -40, 0, 40)
+    UnlockBtn.Position = UDim2.new(0, 20, 1, -100)
+    UnlockBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
+    UnlockBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    UnlockBtn.Font = Enum.Font.GothamBold
+    UnlockBtn.TextSize = 14
+    
+    local BtnCorner = Instance.new("UICorner")
+    BtnCorner.CornerRadius = UDim.new(0, 8)
+    BtnCorner.Parent = UnlockBtn
+    
+    -- Auto Button
+    local AutoBtn = Instance.new("TextButton")
+    AutoBtn.Text = "⏰ AUTO: OFF"
+    AutoBtn.Size = UDim2.new(1, -40, 0, 30)
+    AutoBtn.Position = UDim2.new(0, 20, 1, -60)
+    AutoBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+    AutoBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+    AutoBtn.Font = Enum.Font.Gotham
+    AutoBtn.TextSize = 12
+    
+    local AutoCorner = Instance.new("UICorner")
+    AutoCorner.CornerRadius = UDim.new(0, 6)
+    AutoCorner.Parent = AutoBtn
     
     -- Close Button
-    local CloseButton = Instance.new("TextButton")
-    CloseButton.Text = "✕"
-    CloseButton.Size = UDim2.new(0, 30, 0, 30)
-    CloseButton.Position = UDim2.new(1, -35, 0, 7)
-    CloseButton.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-    CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    CloseButton.Font = Enum.Font.GothamBold
-    CloseButton.TextSize = 16
+    local CloseBtn = Instance.new("TextButton")
+    CloseBtn.Text = "✕"
+    CloseBtn.Size = UDim2.new(0, 30, 0, 30)
+    CloseBtn.Position = UDim2.new(1, -35, 0, 5)
+    CloseBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+    CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    CloseBtn.Font = Enum.Font.GothamBold
+    CloseBtn.TextSize = 14
     
     local CloseCorner = Instance.new("UICorner")
     CloseCorner.CornerRadius = UDim.new(0, 6)
-    CloseCorner.Parent = CloseButton
-    
-    -- Status Display
-    local StatusFrame = Instance.new("Frame")
-    StatusFrame.Size = UDim2.new(1, -30, 0, 80)
-    StatusFrame.Position = UDim2.new(0, 15, 0, 60)
-    StatusFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
-    StatusFrame.BorderSizePixel = 0
-    
-    local StatusCorner = Instance.new("UICorner")
-    StatusCorner.CornerRadius = UDim.new(0, 10)
-    StatusCorner.Parent = StatusFrame
-    
-    local StatusLabel = Instance.new("TextLabel")
-    StatusLabel.Text = "Ready to unlock all cosmetics"
-    StatusLabel.Size = UDim2.new(1, -20, 1, -20)
-    StatusLabel.Position = UDim2.new(0, 10, 0, 10)
-    StatusLabel.BackgroundTransparency = 1
-    StatusLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
-    StatusLabel.Font = Enum.Font.Gotham
-    StatusLabel.TextSize = 14
-    StatusLabel.TextWrapped = true
-    StatusLabel.Parent = StatusFrame
-    
-    -- Unlock Button
-    local UnlockButton = Instance.new("TextButton")
-    UnlockButton.Text = "🔓 UNLOCK ALL COSMETICS"
-    UnlockButton.Size = UDim2.new(1, -30, 0, 50)
-    UnlockButton.Position = UDim2.new(0, 15, 1, -130)
-    UnlockButton.BackgroundColor3 = Color3.fromRGB(0, 180, 80)
-    UnlockButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    UnlockButton.Font = Enum.Font.GothamBold
-    UnlockButton.TextSize = 16
-    
-    local ButtonCorner = Instance.new("UICorner")
-    ButtonCorner.CornerRadius = UDim.new(0, 10)
-    ButtonCorner.Parent = UnlockButton
-    
-    -- Progress Area
-    local ProgressContainer = Instance.new("Frame")
-    ProgressContainer.Size = UDim2.new(1, -30, 0, 60)
-    ProgressContainer.Position = UDim2.new(0, 15, 1, -70)
-    ProgressContainer.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
-    ProgressContainer.BorderSizePixel = 0
-    
-    local ProgressCorner = Instance.new("UICorner")
-    ProgressCorner.CornerRadius = UDim.new(0, 10)
-    ProgressCorner.Parent = ProgressContainer
-    
-    local ProgressBarBack = Instance.new("Frame")
-    ProgressBarBack.Size = UDim2.new(1, -20, 0, 20)
-    ProgressBarBack.Position = UDim2.new(0, 10, 0, 10)
-    ProgressBarBack.BackgroundColor3 = Color3.fromRGB(50, 50, 65)
-    ProgressBarBack.BorderSizePixel = 0
-    
-    local ProgressBackCorner = Instance.new("UICorner")
-    ProgressBackCorner.CornerRadius = UDim.new(0, 10)
-    ProgressBackCorner.Parent = ProgressBarBack
-    
-    local ProgressBar = Instance.new("Frame")
-    ProgressBar.Size = UDim2.new(0, 0, 1, 0)
-    ProgressBar.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
-    ProgressBar.BorderSizePixel = 0
-    
-    local ProgressBarCorner = Instance.new("UICorner")
-    ProgressBarCorner.CornerRadius = UDim.new(0, 10)
-    ProgressBarCorner.Parent = ProgressBar
-    
-    local ProgressText = Instance.new("TextLabel")
-    ProgressText.Text = "0/0 unlocked"
-    ProgressText.Size = UDim2.new(1, 0, 0, 20)
-    ProgressText.Position = UDim2.new(0, 0, 0, 32)
-    ProgressText.BackgroundTransparency = 1
-    ProgressText.TextColor3 = Color3.fromRGB(180, 180, 200)
-    ProgressText.Font = Enum.Font.Gotham
-    ProgressText.TextSize = 12
-    ProgressText.Parent = ProgressContainer
+    CloseCorner.Parent = CloseBtn
     
     -- Parent everything
-    ProgressBar.Parent = ProgressBarBack
-    ProgressBarBack.Parent = ProgressContainer
-    ProgressContainer.Parent = MainFrame
-    UnlockButton.Parent = MainFrame
-    StatusFrame.Parent = MainFrame
-    CloseButton.Parent = TopBar
-    TopBar.Parent = MainFrame
+    Title.Parent = MainFrame
+    Status.Parent = MainFrame
+    UnlockBtn.Parent = MainFrame
+    AutoBtn.Parent = MainFrame
+    CloseBtn.Parent = Title
     MainFrame.Parent = ScreenGui
     
-    -- Variables for progress
-    local totalCosmetics = 0
-    local unlocked = 0
+    -- Variables
+    local autoEnabled = false
     
     -- Unlock function
-    local function StartUnlockProcess()
-        UnlockButton.Text = "UNLOCKING..."
-        UnlockButton.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
-        StatusLabel.Text = "Scanning game for cosmetics..."
+    local function PerformUnlock()
+        UnlockBtn.Text = "UNLOCKING..."
+        UnlockBtn.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
+        Status.Text = "Searching for customization items..."
         
-        -- Find cosmetics
-        local cosmetics = FindAllCosmetics()
-        totalCosmetics = #cosmetics
-        
-        if totalCosmetics == 0 then
-            StatusLabel.Text = "No cosmetics found!\nTry opening the shop first."
-            UnlockButton.Text = "TRY AGAIN"
-            UnlockButton.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
-            return
-        end
-        
-        StatusLabel.Text = "Found " .. totalCosmetics .. " cosmetics\nStarting silent unlock..."
-        ProgressText.Text = "0/" .. totalCosmetics .. " unlocked"
-        
-        -- Unlock each cosmetic
-        for i, cosmetic in ipairs(cosmetics) do
-            local id = cosmetic.Object.Name .. "_" .. i
-            local cosmeticData = {
-                Id = id,
-                Name = cosmetic.Object.Name,
-                Object = cosmetic.Object,
-                Path = cosmetic.Path,
-                Value = cosmetic.Value
-            }
+        task.spawn(function()
+            -- Wait a moment for UI to load
+            task.wait(0.5)
             
-            if not UnlockedCosmetics[id] then
-                -- Unlock using safe methods (no remote hooking)
-                local success = pcall(function()
-                    -- Modify player data
-                    local playerData = Player:FindFirstChild("PlayerData") 
-                                      or Player:FindFirstChild("Data")
-                    if playerData then
-                        local folder = Instance.new("Folder")
-                        folder.Name = "Cosmetic_" .. id
-                        folder.Parent = playerData
-                    end
-                    
-                    -- Update UI
-                    task.spawn(ClientSideUnlock, cosmeticData)
-                end)
+            -- Unlock everything
+            local unlocked = FindAndUnlockAllCosmetics()
+            
+            if unlocked > 0 then
+                UnlockBtn.Text = "✅ UNLOCKED!"
+                UnlockBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 80)
+                Status.Text = "Unlocked " .. unlocked .. " items!\nAll wraps, kits, wheels, etc. are now FREE."
                 
-                if success then
-                    UnlockedCosmetics[id] = true
-                    unlocked = unlocked + 1
-                    
-                    -- Update progress
-                    local progress = unlocked / totalCosmetics
-                    ProgressBar:TweenSize(
-                        UDim2.new(progress, 0, 1, 0),
-                        Enum.EasingDirection.Out,
-                        Enum.EasingStyle.Quad,
-                        0.1,
-                        true
-                    )
-                    
-                    ProgressText.Text = unlocked .. "/" .. totalCosmetics .. " unlocked"
-                    StatusLabel.Text = "Unlocking: " .. cosmeticData.Name
-                end
+                -- Success sound
+                local sound = Instance.new("Sound")
+                sound.SoundId = "rbxassetid://4590662766"
+                sound.Volume = 0.2
+                sound.Parent = ScreenGui
+                sound:Play()
+                game:GetService("Debris"):AddItem(sound, 3)
+            else
+                UnlockBtn.Text = "🔓 UNLOCK ALL ITEMS"
+                UnlockBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+                Status.Text = "No items found!\nMake sure:\n1. Shop is open\n2. On customization tab\n3. Try scrolling"
             end
-            
-            task.wait(0.02)
-        end
-        
-        -- Completion
-        UnlockButton.Text = "✅ UNLOCKED!"
-        UnlockButton.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
-        StatusLabel.Text = "Successfully unlocked " .. unlocked .. " cosmetics!\nOpen the shop to see them all."
-        
-        -- Play success sound
-        local sound = Instance.new("Sound")
-        sound.SoundId = "rbxassetid://4590662766"
-        sound.Volume = 0.3
-        sound.Parent = MainFrame
-        sound:Play()
-        game:GetService("Debris"):AddItem(sound, 3)
-        
-        -- Save unlocks to file
-        pcall(function()
-            local data = {
-                unlocked = unlocked,
-                total = totalCosmetics,
-                timestamp = os.time(),
-                player = Player.Name
-            }
-            writefile("cosmetic_unlocks.txt", 
-                "Unlocked " .. unlocked .. "/" .. totalCosmetics .. " cosmetics\n" ..
-                "Player: " .. Player.Name .. "\n" ..
-                "Time: " .. os.date("%Y-%m-%d %H:%M:%S")
-            )
         end)
     end
     
-    -- Button events
-    UnlockButton.MouseButton1Click:Connect(StartUnlockProcess)
+    -- Auto-toggle function
+    local function ToggleAuto()
+        autoEnabled = not autoEnabled
+        
+        if autoEnabled then
+            AutoBtn.Text = "⏰ AUTO: ON"
+            AutoBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
+            Status.Text = "Auto-unlock enabled!\nItems will unlock automatically."
+            
+            -- Setup auto-unlock
+            SetupAutoUnlock()
+            
+            -- Unlock once now
+            task.wait(1)
+            PerformUnlock()
+        else
+            AutoBtn.Text = "⏰ AUTO: OFF"
+            AutoBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+            Status.Text = "Auto-unlock disabled"
+        end
+    end
     
-    CloseButton.MouseButton1Click:Connect(function()
+    -- Connect events
+    UnlockBtn.MouseButton1Click:Connect(PerformUnlock)
+    AutoBtn.MouseButton1Click:Connect(ToggleAuto)
+    CloseBtn.MouseButton1Click:Connect(function()
         ScreenGui:Destroy()
     end)
     
     -- Make draggable
     local dragging = false
-    local dragInput, dragStart, startPos
+    local dragStart, startPos
     
-    TopBar.InputBegan:Connect(function(input)
+    Title.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
             dragging = true
             dragStart = input.Position
@@ -539,14 +440,8 @@ local function CreateUnlockerUI()
         end
     end)
     
-    TopBar.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement then
-            dragInput = input
-        end
-    end)
-    
     game:GetService("UserInputService").InputChanged:Connect(function(input)
-        if dragging and input == dragInput then
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
             local delta = input.Position - dragStart
             MainFrame.Position = UDim2.new(
                 startPos.X.Scale,
@@ -560,16 +455,29 @@ local function CreateUnlockerUI()
     return ScreenGui
 end
 
--- ===== AUTO-START =====
+-- ===== MAIN EXECUTION =====
 print("=" .. string.rep("=", 50))
-print("🎨 SILENT COSMETIC UNLOCKER v2.0")
-print("Fixed for Knit services - No remote hooking")
+print("🎨 CAR CUSTOMIZATION UNLOCKER")
+print("=" .. string.rep("=", 50))
+print("TARGET ITEMS:")
+print("• Wraps / Paints / Colors")
+print("• Body Kits / Spoilers")
+print("• Wheels / Rims")
+print("• Underglows / Neons")
+print("• Exhausts / Hoods")
+print("• Window Tints / Stickers")
 print("=" .. string.rep("=", 50))
 
--- Create UI automatically
-task.wait(1)
-CreateUnlockerUI()
-
--- Optional: Auto-scan after UI creation
+-- Wait for game to fully load
 task.wait(2)
-print("[System] UI loaded. Click 'UNLOCK ALL COSMETICS' to begin.")
+
+-- Create UI
+CreateControlUI()
+
+-- Try to detect and unlock if shop is already open
+task.wait(3)
+print("[System] UI ready! Open car customization and click UNLOCK.")
+
+-- Auto-attempt after 10 seconds
+task.wait(10)
+print("[Tip] If shop is open, click the UNLOCK button in the top-right panel!")
