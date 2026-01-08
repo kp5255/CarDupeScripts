@@ -1,560 +1,453 @@
--- 🏎️ CAR DEALERSHIP UNLOCKER - DRAGABLE UI
--- Fixed version with dragable interface
+-- 🔓 ACCESS HIDDEN CDT COMMANDS
+-- Activates the existing CMDR system in Car Dealership Tycoon
 
 local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Player = Players.LocalPlayer
 
--- Wait for game
 repeat task.wait() until game:IsLoaded()
 task.wait(2)
 
-print("🚗 CAR UNLOCKER LOADED")
+print("🔓 CDT CMDR ACCESS SCRIPT")
 
--- ===== FIND ALL ITEMS =====
-local function FindAllItems()
-    print("🔍 Scanning for items...")
+-- ===== FIND EXISTING CMDR SYSTEM =====
+local function FindExistingCMDR()
+    print("🔍 Searching for existing CMDR system...")
     
-    local items = {}
-    local PlayerGui = Player:WaitForChild("PlayerGui")
+    -- Common places where CMDR might be hidden
+    local possibleLocations = {
+        Player.PlayerGui,
+        game:GetService("StarterGui"),
+        game:GetService("ReplicatedStorage"),
+        game:GetService("Workspace"),
+        game:GetService("ServerScriptService"),
+        game:GetService("StarterPack"),
+        game:GetService("StarterPlayer"):WaitForChild("StarterPlayerScripts")
+    }
     
-    -- Look for cosmetic buttons
-    for _, obj in pairs(PlayerGui:GetDescendants()) do
-        if obj:IsA("TextButton") then
-            local text = obj.Text:lower()
-            local name = obj.Name:lower()
-            
-            if text:find("buy") or text:find("purchase") 
-               or text:find("$") or name:find("wrap")
-               or name:find("kit") or name:find("wheel")
-               or name:find("neon") or name:find("paint") then
-                
-                table.insert(items, {
-                    button = obj,
-                    name = obj.Name,
-                    text = obj.Text,
-                    path = obj:GetFullName()
-                })
-            end
-        end
-    end
+    local foundCommands = {}
     
-    print("✅ Found " .. #items .. " items")
-    return items
-end
-
--- ===== FIND ALL REMOTES =====
-local function FindAllRemotes()
-    print("📡 Searching for remotes...")
-    
-    local remotes = {}
-    
-    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
-        if obj:IsA("RemoteFunction") or obj:IsA("RemoteEvent") then
-            table.insert(remotes, {
-                object = obj,
-                name = obj.Name,
-                type = obj.ClassName
-            })
-        end
-    end
-    
-    print("✅ Found " .. #remotes .. " remotes")
-    return remotes
-end
-
--- ===== TRY UNLOCK =====
-local function TryUnlock(items, remotes)
-    print("🔓 Attempting unlock...")
-    
-    local successCount = 0
-    
-    for _, item in ipairs(items) do
-        print("🔄 Trying: " .. item.name)
-        
-        for _, remote in ipairs(remotes) do
-            -- Try different formats
-            local formats = {
-                item.name,
-                {Item = item.name},
-                {Name = item.name},
-                {ItemId = item.name},
-                {id = item.name},
-                {product = item.name}
-            }
-            
-            for _, data in ipairs(formats) do
-                local success, result = pcall(function()
-                    if remote.type == "RemoteFunction" then
-                        return remote.object:InvokeServer(data)
-                    else
-                        remote.object:FireServer(data)
-                        return "FireServer called"
-                    end
-                end)
-                
-                if success then
-                    print("   ✅ Success with " .. remote.name)
-                    successCount = successCount + 1
+    for _, location in pairs(possibleLocations) do
+        if location then
+            -- Look for command-related objects
+            for _, obj in pairs(location:GetDescendants()) do
+                if obj:IsA("RemoteFunction") or obj:IsA("RemoteEvent") then
+                    local name = obj.Name:lower()
                     
-                    -- Update button
-                    if item.button:IsA("TextButton") then
-                        item.button.Text = "EQUIP"
-                        item.button.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+                    -- Check for command-related names
+                    if name:find("command") or name:find("cmdr") 
+                       or name:find("admin") or name:find("cheat")
+                       or name:find("unlock") or name:find("give") then
+                        
+                        table.insert(foundCommands, {
+                            object = obj,
+                            name = obj.Name,
+                            type = obj.ClassName,
+                            location = location.Name,
+                            path = obj:GetFullName()
+                        })
+                        print("✅ Found command object: " .. obj.Name .. " (" .. obj.ClassName .. ")")
                     end
-                    
-                    break
+                end
+                
+                -- Look for LocalScripts/ModuleScripts with command functions
+                if obj:IsA("LocalScript") or obj:IsA("ModuleScript") then
+                    local name = obj.Name:lower()
+                    if name:find("command") or name:find("cmdr") 
+                       or name:find("admin") or name:find("cheat") then
+                        
+                        print("📜 Found command script: " .. obj.Name)
+                        
+                        -- Try to get its source
+                        local success, source = pcall(function()
+                            if obj:IsA("ModuleScript") then
+                                local module = require(obj)
+                                return "Module loaded: " .. tostring(type(module))
+                            else
+                                return "LocalScript found"
+                            end
+                        end)
+                        
+                        if success then
+                            print("   " .. source)
+                        end
+                    end
                 end
             end
         end
     end
     
-    print("📊 Unlocked: " .. successCount .. "/" .. #items)
-    return successCount
+    return foundCommands
 end
 
--- ===== CREATE DRAGABLE UI =====
-local function CreateDragableUI()
-    local ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Name = "DragUnlockerUI"
-    ScreenGui.Parent = Player:WaitForChild("PlayerGui")
-    ScreenGui.ResetOnSpawn = false
+-- ===== ACTIVATE HIDDEN COMMANDS =====
+local function ActivateHiddenCommands(commands)
+    print("\n🔓 Attempting to activate hidden commands...")
     
-    -- Main Frame (Dragable)
+    -- Try common unlock commands
+    local unlockCommands = {
+        -- Give/unlock commands
+        "unlockall",
+        "unlockallcosmetics", 
+        "unlockallcars",
+        "giveall",
+        "giveallitems",
+        "giveallcosmetics",
+        "unlockwraps",
+        "unlockkits",
+        "unlockwheels",
+        
+        -- Money/currency commands
+        "givemoney",
+        "givemoney 999999",
+        "givecash",
+        "givecash 999999",
+        "addmoney 999999",
+        
+        -- Admin commands
+        "admin",
+        "admin unlockall",
+        "cheat",
+        "cheat unlockall",
+        
+        -- Specific item commands
+        "giveitem all",
+        "unlockitem all",
+        "purchaseall",
+        "buyall"
+    }
+    
+    for _, command in ipairs(commands) do
+        print("\n🔄 Testing command object: " .. command.name)
+        
+        -- Try different command formats
+        local testData = {
+            -- Just command name
+            command.name,
+            
+            -- With unlock parameter
+            {command = "unlockall"},
+            {cmd = "unlockall"},
+            {action = "unlockall"},
+            
+            -- With specific parameters
+            {Command = "unlockall", Player = Player},
+            {Cmd = "unlockall", User = Player},
+            
+            -- Simple unlock
+            "unlockall",
+            "unlock all",
+            "unlockallcosmetics",
+            
+            -- Give commands
+            "giveall",
+            "give all",
+            "giveallitems",
+            
+            -- With player reference
+            {UnlockAll = true, Player = Player},
+            {GiveAll = true, Player = Player}
+        }
+        
+        for i, data in ipairs(testData) do
+            print("   Trying format " .. i)
+            
+            local success, result = pcall(function()
+                if command.type == "RemoteFunction" then
+                    return command.object:InvokeServer(data)
+                else
+                    command.object:FireServer(data)
+                    return "FireServer called"
+                end
+            end)
+            
+            if success then
+                print("   ✅ Success! Result: " .. tostring(result))
+            else
+                -- Don't spam errors
+                if i == 1 then
+                    print("   ❌ Failed: " .. tostring(result))
+                end
+            end
+            
+            task.wait(0.05)
+        end
+    end
+end
+
+-- ===== SEND DIRECT COMMANDS =====
+local function SendDirectCommand(commandText)
+    print("\n📡 Sending command: " .. commandText)
+    
+    -- Look for a command remote
+    local foundRemotes = FindExistingCMDR()
+    
+    if #foundRemotes == 0 then
+        print("❌ No command system found")
+        return false
+    end
+    
+    -- Try each remote with the command
+    for _, remote in ipairs(foundRemotes) do
+        print("🔄 Trying with: " .. remote.name)
+        
+        local formats = {
+            commandText,
+            {command = commandText},
+            {cmd = commandText},
+            {text = commandText},
+            {Command = commandText},
+            {Cmd = commandText}
+        }
+        
+        for i, data in ipairs(formats) do
+            local success, result = pcall(function()
+                if remote.type == "RemoteFunction" then
+                    return remote.object:InvokeServer(data)
+                else
+                    remote.object:FireServer(data)
+                    return "FireServer called"
+                end
+            end)
+            
+            if success then
+                print("   ✅ Format " .. i .. " - Success: " .. tostring(result))
+                return true
+            end
+        end
+    end
+    
+    print("❌ Command failed")
+    return false
+end
+
+-- ===== CREATE COMMAND INTERFACE =====
+local function CreateCommandInterface()
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "CDTCommandAccess"
+    ScreenGui.Parent = Player:WaitForChild("PlayerGui")
+    
     local MainFrame = Instance.new("Frame")
-    MainFrame.Size = UDim2.new(0, 400, 0, 450)
-    MainFrame.Position = UDim2.new(0.5, -200, 0.5, -225)
-    MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
+    MainFrame.Size = UDim2.new(0, 500, 0, 400)
+    MainFrame.Position = UDim2.new(0.5, -250, 0.5, -200)
+    MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 35)
     MainFrame.Active = true
     MainFrame.Draggable = true
     
-    -- Title Bar (Drag handle)
-    local TitleBar = Instance.new("Frame")
-    TitleBar.Size = UDim2.new(1, 0, 0, 40)
-    TitleBar.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
-    TitleBar.BorderSizePixel = 0
-    
     local Title = Instance.new("TextLabel")
-    Title.Text = "🚗 DRAGABLE UNLOCKER"
-    Title.Size = UDim2.new(1, -40, 1, 0)
-    Title.Position = UDim2.new(0, 10, 0, 0)
-    Title.BackgroundTransparency = 1
+    Title.Text = "🔓 CDT HIDDEN COMMAND ACCESS"
+    Title.Size = UDim2.new(1, 0, 0, 40)
+    Title.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
     Title.TextColor3 = Color3.fromRGB(255, 255, 255)
     Title.Font = Enum.Font.GothamBold
-    Title.TextSize = 16
     
-    local CloseBtn = Instance.new("TextButton")
-    CloseBtn.Text = "✕"
-    CloseBtn.Size = UDim2.new(0, 30, 0, 30)
-    CloseBtn.Position = UDim2.new(1, -35, 0, 5)
-    CloseBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-    CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    CloseBtn.Font = Enum.Font.GothamBold
+    local Status = Instance.new("TextLabel")
+    Status.Text = "Status: Ready\n"
+    Status.Size = UDim2.new(1, -20, 0, 200)
+    Status.Position = UDim2.new(0, 10, 0, 50)
+    Status.BackgroundTransparency = 1
+    Status.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Status.TextWrapped = true
+    Status.TextXAlignment = Enum.TextXAlignment.Left
     
-    -- Status Display
-    local StatusFrame = Instance.new("ScrollingFrame")
-    StatusFrame.Size = UDim2.new(1, -20, 0, 250)
-    StatusFrame.Position = UDim2.new(0, 10, 0, 50)
-    StatusFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
-    StatusFrame.ScrollBarThickness = 6
-    StatusFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+    -- Command Input
+    local CommandBox = Instance.new("TextBox")
+    CommandBox.PlaceholderText = "Type command here (e.g., unlockall)"
+    CommandBox.Size = UDim2.new(1, -20, 0, 30)
+    CommandBox.Position = UDim2.new(0, 10, 0, 260)
+    CommandBox.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
+    CommandBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+    CommandBox.Font = Enum.Font.Code
     
-    local StatusLabel = Instance.new("TextLabel")
-    StatusLabel.Name = "StatusLabel"
-    StatusLabel.Text = "DRAGABLE UNLOCKER READY\n" .. string.rep("=", 40) .. "\n"
-    StatusLabel.Size = UDim2.new(1, -10, 0, 0)
-    StatusLabel.Position = UDim2.new(0, 5, 0, 5)
-    StatusLabel.BackgroundTransparency = 1
-    StatusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    StatusLabel.Font = Enum.Font.Code
-    StatusLabel.TextSize = 12
-    StatusLabel.TextXAlignment = Enum.TextXAlignment.Left
-    StatusLabel.TextYAlignment = Enum.TextYAlignment.Top
-    StatusLabel.TextWrapped = true
-    StatusLabel.AutomaticSize = Enum.AutomaticSize.Y
+    local SendBtn = Instance.new("TextButton")
+    SendBtn.Text = "🚀 SEND COMMAND"
+    SendBtn.Size = UDim2.new(1, -20, 0, 30)
+    SendBtn.Position = UDim2.new(0, 10, 0, 300)
+    SendBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
+    SendBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    SendBtn.Font = Enum.Font.GothamBold
     
-    -- Control Panel
-    local ControlFrame = Instance.new("Frame")
-    ControlFrame.Size = UDim2.new(1, -20, 0, 140)
-    ControlFrame.Position = UDim2.new(0, 10, 0, 310)
-    ControlFrame.BackgroundTransparency = 1
-    
-    -- Buttons
-    local ScanBtn = Instance.new("TextButton")
-    ScanBtn.Name = "ScanBtn"
-    ScanBtn.Text = "🔍 SCAN ITEMS"
-    ScanBtn.Size = UDim2.new(1, 0, 0, 35)
-    ScanBtn.Position = UDim2.new(0, 0, 0, 0)
-    ScanBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
-    ScanBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    ScanBtn.Font = Enum.Font.GothamBold
+    -- Quick Command Buttons
+    local QuickFrame = Instance.new("Frame")
+    QuickFrame.Size = UDim2.new(1, -20, 0, 60)
+    QuickFrame.Position = UDim2.new(0, 10, 0, 340)
+    QuickFrame.BackgroundTransparency = 1
     
     local UnlockBtn = Instance.new("TextButton")
-    UnlockBtn.Name = "UnlockBtn"
     UnlockBtn.Text = "🔓 UNLOCK ALL"
-    UnlockBtn.Size = UDim2.new(1, 0, 0, 35)
-    UnlockBtn.Position = UDim2.new(0, 0, 0, 45)
-    UnlockBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
+    UnlockBtn.Size = UDim2.new(0.48, 0, 0, 25)
+    UnlockBtn.Position = UDim2.new(0, 0, 0, 0)
+    UnlockBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
     UnlockBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    UnlockBtn.Font = Enum.Font.GothamBold
-    UnlockBtn.Visible = false
+    UnlockBtn.Font = Enum.Font.Gotham
     
-    local VisualBtn = Instance.new("TextButton")
-    VisualBtn.Name = "VisualBtn"
-    VisualBtn.Text = "🎨 VISUAL MODE"
-    VisualBtn.Size = UDim2.new(1, 0, 0, 35)
-    VisualBtn.Position = UDim2.new(0, 0, 0, 90)
-    VisualBtn.BackgroundColor3 = Color3.fromRGB(200, 100, 0)
-    VisualBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    VisualBtn.Font = Enum.Font.GothamBold
+    local MoneyBtn = Instance.new("TextButton")
+    MoneyBtn.Text = "💰 GIVE MONEY"
+    MoneyBtn.Size = UDim2.new(0.48, 0, 0, 25)
+    MoneyBtn.Position = UDim2.new(0.52, 0, 0, 0)
+    MoneyBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
+    MoneyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    MoneyBtn.Font = Enum.Font.Gotham
     
-    -- Progress Bar
-    local ProgressFrame = Instance.new("Frame")
-    ProgressFrame.Size = UDim2.new(1, -20, 0, 20)
-    ProgressFrame.Position = UDim2.new(0, 10, 0, 460)
-    ProgressFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
+    local CarsBtn = Instance.new("TextButton")
+    CarsBtn.Text = "🚗 UNLOCK CARS"
+    CarsBtn.Size = UDim2.new(0.48, 0, 0, 25)
+    CarsBtn.Position = UDim2.new(0, 0, 0, 35)
+    CarsBtn.BackgroundColor3 = Color3.fromRGB(200, 100, 0)
+    CarsBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    CarsBtn.Font = Enum.Font.Gotham
     
-    local ProgressBar = Instance.new("Frame")
-    ProgressBar.Name = "ProgressBar"
-    ProgressBar.Size = UDim2.new(0, 0, 1, 0)
-    ProgressBar.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
-    ProgressBar.BorderSizePixel = 0
+    local CosmeticsBtn = Instance.new("TextButton")
+    CosmeticsBtn.Text = "🎨 UNLOCK COSMETICS"
+    CosmeticsBtn.Size = UDim2.new(0.48, 0, 0, 25)
+    CosmeticsBtn.Position = UDim2.new(0.52, 0, 0, 35)
+    CosmeticsBtn.BackgroundColor3 = Color3.fromRGB(150, 0, 200)
+    CosmeticsBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    CosmeticsBtn.Font = Enum.Font.Gotham
     
     -- Add corners
-    local function AddCorner(obj, radius)
-        local corner = Instance.new("UICorner")
-        corner.CornerRadius = UDim.new(0, radius or 8)
-        corner.Parent = obj
-        return corner
-    end
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
     
-    AddCorner(MainFrame, 10)
-    AddCorner(TitleBar, 10)
-    AddCorner(CloseBtn, 6)
-    AddCorner(StatusFrame, 8)
-    AddCorner(ScanBtn)
-    AddCorner(UnlockBtn)
-    AddCorner(VisualBtn)
-    AddCorner(ProgressFrame, 10)
-    AddCorner(ProgressBar, 10)
+    corner:Clone().Parent = MainFrame
+    corner:Clone().Parent = Title
+    corner:Clone().Parent = CommandBox
+    corner:Clone().Parent = SendBtn
+    corner:Clone().Parent = UnlockBtn
+    corner:Clone().Parent = MoneyBtn
+    corner:Clone().Parent = CarsBtn
+    corner:Clone().Parent = CosmeticsBtn
     
-    -- Add stroke to main frame
-    local Stroke = Instance.new("UIStroke")
-    Stroke.Color = Color3.fromRGB(0, 150, 255)
-    Stroke.Thickness = 2
-    Stroke.Parent = MainFrame
+    -- Parent
+    Title.Parent = MainFrame
+    Status.Parent = MainFrame
+    CommandBox.Parent = MainFrame
+    SendBtn.Parent = MainFrame
+    QuickFrame.Parent = MainFrame
     
-    -- Parent everything
-    StatusLabel.Parent = StatusFrame
-    ProgressBar.Parent = ProgressFrame
-    
-    Title.Parent = TitleBar
-    CloseBtn.Parent = TitleBar
-    TitleBar.Parent = MainFrame
-    StatusFrame.Parent = MainFrame
-    ControlFrame.Parent = MainFrame
-    ProgressFrame.Parent = MainFrame
-    
-    ScanBtn.Parent = ControlFrame
-    UnlockBtn.Parent = ControlFrame
-    VisualBtn.Parent = ControlFrame
+    UnlockBtn.Parent = QuickFrame
+    MoneyBtn.Parent = QuickFrame
+    CarsBtn.Parent = QuickFrame
+    CosmeticsBtn.Parent = QuickFrame
     
     MainFrame.Parent = ScreenGui
     
-    -- Variables
-    local foundItems = {}
-    local foundRemotes = {}
-    local isProcessing = false
-    
-    -- Update status function
-    local function UpdateStatus(text, color)
-        color = color or Color3.fromRGB(255, 255, 255)
-        StatusLabel.Text = StatusLabel.Text .. text .. "\n"
-        StatusFrame.CanvasSize = UDim2.new(0, 0, 0, StatusLabel.TextBounds.Y + 20)
-        StatusFrame.CanvasPosition = Vector2.new(0, StatusLabel.TextBounds.Y)
-        
-        -- Also print to console
-        print(text)
+    -- Update status
+    local function updateStatus(text)
+        Status.Text = Status.Text .. text .. "\n"
     end
     
-    local function ClearStatus()
-        StatusLabel.Text = ""
-    end
-    
-    -- Update progress bar
-    local function UpdateProgress(percent)
-        ProgressBar:TweenSize(
-            UDim2.new(percent / 100, 0, 1, 0),
-            Enum.EasingDirection.Out,
-            Enum.EasingStyle.Quad,
-            0.3,
-            true
-        )
-    end
-    
-    -- Scan function
-    ScanBtn.MouseButton1Click:Connect(function()
-        if isProcessing then return end
-        isProcessing = true
+    -- Send command
+    SendBtn.MouseButton1Click:Connect(function()
+        local cmd = CommandBox.Text
+        if cmd == "" then return end
         
-        ScanBtn.Text = "SCANNING..."
-        ClearStatus()
-        UpdateStatus("🔍 Scanning for items...", Color3.fromRGB(255, 200, 0))
-        UpdateProgress(25)
+        SendBtn.Text = "SENDING..."
+        updateStatus("\n> " .. cmd)
         
-        task.wait(0.5)
+        local success = SendDirectCommand(cmd)
         
-        -- Find items
-        UpdateStatus("Looking for cosmetic items...")
-        foundItems = FindAllItems()
-        UpdateProgress(50)
-        
-        task.wait(0.5)
-        
-        -- Find remotes
-        UpdateStatus("Looking for remotes...")
-        foundRemotes = FindAllRemotes()
-        UpdateProgress(75)
-        
-        task.wait(0.5)
-        
-        if #foundItems > 0 and #foundRemotes > 0 then
-            UpdateStatus("✅ Found " .. #foundItems .. " items", Color3.fromRGB(0, 255, 0))
-            UpdateStatus("✅ Found " .. #foundRemotes .. " remotes", Color3.fromRGB(0, 255, 0))
-            UpdateStatus("\n🎯 Ready to unlock!", Color3.fromRGB(200, 220, 255))
-            
-            UnlockBtn.Visible = true
-            UnlockBtn.Text = "🔓 UNLOCK " .. #foundItems .. " ITEMS"
-            ScanBtn.Text = "✅ SCAN COMPLETE"
-            ScanBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+        if success then
+            updateStatus("✅ Command sent successfully")
+            SendBtn.Text = "✅ COMMAND SENT"
+            SendBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
         else
-            UpdateStatus("❌ Scan incomplete", Color3.fromRGB(255, 100, 100))
-            UpdateStatus("Items: " .. #foundItems, Color3.fromRGB(255, 200, 100))
-            UpdateStatus("Remotes: " .. #foundRemotes, Color3.fromRGB(255, 200, 100))
-            UpdateStatus("\n💡 Open the car shop first!", Color3.fromRGB(255, 255, 200))
-            
-            ScanBtn.Text = "🔍 SCAN ITEMS"
-            ScanBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+            updateStatus("❌ Command failed")
+            SendBtn.Text = "❌ FAILED"
+            SendBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
         end
         
-        UpdateProgress(100)
-        isProcessing = false
+        task.wait(1)
+        SendBtn.Text = "🚀 SEND COMMAND"
+        SendBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
     end)
     
-    -- Unlock function
+    -- Enter key to send
+    CommandBox.FocusLost:Connect(function(enterPressed)
+        if enterPressed then
+            SendBtn:Click()
+        end
+    end)
+    
+    -- Quick buttons
     UnlockBtn.MouseButton1Click:Connect(function()
-        if isProcessing then return end
-        if #foundItems == 0 then
-            UpdateStatus("❌ Scan first!", Color3.fromRGB(255, 100, 100))
-            return
-        end
-        
-        isProcessing = true
-        UnlockBtn.Text = "UNLOCKING..."
-        ClearStatus()
-        UpdateStatus("🔓 Attempting unlock...", Color3.fromRGB(255, 200, 0))
-        UpdateProgress(0)
-        
-        local totalItems = #foundItems
-        local unlocked = 0
-        
-        for i, item in ipairs(foundItems) do
-            UpdateStatus("Processing: " .. item.name .. " (" .. i .. "/" .. totalItems .. ")")
-            
-            -- Try to unlock this item
-            for _, remote in ipairs(foundRemotes) do
-                local formats = {
-                    item.name,
-                    {Item = item.name},
-                    {Name = item.name},
-                    {ItemId = item.name}
-                }
-                
-                for _, data in ipairs(formats) do
-                    local success, result = pcall(function()
-                        if remote.type == "RemoteFunction" then
-                            return remote.object:InvokeServer(data)
-                        else
-                            remote.object:FireServer(data)
-                            return "FireServer called"
-                        end
-                    })
-                    
-                    if success then
-                        UpdateStatus("   ✅ Success with " .. remote.name, Color3.fromRGB(0, 255, 0))
-                        unlocked = unlocked + 1
-                        
-                        -- Update button
-                        if item.button:IsA("TextButton") then
-                            item.button.Text = "EQUIP"
-                            item.button.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
-                        end
-                        
-                        break
-                    end
-                end
-            end
-            
-            -- Update progress
-            local progress = (i / totalItems) * 100
-            UpdateProgress(progress)
-            task.wait(0.1)
-        end
-        
-        UpdateStatus("\n📊 UNLOCK RESULTS:", Color3.fromRGB(200, 220, 255))
-        UpdateStatus("Successfully unlocked: " .. unlocked .. "/" .. totalItems, Color3.fromRGB(0, 255, 0))
-        
-        if unlocked > 0 then
-            UpdateStatus("🎉 Some items may be unlocked!", Color3.fromRGB(0, 255, 0))
-            UpdateStatus("💡 Check if buttons say 'EQUIP'", Color3.fromRGB(200, 255, 200))
-            
-            UnlockBtn.Text = "✅ " .. unlocked .. " UNLOCKED"
-            UnlockBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
-        else
-            UpdateStatus("❌ No items unlocked", Color3.fromRGB(255, 100, 100))
-            UpdateStatus("💡 Try visual mode instead", Color3.fromRGB(255, 200, 100))
-            
-            UnlockBtn.Text = "🔓 UNLOCK ALL"
-        end
-        
-        UpdateProgress(100)
-        isProcessing = false
+        CommandBox.Text = "unlockall"
+        SendBtn:Click()
     end)
     
-    -- Visual mode function
-    VisualBtn.MouseButton1Click:Connect(function()
-        if isProcessing then return end
-        isProcessing = true
-        
-        VisualBtn.Text = "MODIFYING..."
-        ClearStatus()
-        UpdateStatus("🎨 Applying visual modifications...", Color3.fromRGB(255, 200, 0))
-        UpdateProgress(0)
-        
-        local modified = 0
-        local PlayerGui = Player:WaitForChild("PlayerGui")
-        
-        -- Find and modify all buy buttons
-        for _, obj in pairs(PlayerGui:GetDescendants()) do
-            if obj:IsA("TextButton") then
-                local text = obj.Text:lower()
-                if text:find("buy") or text:find("purchase") 
-                   or text:find("$") or text:find("%d%d%d") then
-                    
-                    obj.Text = "EQUIP"
-                    obj.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
-                    obj.TextColor3 = Color3.fromRGB(255, 255, 255)
-                    modified = modified + 1
-                end
-            elseif obj:IsA("TextLabel") then
-                local text = obj.Text:lower()
-                if text:find("locked") or text:find("not owned") then
-                    obj.Text = "UNLOCKED"
-                    obj.TextColor3 = Color3.fromRGB(0, 255, 0)
-                    modified = modified + 1
-                end
-            end
-        end
-        
-        UpdateStatus("\n🛍️ VISUAL RESULTS:", Color3.fromRGB(200, 220, 255))
-        UpdateStatus("Modified elements: " .. modified, Color3.fromRGB(255, 255, 200))
-        
-        if modified > 0 then
-            UpdateStatus("✅ Shop should now show 'EQUIP' buttons", Color3.fromRGB(0, 255, 0))
-            UpdateStatus("💡 This is visual only - items aren't really unlocked", Color3.fromRGB(200, 200, 255))
-            
-            VisualBtn.Text = "✅ VISUAL DONE"
-            VisualBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
-        else
-            UpdateStatus("❌ No elements modified", Color3.fromRGB(255, 100, 100))
-            UpdateStatus("💡 Open the shop first!", Color3.fromRGB(255, 200, 100))
-            
-            VisualBtn.Text = "🎨 VISUAL MODE"
-        end
-        
-        UpdateProgress(100)
-        isProcessing = false
+    MoneyBtn.MouseButton1Click:Connect(function()
+        CommandBox.Text = "givemoney 999999"
+        SendBtn:Click()
     end)
     
-    -- Close button
-    CloseBtn.MouseButton1Click:Connect(function()
-        ScreenGui:Destroy()
+    CarsBtn.MouseButton1Click:Connect(function()
+        CommandBox.Text = "unlockallcars"
+        SendBtn:Click()
     end)
     
-    -- Minimize on title bar click (optional)
-    local isMinimized = false
-    TitleBar.MouseButton1Click:Connect(function()
-        if not isMinimized then
-            StatusFrame.Visible = false
-            ControlFrame.Visible = false
-            ProgressFrame.Visible = false
-            MainFrame.Size = UDim2.new(0, 400, 0, 40)
-            isMinimized = true
-        else
-            StatusFrame.Visible = true
-            ControlFrame.Visible = true
-            ProgressFrame.Visible = true
-            MainFrame.Size = UDim2.new(0, 400, 0, 450)
-            isMinimized = false
-        end
+    CosmeticsBtn.MouseButton1Click:Connect(function()
+        CommandBox.Text = "unlockallcosmetics"
+        SendBtn:Click()
     end)
     
-    -- Initial message
-    ClearStatus()
-    UpdateStatus("🚗 DRAGABLE CAR UNLOCKER", Color3.fromRGB(0, 200, 255))
-    UpdateStatus(string.rep("=", 40), Color3.fromRGB(100, 100, 100))
-    UpdateStatus("DRAG the title bar to move window", Color3.fromRGB(255, 255, 200))
-    UpdateStatus("Click title bar to minimize/maximize", Color3.fromRGB(255, 255, 200))
-    UpdateStatus(string.rep("=", 40), Color3.fromRGB(100, 100, 100))
-    UpdateStatus("INSTRUCTIONS:", Color3.fromRGB(200, 220, 255))
-    UpdateStatus("1. Open car customization shop", Color3.fromRGB(255, 255, 200))
-    UpdateStatus("2. Browse wraps/kits/wheels", Color3.fromRGB(255, 255, 200))
-    UpdateStatus("3. Click SCAN ITEMS", Color3.fromRGB(255, 255, 200))
-    UpdateStatus("4. Click UNLOCK ALL", Color3.fromRGB(255, 255, 200))
-    UpdateStatus("5. Use VISUAL MODE for UI changes", Color3.fromRGB(255, 255, 200))
-    UpdateStatus(string.rep("=", 40), Color3.fromRGB(100, 100, 100))
+    -- Initial scan
+    updateStatus("🔍 Scanning for CDT command system...")
     
-    -- Auto-scan after 3 seconds
-    task.wait(3)
-    UpdateStatus("\n⏰ Auto-scanning in 2 seconds...", Color3.fromRGB(255, 200, 0))
-    task.wait(2)
+    local commands = FindExistingCMDR()
     
-    ScanBtn.Text = "SCANNING..."
-    ClearStatus()
-    UpdateStatus("🔍 Auto-scanning...", Color3.fromRGB(255, 200, 0))
-    
-    foundItems = FindAllItems()
-    foundRemotes = FindAllRemotes()
-    
-    if #foundItems > 0 and #foundRemotes > 0 then
-        UpdateStatus("✅ Auto-found " .. #foundItems .. " items", Color3.fromRGB(0, 255, 0))
-        UpdateStatus("✅ Auto-found " .. #foundRemotes .. " remotes", Color3.fromRGB(0, 255, 0))
-        UpdateStatus("💡 Click UNLOCK ALL to try", Color3.fromRGB(200, 220, 255))
-        
-        UnlockBtn.Visible = true
-        UnlockBtn.Text = "🔓 UNLOCK " .. #foundItems .. " ITEMS"
-        ScanBtn.Text = "✅ AUTO-SCANNED"
-        ScanBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+    if #commands > 0 then
+        updateStatus("✅ Found " .. #commands .. " command objects")
+        updateStatus("\n🎮 READY TO SEND COMMANDS")
+        updateStatus("Try commands like:")
+        updateStatus("  unlockall")
+        updateStatus("  givemoney 999999")
+        updateStatus("  unlockallcosmetics")
+        updateStatus("  giveall")
     else
-        UpdateStatus("❌ Auto-scan found nothing", Color3.fromRGB(255, 100, 100))
-        UpdateStatus("💡 Open the shop and click SCAN", Color3.fromRGB(255, 200, 100))
-        
-        ScanBtn.Text = "🔍 SCAN ITEMS"
+        updateStatus("❌ No command system found")
+        updateStatus("CDT may have removed it")
     end
     
     return ScreenGui
 end
 
--- ===== MAIN =====
-print("\n" .. string.rep("=", 60))
-print("🚗 DRAGABLE CAR UNLOCKER v1.0")
-print(string.rep("=", 60))
+-- ===== AUTO-ACTIVATE =====
+print("\n🎮 INITIALIZING CDT COMMAND ACCESS...")
+task.wait(1)
 
+CreateCommandInterface()
+
+-- Auto-scan for commands
 task.wait(2)
-CreateDragableUI()
+print("\n🔍 Auto-scanning for commands...")
+local foundCommands = FindExistingCMDR()
 
-print("\n✅ UI Created Successfully!")
-print("📍 Look for the dragable window in-game")
-print("🎯 Drag the title bar to move it")
-print("💡 Follow the instructions in the UI")
+if #foundCommands > 0 then
+    print("✅ Found " .. #foundCommands .. " command objects")
+    print("💡 Try typing commands in the UI")
+    
+    -- Try common commands automatically
+    task.wait(3)
+    print("\n🔄 Trying common unlock commands...")
+    
+    local commonCommands = {
+        "unlockall",
+        "givemoney 999999",
+        "unlockallcosmetics",
+        "giveall"
+    }
+    
+    for _, cmd in ipairs(commonCommands) do
+        print("Trying: " .. cmd)
+        SendDirectCommand(cmd)
+        task.wait(1)
+    end
+else
+    print("❌ No command system found")
+    print("💡 The game may have patched it")
+end
+
+print("\n" .. string.rep("=", 60))
+print("🎮 CDT COMMAND ACCESS READY")
+print("📍 Look for the command window")
+print("💡 Try commands like: unlockall, givemoney 999999")
 print(string.rep("=", 60))
