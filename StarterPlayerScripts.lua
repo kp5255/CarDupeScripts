@@ -1,50 +1,88 @@
--- FINAL FIXED TRADE DUPE
+-- UNIVERSAL TRADE DUPE SCRIPT
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
--- Get trading remotes
-local TradingRemotes = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Services"):WaitForChild("TradingServiceRemotes")
-local SessionSetConfirmation = TradingRemotes:WaitForChild("SessionSetConfirmation")
-local OnSessionItemsUpdated = TradingRemotes:WaitForChild("OnSessionItemsUpdated")
-local OnSessionCountdownUpdated = TradingRemotes:WaitForChild("OnSessionCountdownUpdated")
+print("🔍 Searching for ALL trading remotes...")
 
--- Variables
-local ItemToDupe = nil
-local CountdownTime = 0
-local HookInstalled = false
-
--- Track items
-OnSessionItemsUpdated.OnClientEvent:Connect(function(data)
-    if data and data.Player == LocalPlayer then
-        if data.Items and #data.Items > 0 then
-            ItemToDupe = data.Items[1].Id
-            print("✅ Car ID:", ItemToDupe)
+-- Find ALL remotes in the entire game that might be trading related
+local allRemotes = {}
+local function collectRemotes(parent, path)
+    for _, child in pairs(parent:GetChildren()) do
+        local fullPath = path .. "." .. child.Name
+        
+        if child:IsA("RemoteFunction") or child:IsA("RemoteEvent") then
+            -- Check if it might be trading related
+            local nameLower = child.Name:lower()
+            if nameLower:find("trade") or 
+               nameLower:find("session") or 
+               nameLower:find("confirm") or
+               nameLower:find("accept") or
+               nameLower:find("cancel") then
+                allRemotes[fullPath] = child
+                print("Found: " .. fullPath .. " (" .. child.ClassName .. ")")
+            end
+        end
+        
+        -- Recursively search
+        if #child:GetChildren() > 0 then
+            collectRemotes(child, fullPath)
         end
     end
-end)
+end
 
--- Track countdown
-OnSessionCountdownUpdated.OnClientEvent:Connect(function(timeData)
-    if timeData and timeData.Time then
-        CountdownTime = timeData.Time
-        if CountdownTime > 0 then
-            print("⏰ Countdown:", CountdownTime .. "s")
-        end
-    end
-end)
+collectRemotes(game, "game")
 
--- INSTALL METATABLE HOOK (DO THIS FIRST)
-local function installMetatableHook()
-    if HookInstalled then
-        print("✅ Hook already installed")
-        return
+-- Also check common locations
+local commonPaths = {
+    ReplicatedStorage:WaitForChild("Remotes"),
+    ReplicatedStorage:WaitForChild("Events"),
+    ReplicatedStorage:WaitForChild("Network"),
+    ReplicatedStorage:WaitForChild("Trading"),
+    game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
+}
+
+for _, path in pairs(commonPaths) do
+    if path then
+        collectRemotes(path, path.Name)
     end
-    
-    print("🔧 Installing metatable hook...")
-    
-    local mt = getrawmetatable(game)
-    local oldNamecall = mt.__namecall
+end
+
+print("\n🎯 Found " .. #allRemotes .. " potential trading remotes")
+
+-- Try to find the main trade confirmation remote
+local mainTradeRemote = nil
+for path, remote in pairs(allRemotes) do
+    if remote.Name:lower():find("confirm") or remote.Name:lower():find("accept") then
+        mainTradeRemote = remote
+        print("🎯 Selected main remote: " .. path)
+        break
+    end
+end
+
+if not mainTradeRemote then
+    -- Just use the first remote found
+    for path, remote in pairs(allRemotes) do
+        mainTradeRemote = remote
+        print("⚠️ Using first remote: " .. path)
+        break
+    end
+end
+
+if not mainTradeRemote then
+    warn("❌ No trading remotes found!")
+    return
+end
+
+-- Install UNIVERSAL hook on ALL trading remotes
+print("\n🔧 Installing universal hook on ALL trading remotes...")
+
+local mt = getrawmetatable(game)
+local oldNamecall = mt.__namecall
+local hookInstalled = false
+
+local function installUniversalHook()
+    if hookInstalled then return end
     
     setreadonly(mt, false)
     
@@ -52,28 +90,70 @@ local function installMetatableHook()
         local method = getnamecallmethod()
         local args = {...}
         
-        -- Target SessionSetConfirmation RemoteFunction
-        if method == "InvokeServer" and self == SessionSetConfirmation then
-            print("[METATABLE HOOK] Intercepted:", args[1])
+        -- Check if this is ANY remote call
+        if method == "InvokeServer" or method == "FireServer" then
+            local remoteName = tostring(self)
             
-            -- If this is an accept (true)
-            if args[1] == true then
-                -- Send original accept
-                local result = oldNamecall(self, ...)
+            -- Check if it's a trading-related remote
+            if remoteName:lower():find("trade") or 
+               remoteName:lower():find("session") or
+               remoteName:lower():find("confirm") or
+               table.find(allRemotes, self) then
                 
-                -- Queue automatic cancel
-                spawn(function()
-                    wait(0.001)
-                    print("[METATABLE HOOK] Auto-cancelling...")
-                    for i = 1, 3 do
-                        pcall(function()
-                            oldNamecall(self, false)
-                        end)
+                print("[UNIVERSAL HOOK] " .. remoteName .. ":" .. method .. "(" .. tostring(args[1]) .. ")")
+                
+                -- If this looks like an accept (true or "accept")
+                local isAccept = false
+                if args[1] == true then
+                    isAccept = true
+                elseif type(args[1]) == "string" and args[1]:lower():find("accept") then
+                    isAccept = true
+                elseif type(args[1]) == "number" and args[1] == 1 then
+                    isAccept = true
+                end
+                
+                if isAccept then
+                    print("[UNIVERSAL HOOK] 🎯 ACCEPT DETECTED!")
+                    
+                    -- Send original
+                    local result = oldNamecall(self, ...)
+                    
+                    -- Queue auto-cancel
+                    spawn(function()
                         wait(0.001)
-                    end
-                end)
-                
-                return result
+                        
+                        -- Try different cancel methods
+                        if method == "InvokeServer" then
+                            -- Try false
+                            pcall(function()
+                                print("[UNIVERSAL HOOK] Sending cancel (false)")
+                                oldNamecall(self, false)
+                            end)
+                            
+                            -- Try 0
+                            pcall(function()
+                                print("[UNIVERSAL HOOK] Sending cancel (0)")
+                                oldNamecall(self, 0)
+                            end)
+                            
+                            -- Try "cancel"
+                            pcall(function()
+                                print("[UNIVERSAL HOOK] Sending cancel (string)")
+                                oldNamecall(self, "cancel")
+                            end)
+                        else
+                            -- For FireServer, just try multiple times
+                            for i = 1, 3 do
+                                pcall(function()
+                                    oldNamecall(self, false)
+                                end)
+                                wait(0.001)
+                            end
+                        end
+                    end)
+                    
+                    return result
+                end
             end
         end
         
@@ -81,213 +161,162 @@ local function installMetatableHook()
     end)
     
     setreadonly(mt, true)
-    HookInstalled = true
-    print("✅ Metatable hook installed!")
+    hookInstalled = true
+    print("✅ UNIVERSAL HOOK INSTALLED!")
+    print("Will intercept ALL trading remote calls")
 end
 
--- SIMPLE DUPE FUNCTION
-local function simpleDupe()
-    if not ItemToDupe then
-        print("❌ Add car first")
-        return
-    end
-    
-    print("🚀 Starting dupe...")
-    print("Car:", ItemToDupe)
+-- Simple dupe function
+local function universalDupe()
+    print("\n🚀 UNIVERSAL DUPE STARTING...")
     
     -- Install hook if not already
-    if not HookInstalled then
-        installMetatableHook()
+    if not hookInstalled then
+        installUniversalHook()
     end
     
-    -- Accept trade (hook will auto-cancel)
-    print("Accepting trade...")
-    local success, result = pcall(function()
-        return SessionSetConfirmation:InvokeServer(true)
-    end)
+    -- Try to trigger trade with main remote
+    print("Attempting to trigger trade...")
     
-    if not success then
-        print("❌ Failed:", result)
-        return
+    -- Try different parameter combinations
+    local testParams = {true, false, 1, 0, "accept", "cancel", "trade", {}}
+    
+    for _, param in pairs(testParams) do
+        pcall(function()
+            if mainTradeRemote:IsA("RemoteFunction") then
+                print("Testing: " .. mainTradeRemote.Name .. ":InvokeServer(" .. tostring(param) .. ")")
+                mainTradeRemote:InvokeServer(param)
+            elseif mainTradeRemote:IsA("RemoteEvent") then
+                print("Testing: " .. mainTradeRemote.Name .. ":FireServer(" .. tostring(param) .. ")")
+                mainTradeRemote:FireServer(param)
+            end
+        end)
+        wait(0.5)
     end
     
-    -- Wait for countdown
-    print("Waiting for countdown...")
-    local waited = 0
-    while CountdownTime == 0 and waited < 50 do
-        wait(0.1)
-        waited = waited + 1
-    end
-    
-    if CountdownTime == 0 then
-        print("❌ No countdown - other player needs to accept")
-        return
-    end
-    
-    print("Countdown active:", CountdownTime .. "s")
-    
-    -- Wait for optimal timing
-    while CountdownTime > 0.3 do
-        wait(0.1)
-    end
-    
-    -- Send another accept to trigger hook again
-    print("🚨 Sending final accept at " .. CountdownTime .. "s")
-    pcall(function()
-        SessionSetConfirmation:InvokeServer(true)
-    end)
-    
-    print("✅ Dupe attempt complete!")
+    print("✅ Universal dupe attempt complete!")
+    print("Check your inventory!")
 end
 
--- MANUAL TRIGGER FUNCTION
-local function manualTrigger()
-    print("🎮 MANUAL TRIGGER")
+-- BRUTE FORCE ATTACK
+local function bruteForceAttack()
+    print("\n💥 BRUTE FORCE ATTACK")
     
-    if not HookInstalled then
-        installMetatableHook()
+    -- Install hook
+    if not hookInstalled then
+        installUniversalHook()
     end
     
-    -- Just send an accept to trigger the hook
-    pcall(function()
-        SessionSetConfirmation:InvokeServer(true)
-    end)
-    
-    print("✅ Trigger sent!")
-end
-
--- COUNTDOWN TRIGGER (for precise timing)
-local function countdownTrigger()
-    print("⏱️ COUNTDOWN TRIGGER")
-    
-    if not HookInstalled then
-        installMetatableHook()
-    end
-    
-    -- Wait for specific countdown times
-    local triggerTimes = {4.5, 4.0, 3.5, 3.0, 2.5, 2.0, 1.5, 1.0, 0.5, 0.4, 0.3, 0.2, 0.1}
-    
-    for _, triggerTime in pairs(triggerTimes) do
-        while CountdownTime > triggerTime do
-            wait(0.1)
+    -- Attack ALL found remotes
+    for path, remote in pairs(allRemotes) do
+        print("\nAttacking: " .. path)
+        
+        -- Send multiple packets to each remote
+        for i = 1, 10 do
+            spawn(function()
+                pcall(function()
+                    if remote:IsA("RemoteFunction") then
+                        remote:InvokeServer(true)
+                        remote:InvokeServer(false)
+                    elseif remote:IsA("RemoteEvent") then
+                        remote:FireServer(true)
+                        remote:FireServer(false)
+                    end
+                end)
+            end)
+            wait(0.01)
         end
         
-        print("🚨 Triggering at " .. CountdownTime .. "s")
-        pcall(function()
-            SessionSetConfirmation:InvokeServer(true)
-        end)
-        
-        wait(0.3) -- Wait between triggers
+        wait(0.5)
     end
     
-    print("✅ All triggers sent!")
+    print("✅ Brute force attack complete!")
 end
 
--- CREATE SIMPLE UI
+-- CREATE UI
 local gui = Instance.new("ScreenGui")
-gui.Name = "FinalDupe"
+gui.Name = "UniversalDupe"
 gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 150, 0, 120)
+frame.Size = UDim2.new(0, 180, 0, 140)
 frame.Position = UDim2.new(0, 20, 0, 100)
 frame.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-frame.BorderSizePixel = 2
-frame.BorderColor3 = Color3.new(0, 1, 0)
+frame.BorderSizePixel = 3
+frame.BorderColor3 = Color3.new(1, 0.5, 0)
 frame.Parent = gui
 
 local title = Instance.new("TextLabel")
-title.Text = "≡ FINAL DUPE"
-title.Size = UDim2.new(1, 0, 0, 20)
-title.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+title.Text = "🎯 UNIVERSAL DUPE"
+title.Size = UDim2.new(1, 0, 0, 25)
+title.BackgroundColor3 = Color3.fromRGB(200, 100, 0)
 title.TextColor3 = Color3.new(1, 1, 1)
+title.Font = Enum.Font.SourceSansBold
 title.Parent = frame
 
--- Status
-local status = Instance.new("TextLabel")
-status.Text = "Add car"
-status.Size = UDim2.new(1, 0, 0, 20)
-status.Position = UDim2.new(0, 0, 0.2, 0)
-status.TextColor3 = Color3.new(1, 1, 0)
-status.TextSize = 12
-status.Parent = frame
+-- Buttons
+local btnInstall = Instance.new("TextButton")
+btnInstall.Text = "🔧 INSTALL HOOK"
+btnInstall.Size = UDim2.new(0.9, 0, 0, 25)
+btnInstall.Position = UDim2.new(0.05, 0, 0.2, 0)
+btnInstall.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
+btnInstall.TextColor3 = Color3.new(1, 1, 1)
+btnInstall.Parent = frame
+btnInstall.MouseButton1Click:Connect(installUniversalHook)
 
--- Install Hook button
-local btnHook = Instance.new("TextButton")
-btnHook.Text = "🔧 INSTALL HOOK"
-btnHook.Size = UDim2.new(0.9, 0, 0, 25)
-btnHook.Position = UDim2.new(0.05, 0, 0.4, 0)
-btnHook.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
-btnHook.TextColor3 = Color3.new(1, 1, 1)
-btnHook.Parent = frame
-btnHook.MouseButton1Click:Connect(installMetatableHook)
-
--- Start Dupe button
 local btnDupe = Instance.new("TextButton")
 btnDupe.Text = "🚀 START DUPE"
 btnDupe.Size = UDim2.new(0.9, 0, 0, 25)
-btnDupe.Position = UDim2.new(0.05, 0, 0.7, 0)
+btnDupe.Position = UDim2.new(0.05, 0, 0.45, 0)
 btnDupe.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
 btnDupe.TextColor3 = Color3.new(1, 1, 1)
 btnDupe.Parent = frame
-btnDupe.MouseButton1Click:Connect(simpleDupe)
+btnDupe.MouseButton1Click:Connect(universalDupe)
 
--- Close
-local btnClose = Instance.new("TextButton")
-btnClose.Text = "X"
-btnClose.Size = UDim2.new(0, 20, 0, 20)
-btnClose.Position = UDim2.new(1, -20, 0, 0)
-btnClose.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-btnClose.TextColor3 = Color3.new(1, 1, 1)
-btnClose.Parent = frame
-btnClose.MouseButton1Click:Connect(function()
-    gui:Destroy()
-end)
+local btnBrute = Instance.new("TextButton")
+btnBrute.Text = "💥 BRUTE FORCE"
+btnBrute.Size = UDim2.new(0.9, 0, 0, 25)
+btnBrute.Position = UDim2.new(0.05, 0, 0.7, 0)
+btnBrute.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+btnBrute.TextColor3 = Color3.new(1, 1, 1)
+btnBrute.Parent = frame
+btnBrute.MouseButton1Click:Connect(bruteForceAttack)
 
--- Update status
-game:GetService("RunService").Heartbeat:Connect(function()
-    if ItemToDupe then
-        status.Text = "✅ READY"
-        status.TextColor3 = Color3.new(0, 1, 0)
-    else
-        status.Text = "Add car"
-        status.TextColor3 = Color3.new(1, 1, 0)
-    end
-    
-    if CountdownTime > 0 then
-        status.Text = status.Text .. " " .. CountdownTime .. "s"
-    end
-    
-    if HookInstalled then
-        btnHook.Text = "✅ HOOK INSTALLED"
-        btnHook.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
-    end
-end)
+-- Status
+local status = Instance.new("TextLabel")
+status.Text = "Found " .. #allRemotes .. " remotes"
+status.Size = UDim2.new(1, 0, 0, 20)
+status.Position = UDim2.new(0, 0, 0.95, 0)
+status.TextColor3 = Color3.new(1, 1, 1)
+status.TextSize = 10
+status.Parent = frame
 
 print("\n" .. string.rep("=", 60))
-print("🎯 FINAL DUPE SCRIPT - FIXED")
+print("🎯 UNIVERSAL TRADE DUPE")
 print(string.rep("=", 60))
-print("HOW TO USE:")
-print("1. Click '🔧 INSTALL HOOK' button")
-print("2. Start trade with alt account")
+print("This script:")
+print("1. Searches ALL remotes in the game")
+print("2. Finds trading-related remotes")
+print("3. Hooks ALL of them automatically")
+print("4. Auto-cancels when detects accepts")
+print(string.rep("=", 60))
+print("INSTRUCTIONS:")
+print("1. Click '🔧 INSTALL HOOK'")
+print("2. Start trade normally in game")
 print("3. Add car to trade")
-print("4. Wait for '✅ READY' message")
-print("5. Click '🚀 START DUPE' button")
-print("6. Other player MUST accept")
-print("7. Hook will auto-cancel for you")
-print(string.rep("=", 60))
-print("The hook intercepts ALL trade packets")
-print("and automatically sends cancels!")
+print("4. Click '🚀 START DUPE'")
+print("5. Accept trade in game")
+print("6. Hook will auto-cancel")
 print(string.rep("=", 60))
 
--- Make functions global
-_G.install = installMetatableHook
-_G.start = simpleDupe
-_G.trigger = manualTrigger
-_G.timed = countdownTrigger
+-- Make global
+_G.install = installUniversalHook
+_G.dupe = universalDupe
+_G.brute = bruteForceAttack
+_G.remotes = allRemotes
 
 print("\nConsole commands:")
-print("_G.install() - Install metatable hook")
-print("_G.start()   - Start dupe sequence")
-print("_G.trigger() - Manually trigger hook")
-print("_G.timed()   - Trigger at all timings")
+print("_G.install() - Install universal hook")
+print("_G.dupe()    - Run universal dupe")
+print("_G.brute()   - Brute force attack")
+print("_G.remotes   - List of found remotes")
