@@ -1,155 +1,189 @@
--- FIXED: Countdown is a table error
-
+-- FIXED: Item detection problem
 local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local LocalPlayer = Players.LocalPlayer
 
--- Find trading remotes
-local TradingRemotes = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Services"):WaitForChild("TradingServiceRemotes")
-
-if not TradingRemotes then
-    print("❌ No trading found")
-    return
-end
-
 -- Get remotes
+local TradingRemotes = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("Services"):WaitForChild("TradingServiceRemotes")
 local SessionSetConfirmation = TradingRemotes:WaitForChild("SessionSetConfirmation")
 local OnSessionItemsUpdated = TradingRemotes:WaitForChild("OnSessionItemsUpdated")
 local OnSessionCountdownUpdated = TradingRemotes:WaitForChild("OnSessionCountdownUpdated")
 
+-- DEBUG: Print to confirm we found remotes
+print("✅ Remotes found:")
+print("- SessionSetConfirmation:", SessionSetConfirmation ~= nil)
+print("- OnSessionItemsUpdated:", OnSessionItemsUpdated ~= nil)
+print("- OnSessionCountdownUpdated:", OnSessionCountdownUpdated ~= nil)
+
 -- Variables
 local ItemToDupe = nil
-local Countdown = 0
+local CountdownTime = 0
 
--- Track item
-if OnSessionItemsUpdated then
-    OnSessionItemsUpdated.OnClientEvent:Connect(function(data)
-        if data and type(data) == "table" then
-            if data[LocalPlayer.UserId] then
-                if #data[LocalPlayer.UserId] > 0 then
-                    ItemToDupe = data[LocalPlayer.UserId][1]
-                    print("✅ Item ready")
+-- DEBUG function to print item data
+local function debugItems(data)
+    print("\n🔍 DEBUG ITEM DATA:")
+    print("Type:", type(data))
+    
+    if type(data) == "table" then
+        print("Table keys:")
+        for key, value in pairs(data) do
+            print("  " .. tostring(key) .. " = " .. tostring(type(value)))
+            
+            if type(value) == "table" then
+                print("    Items for player " .. key .. ":")
+                for i, item in ipairs(value) do
+                    print("      Item " .. i .. ": " .. tostring(item))
                 end
             end
         end
-    end)
+    end
 end
 
--- Track countdown (FIXED: Handle table data)
-if OnSessionCountdownUpdated then
-    OnSessionCountdownUpdated.OnClientEvent:Connect(function(timeData)
-        -- timeData might be a table, not a number
-        if type(timeData) == "number" then
-            -- It's a number directly
-            Countdown = timeData
-        elseif type(timeData) == "table" then
-            -- It's a table, extract the time
-            if timeData.timeLeft then
-                Countdown = timeData.timeLeft
-            elseif timeData.TimeLeft then
-                Countdown = timeData.TimeLeft
-            elseif timeData.seconds then
-                Countdown = timeData.seconds
-            elseif timeData.Seconds then
-                Countdown = timeData.Seconds
-            elseif timeData[1] then
-                Countdown = timeData[1]
-            else
-                -- Try to find any number in the table
-                for _, value in pairs(timeData) do
-                    if type(value) == "number" then
-                        Countdown = value
-                        break
+-- Track item (FIXED: Better detection)
+OnSessionItemsUpdated.OnClientEvent:Connect(function(data)
+    debugItems(data) -- Show what data looks like
+    
+    if type(data) == "table" then
+        -- Try different ways to find our items
+        local myUserId = tostring(LocalPlayer.UserId)
+        
+        -- Method 1: Direct user ID key
+        if data[LocalPlayer.UserId] then
+            local items = data[LocalPlayer.UserId]
+            if #items > 0 then
+                ItemToDupe = items[1]
+                print("✅ Method 1: Car detected! ID:", ItemToDupe)
+                return
+            end
+        end
+        
+        -- Method 2: User ID as string
+        if data[myUserId] then
+            local items = data[myUserId]
+            if #items > 0 then
+                ItemToDupe = items[1]
+                print("✅ Method 2: Car detected! ID:", ItemToDupe)
+                return
+            end
+        end
+        
+        -- Method 3: Find any user ID that matches
+        for playerId, items in pairs(data) do
+            if type(items) == "table" then
+                local playerIdNum = tonumber(playerId)
+                if playerIdNum == LocalPlayer.UserId then
+                    if #items > 0 then
+                        ItemToDupe = items[1]
+                        print("✅ Method 3: Car detected! ID:", ItemToDupe)
+                        return
                     end
                 end
             end
         end
-        
-        -- Debug: Print what we received
-        if Countdown > 0 then
-            print("⏰ Countdown:", Countdown, "seconds")
-            print("Data received:", timeData)
-        end
-    end)
-end
+    end
+    
+    print("❌ No car detected in trade")
+    ItemToDupe = nil
+end)
 
--- Simple dupe function (FIXED: Safe number comparison)
+-- Track countdown
+OnSessionCountdownUpdated.OnClientEvent:Connect(function(timeData)
+    if type(timeData) == "table" and timeData.Time then
+        CountdownTime = timeData.Time
+        
+        if CountdownTime > 0 then
+            print("⏰ " .. CountdownTime .. "s")
+        end
+    end
+end)
+
+-- Simple dupe function
 local function startDupe()
+    print("\n🚀 Attempting dupe...")
+    print("ItemToDupe:", ItemToDupe)
+    print("Type:", type(ItemToDupe))
+    
     if not ItemToDupe then
-        print("❌ Add car first")
+        print("❌ ERROR: ItemToDupe is nil!")
+        print("Please make sure:")
+        print("1. Trade is started")
+        print("2. Car is added to trade")
+        print("3. Wait for 'Car detected!' message")
         return
     end
     
-    print("🚀 Starting...")
+    if type(ItemToDupe) ~= "string" and type(ItemToDupe) ~= "number" then
+        print("❌ ERROR: ItemToDupe is not string/number!")
+        print("It's a:", type(ItemToDupe))
+        return
+    end
     
-    -- Accept
+    print("Step 1: Accepting trade...")
     pcall(function()
         SessionSetConfirmation:InvokeServer(true)
     end)
     
-    -- Wait for countdown to start
     print("Waiting for countdown...")
-    local waited = 0
-    while Countdown == 0 and waited < 50 do  -- 5 seconds max
+    
+    -- Wait for countdown
+    local waitTime = 0
+    while CountdownTime == 0 and waitTime < 30 do
         wait(0.1)
-        waited = waited + 1
+        waitTime = waitTime + 1
     end
     
-    if Countdown == 0 then
-        print("❌ No countdown started")
-        print("Make sure other player accepts!")
+    if CountdownTime == 0 then
+        print("❌ Countdown never started")
+        print("Other player needs to accept!")
         return
     end
     
-    -- Wait for last moment (SAFE: Ensure Countdown is number)
-    print("Countdown active:", Countdown, "seconds")
+    print("Countdown active: " .. CountdownTime .. "s")
     
-    local startTime = Countdown
-    while true do
-        -- SAFE CHECK: Make sure Countdown is a number
-        if type(Countdown) ~= "number" then
-            print("⚠️ Countdown is not a number:", Countdown)
-            break
-        end
-        
-        if Countdown <= 0.5 then
-            break
-        end
-        
+    -- Wait for last moment
+    while CountdownTime > 0.3 do
         wait(0.1)
     end
     
-    -- Cancel at last moment
-    print("🚨 CANCELLING NOW!")
+    print("🚨 Cancelling at " .. CountdownTime .. "s!")
     
-    -- Multiple cancels for safety
+    -- Send cancel
     for i = 1, 3 do
         pcall(function()
             SessionSetConfirmation:InvokeServer(false)
         end)
-        wait(0.1)
+        wait(0.05)
     end
     
     print("✅ Dupe attempt complete!")
-    print("Check your inventory!")
 end
 
--- TINY DRAGGABLE UI
+-- MANUAL MODE: Force set item
+local function manualSetItem()
+    print("\n🔧 MANUAL MODE")
+    print("Current ItemToDupe:", ItemToDupe)
+    print("Enter item ID from debug output:")
+    
+    -- This would normally be a textbox, but for now:
+    print("Check debug output above for item ID")
+    print("Then type in console: _G.ItemToDupe = 'ITEM_ID_HERE'")
+end
+
+-- SIMPLE UI
 local gui = Instance.new("ScreenGui")
-gui.Name = "MiniDupe"
+gui.Name = "DupeGUI"
 gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 150, 0, 80)
+frame.Size = UDim2.new(0, 160, 0, 90)
 frame.Position = UDim2.new(0, 20, 0, 100)
 frame.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
 frame.BorderSizePixel = 2
-frame.BorderColor3 = Color3.new(0.2, 0.6, 1)
+frame.BorderColor3 = Color3.new(0, 0.7, 1)
 frame.Parent = gui
 
--- Title bar (for dragging)
+-- Title
 local title = Instance.new("TextLabel")
-title.Text = "DUPE v2"
+title.Text = "≡ DUPE (Drag)"
 title.Size = UDim2.new(1, 0, 0, 20)
 title.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
 title.TextColor3 = Color3.new(1, 1, 1)
@@ -157,38 +191,51 @@ title.Parent = frame
 
 -- Status
 local status = Instance.new("TextLabel")
-status.Text = "Add car"
+status.Name = "Status"
+status.Text = "Add car to trade"
 status.Size = UDim2.new(1, 0, 0, 20)
 status.Position = UDim2.new(0, 0, 0.25, 0)
 status.TextColor3 = Color3.new(1, 1, 0)
 status.TextSize = 12
 status.Parent = frame
 
--- Start button
-local btn = Instance.new("TextButton")
-btn.Text = "START"
-btn.Size = UDim2.new(0.8, 0, 0, 30)
-btn.Position = UDim2.new(0.1, 0, 0.6, 0)
-btn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
-btn.TextColor3 = Color3.new(1, 1, 1)
-btn.Parent = frame
+-- Dupe button
+local btnDupe = Instance.new("TextButton")
+btnDupe.Text = "START DUPE"
+btnDupe.Size = UDim2.new(0.9, 0, 0.3, 0)
+btnDupe.Position = UDim2.new(0.05, 0, 0.5, 0)
+btnDupe.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+btnDupe.TextColor3 = Color3.new(1, 1, 1)
+btnDupe.Parent = frame
 
-btn.MouseButton1Click:Connect(startDupe)
+btnDupe.MouseButton1Click:Connect(startDupe)
+
+-- Manual button
+local btnManual = Instance.new("TextButton")
+btnManual.Text = "DEBUG"
+btnManual.Size = UDim2.new(0.4, 0, 0.2, 0)
+btnManual.Position = UDim2.new(0.55, 0, 0.8, 0)
+btnManual.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+btnManual.TextColor3 = Color3.new(1, 1, 1)
+btnManual.TextSize = 10
+btnManual.Parent = frame
+
+btnManual.MouseButton1Click:Connect(manualSetItem)
 
 -- Close button
-local close = Instance.new("TextButton")
-close.Text = "X"
-close.Size = UDim2.new(0, 20, 0, 20)
-close.Position = UDim2.new(1, -20, 0, 0)
-close.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-close.TextColor3 = Color3.new(1, 1, 1)
-close.Parent = frame
+local btnClose = Instance.new("TextButton")
+btnClose.Text = "X"
+btnClose.Size = UDim2.new(0.2, 0, 0.2, 0)
+btnClose.Position = UDim2.new(0.8, 0, 0, 0)
+btnClose.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+btnClose.TextColor3 = Color3.new(1, 1, 1)
+btnClose.Parent = frame
 
-close.MouseButton1Click:Connect(function()
+btnClose.MouseButton1Click:Connect(function()
     gui:Destroy()
 end)
 
--- Make draggable
+-- Draggable
 local dragging = false
 local dragStart, frameStart
 
@@ -201,9 +248,7 @@ title.InputBegan:Connect(function(input)
 end)
 
 title.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch then
-        dragging = false
-    end
+    dragging = false
 end)
 
 game:GetService("UserInputService").InputChanged:Connect(function(input)
@@ -218,7 +263,7 @@ game:GetService("UserInputService").InputChanged:Connect(function(input)
     end
 end)
 
--- Update status (SAFE: Check if Countdown is number)
+-- Update status
 game:GetService("RunService").Heartbeat:Connect(function()
     if ItemToDupe then
         status.Text = "✅ READY"
@@ -228,33 +273,22 @@ game:GetService("RunService").Heartbeat:Connect(function()
         status.TextColor3 = Color3.new(1, 1, 0)
     end
     
-    -- SAFE: Only show if it's a number
-    if type(Countdown) == "number" and Countdown > 0 then
-        status.Text = status.Text .. " " .. Countdown .. "s"
+    if CountdownTime > 0 then
+        status.Text = status.Text .. " " .. CountdownTime .. "s"
     end
 end)
 
-print("📱 Fixed dupe loaded!")
-print("Drag the blue bar to move")
-
--- DEBUG: Print what the countdown remote sends
-print("\n🔍 DEBUG MODE ON")
-print("Starting countdown listener...")
-
--- Also hook to see raw data
-if OnSessionCountdownUpdated then
-    local originalEvent = OnSessionCountdownUpdated.OnClientEvent
-    OnSessionCountdownUpdated.OnClientEvent:Connect(function(data)
-        print("\n📊 COUNTDOWN DATA RECEIVED:")
-        print("Type:", type(data))
-        
-        if type(data) == "table" then
-            print("Table contents:")
-            for key, value in pairs(data) do
-                print("  " .. tostring(key) .. " = " .. tostring(value) .. " (" .. type(value) .. ")")
-            end
-        else
-            print("Value:", data)
-        end
-    end)
-end
+print("\n" .. string.rep("=", 50))
+print("DEBUG MODE ENABLED")
+print(string.rep("=", 50))
+print("INSTRUCTIONS:")
+print("1. Start trade with someone")
+print("2. Add car to trade")
+print("3. Look at DEBUG output above")
+print("4. Wait for 'Car detected!' message")
+print("5. Click START DUPE")
+print(string.rep("=", 50))
+print("\nIf 'Car detected!' doesn't appear:")
+print("1. Click DEBUG button")
+print("2. Check console for item ID")
+print("3. Manually set with: _G.ItemToDupe = 'ID'")
