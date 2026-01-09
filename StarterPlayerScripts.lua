@@ -1,138 +1,198 @@
--- PERFECT COUNTDOWN DUPE SCRIPT
+-- FIXED: Countdown is a table error
+
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local LocalPlayer = Players.LocalPlayer
 
+-- Find trading remotes
+local TradingRemotes = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Services"):WaitForChild("TradingServiceRemotes")
+
+if not TradingRemotes then
+    print("❌ No trading found")
+    return
+end
+
 -- Get remotes
-local TradingRemotes = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("Services"):WaitForChild("TradingServiceRemotes")
 local SessionSetConfirmation = TradingRemotes:WaitForChild("SessionSetConfirmation")
 local OnSessionItemsUpdated = TradingRemotes:WaitForChild("OnSessionItemsUpdated")
 local OnSessionCountdownUpdated = TradingRemotes:WaitForChild("OnSessionCountdownUpdated")
 
 -- Variables
 local ItemToDupe = nil
-local CountdownTime = 0
-local TradeActive = false
+local Countdown = 0
 
 -- Track item
-OnSessionItemsUpdated.OnClientEvent:Connect(function(data)
-    if data and data[LocalPlayer.UserId] then
-        if #data[LocalPlayer.UserId] > 0 then
-            ItemToDupe = data[LocalPlayer.UserId][1]
-            print("✅ Car detected!")
+if OnSessionItemsUpdated then
+    OnSessionItemsUpdated.OnClientEvent:Connect(function(data)
+        if data and type(data) == "table" then
+            if data[LocalPlayer.UserId] then
+                if #data[LocalPlayer.UserId] > 0 then
+                    ItemToDupe = data[LocalPlayer.UserId][1]
+                    print("✅ Item ready")
+                end
+            end
         end
-    end
-end)
+    end)
+end
 
--- Track countdown (FIXED: Use Time with capital T)
-OnSessionCountdownUpdated.OnClientEvent:Connect(function(timeData)
-    if type(timeData) == "table" and timeData.Time then
-        CountdownTime = timeData.Time
-        TradeActive = CountdownTime > 0
+-- Track countdown (FIXED: Handle table data)
+if OnSessionCountdownUpdated then
+    OnSessionCountdownUpdated.OnClientEvent:Connect(function(timeData)
+        -- timeData might be a table, not a number
+        if type(timeData) == "number" then
+            -- It's a number directly
+            Countdown = timeData
+        elseif type(timeData) == "table" then
+            -- It's a table, extract the time
+            if timeData.timeLeft then
+                Countdown = timeData.timeLeft
+            elseif timeData.TimeLeft then
+                Countdown = timeData.TimeLeft
+            elseif timeData.seconds then
+                Countdown = timeData.seconds
+            elseif timeData.Seconds then
+                Countdown = timeData.Seconds
+            elseif timeData[1] then
+                Countdown = timeData[1]
+            else
+                -- Try to find any number in the table
+                for _, value in pairs(timeData) do
+                    if type(value) == "number" then
+                        Countdown = value
+                        break
+                    end
+                end
+            end
+        end
         
-        if TradeActive then
-            print("⏰ " .. CountdownTime .. "s")
+        -- Debug: Print what we received
+        if Countdown > 0 then
+            print("⏰ Countdown:", Countdown, "seconds")
+            print("Data received:", timeData)
         end
-    end
-end)
+    end)
+end
 
--- Simple dupe function
+-- Simple dupe function (FIXED: Safe number comparison)
 local function startDupe()
     if not ItemToDupe then
-        print("❌ Add car to trade first!")
+        print("❌ Add car first")
         return
     end
     
-    print("🚀 Starting dupe...")
+    print("🚀 Starting...")
     
-    -- Step 1: Accept trade
+    -- Accept
     pcall(function()
         SessionSetConfirmation:InvokeServer(true)
     end)
     
-    print("Waiting for countdown...")
-    
     -- Wait for countdown to start
-    local waitTime = 0
-    while CountdownTime == 0 and waitTime < 5 do
-        wait(1)
-        waitTime = waitTime + 1
+    print("Waiting for countdown...")
+    local waited = 0
+    while Countdown == 0 and waited < 50 do  -- 5 seconds max
+        wait(0.1)
+        waited = waited + 1
     end
     
-    if CountdownTime == 0 then
-        print("❌ Countdown didn't start!")
+    if Countdown == 0 then
+        print("❌ No countdown started")
         print("Make sure other player accepts!")
         return
     end
     
-    -- Step 2: Wait for last 0.3 seconds
-    print("Countdown: " .. CountdownTime .. "s")
+    -- Wait for last moment (SAFE: Ensure Countdown is number)
+    print("Countdown active:", Countdown, "seconds")
     
-    while CountdownTime > 0.3 do
+    local startTime = Countdown
+    while true do
+        -- SAFE CHECK: Make sure Countdown is a number
+        if type(Countdown) ~= "number" then
+            print("⚠️ Countdown is not a number:", Countdown)
+            break
+        end
+        
+        if Countdown <= 0.5 then
+            break
+        end
+        
         wait(0.1)
     end
     
-    -- Step 3: Cancel at last moment
-    print("🚨 CANCELLING AT " .. CountdownTime .. "s!")
+    -- Cancel at last moment
+    print("🚨 CANCELLING NOW!")
     
-    -- Send cancel multiple times
+    -- Multiple cancels for safety
     for i = 1, 3 do
         pcall(function()
             SessionSetConfirmation:InvokeServer(false)
         end)
-        wait(0.05)
+        wait(0.1)
     end
     
-    print("✅ Dupe complete!")
-    print("Check if car duplicated!")
+    print("✅ Dupe attempt complete!")
+    print("Check your inventory!")
 end
 
--- ULTRA SIMPLE UI
+-- TINY DRAGGABLE UI
 local gui = Instance.new("ScreenGui")
-gui.Name = "SimpleDupe"
+gui.Name = "MiniDupe"
 gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 140, 0, 70)
+frame.Size = UDim2.new(0, 150, 0, 80)
 frame.Position = UDim2.new(0, 20, 0, 100)
 frame.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
 frame.BorderSizePixel = 2
-frame.BorderColor3 = Color3.new(0, 0.7, 1)
+frame.BorderColor3 = Color3.new(0.2, 0.6, 1)
 frame.Parent = gui
 
--- Drag bar
-local drag = Instance.new("TextLabel")
-drag.Text = "≡ Drag"
-drag.Size = UDim2.new(1, 0, 0, 15)
-drag.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
-drag.TextColor3 = Color3.new(1, 1, 1)
-drag.TextSize = 12
-drag.Parent = frame
+-- Title bar (for dragging)
+local title = Instance.new("TextLabel")
+title.Text = "DUPE v2"
+title.Size = UDim2.new(1, 0, 0, 20)
+title.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
+title.TextColor3 = Color3.new(1, 1, 1)
+title.Parent = frame
 
 -- Status
 local status = Instance.new("TextLabel")
 status.Text = "Add car"
-status.Size = UDim2.new(1, 0, 0, 15)
+status.Size = UDim2.new(1, 0, 0, 20)
 status.Position = UDim2.new(0, 0, 0.25, 0)
 status.TextColor3 = Color3.new(1, 1, 0)
-status.TextSize = 11
+status.TextSize = 12
 status.Parent = frame
 
--- Button
+-- Start button
 local btn = Instance.new("TextButton")
-btn.Text = "DUPE"
-btn.Size = UDim2.new(0.7, 0, 0.4, 0)
-btn.Position = UDim2.new(0.15, 0, 0.5, 0)
+btn.Text = "START"
+btn.Size = UDim2.new(0.8, 0, 0, 30)
+btn.Position = UDim2.new(0.1, 0, 0.6, 0)
 btn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
 btn.TextColor3 = Color3.new(1, 1, 1)
 btn.Parent = frame
 
 btn.MouseButton1Click:Connect(startDupe)
 
--- Draggable
+-- Close button
+local close = Instance.new("TextButton")
+close.Text = "X"
+close.Size = UDim2.new(0, 20, 0, 20)
+close.Position = UDim2.new(1, -20, 0, 0)
+close.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+close.TextColor3 = Color3.new(1, 1, 1)
+close.Parent = frame
+
+close.MouseButton1Click:Connect(function()
+    gui:Destroy()
+end)
+
+-- Make draggable
 local dragging = false
 local dragStart, frameStart
 
-drag.InputBegan:Connect(function(input)
+title.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.Touch then
         dragging = true
         dragStart = input.Position
@@ -140,8 +200,10 @@ drag.InputBegan:Connect(function(input)
     end
 end)
 
-drag.InputEnded:Connect(function()
-    dragging = false
+title.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch then
+        dragging = false
+    end
 end)
 
 game:GetService("UserInputService").InputChanged:Connect(function(input)
@@ -156,7 +218,7 @@ game:GetService("UserInputService").InputChanged:Connect(function(input)
     end
 end)
 
--- Update status
+-- Update status (SAFE: Check if Countdown is number)
 game:GetService("RunService").Heartbeat:Connect(function()
     if ItemToDupe then
         status.Text = "✅ READY"
@@ -166,21 +228,33 @@ game:GetService("RunService").Heartbeat:Connect(function()
         status.TextColor3 = Color3.new(1, 1, 0)
     end
     
-    if CountdownTime > 0 then
-        status.Text = status.Text .. " " .. CountdownTime .. "s"
+    -- SAFE: Only show if it's a number
+    if type(Countdown) == "number" and Countdown > 0 then
+        status.Text = status.Text .. " " .. Countdown .. "s"
     end
 end)
 
-print("\n" .. string.rep("=", 40))
-print("PERFECT DUPE SCRIPT LOADED!")
-print(string.rep("=", 40))
-print("COUNTDOWN DATA: Uses Time = X (number)")
-print("INSTRUCTIONS:")
-print("1. Start trade")
-print("2. Add car")
-print("3. Wait for ✅ READY")
-print("4. Click DUPE button")
-print("5. Other player MUST accept")
-print("6. Script cancels at 0.3s")
-print("7. Check inventory!")
-print(string.rep("=", 40))
+print("📱 Fixed dupe loaded!")
+print("Drag the blue bar to move")
+
+-- DEBUG: Print what the countdown remote sends
+print("\n🔍 DEBUG MODE ON")
+print("Starting countdown listener...")
+
+-- Also hook to see raw data
+if OnSessionCountdownUpdated then
+    local originalEvent = OnSessionCountdownUpdated.OnClientEvent
+    OnSessionCountdownUpdated.OnClientEvent:Connect(function(data)
+        print("\n📊 COUNTDOWN DATA RECEIVED:")
+        print("Type:", type(data))
+        
+        if type(data) == "table" then
+            print("Table contents:")
+            for key, value in pairs(data) do
+                print("  " .. tostring(key) .. " = " .. tostring(value) .. " (" .. type(value) .. ")")
+            end
+        else
+            print("Value:", data)
+        end
+    end)
+end
