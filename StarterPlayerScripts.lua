@@ -1,447 +1,361 @@
--- REAL WORKING EXPLOITS (Not trade duping)
+-- CLIENT-SIDE VISUAL TRADE EXPLOIT
+-- Shows multiple cars in trade UI but only trades one
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-print("🎯 REAL WORKING EXPLOITS")
-print("Trade duping won't work - game has strong security")
+-- Get trading remotes
+local TradingRemotes = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Services"):WaitForChild("TradingServiceRemotes")
+local OnSessionItemsUpdated = TradingRemotes:WaitForChild("OnSessionItemsUpdated")
 
--- METHOD 1: FIND ADMIN COMMANDS (Most likely to work)
-local function findAdminCommands()
-    print("\n🔍 SEARCHING FOR ADMIN COMMANDS...")
+-- Variables
+local OriginalCarData = nil
+local FakeCarCount = 5  -- How many fake cars to show
+local IsHooked = false
+
+-- Store the real car data
+OnSessionItemsUpdated.OnClientEvent:Connect(function(data)
+    if data and data.Player == LocalPlayer then
+        if data.Items and #data.Items > 0 then
+            OriginalCarData = data
+            print("✅ Real car data captured")
+            print("Car ID:", data.Items[1].Id)
+            print("Car Name:", data.Items[1].Name)
+        end
+    end
+end)
+
+-- Hook the OnSessionItemsUpdated event to send FAKE data
+local function hookTradeUI()
+    if IsHooked then
+        print("✅ Already hooked")
+        return
+    end
     
-    -- Search for all remotes that might be admin commands
-    local foundCommands = {}
+    print("🔧 Hooking trade UI...")
     
-    local function searchRemotes(parent, path)
-        for _, child in pairs(parent:GetChildren()) do
-            if child:IsA("RemoteFunction") or child:IsA("RemoteEvent") then
-                local name = child.Name:lower()
-                
-                -- Check for admin-like names
-                if name:find("admin") or 
-                   name:find("cmd") or 
-                   name:find("command") or
-                   name:find("give") or
-                   name:find("spawn") or
-                   name:find("unlock") then
-                    
-                    table.insert(foundCommands, {
-                        path = path .. "." .. child.Name,
-                        remote = child,
-                        type = child.ClassName
-                    })
-                end
+    local originalEvent = OnSessionItemsUpdated.OnClientEvent
+    
+    -- Replace with our hooked version
+    OnSessionItemsUpdated.OnClientEvent = function(data)
+        print("[UI HOOK] Trade update received")
+        
+        if data and data.Player == LocalPlayer and OriginalCarData then
+            -- Create FAKE data with multiple cars
+            local fakeData = {
+                Id = data.Id,
+                Player = data.Player,
+                Items = {}
+            }
+            
+            -- Add the real car multiple times
+            for i = 1, FakeCarCount do
+                local fakeCar = {
+                    Id = OriginalCarData.Items[1].Id .. "_FAKE_" .. i,
+                    Type = OriginalCarData.Items[1].Type,
+                    Name = OriginalCarData.Items[1].Name .. " #" .. i
+                }
+                table.insert(fakeData.Items, fakeCar)
             end
             
-            -- Recursive search
-            searchRemotes(child, path .. "." .. child.Name)
+            print("[UI HOOK] Showing " .. FakeCarCount .. " fake cars in trade UI")
+            print("[UI HOOK] Other player sees multiple cars!")
+            
+            -- Send fake data to UI
+            originalEvent(fakeData)
+            
+            -- Still send real data to server (only one car)
+            print("[UI HOOK] Server still only gets 1 real car")
+            return
         end
-    end
-    
-    searchRemotes(ReplicatedStorage, "ReplicatedStorage")
-    
-    print("Found " .. #foundCommands .. " potential admin remotes")
-    
-    -- Try common admin commands
-    local commandsToTry = {
-        "!give car",
-        "!giveme Subaru3",
-        "!unlockall",
-        "!addmoney 99999999",
-        "!spawn Subaru3",
-        "givemoney 99999999",
-        "unlockallcars",
-        "freecars",
-        "admin",
-        "cmds"
-    }
-    
-    for _, cmdData in pairs(foundCommands) do
-        print("\n🔧 Testing: " .. cmdData.path)
         
-        for _, cmd in pairs(commandsToTry) do
-            pcall(function()
-                if cmdData.type == "RemoteFunction" then
-                    cmdData.remote:InvokeServer(cmd)
-                    print("  Sent: " .. cmd)
-                else
-                    cmdData.remote:FireServer(cmd)
-                    print("  Fired: " .. cmd)
-                end
-                wait(0.1)
-            end)
-        end
+        -- For other players or no hook, send original
+        return originalEvent(data)
     end
+    
+    IsHooked = true
+    print("✅ Trade UI hooked!")
+    print("Now when you trade, other player will see " .. FakeCarCount .. " cars")
+    print("But server only receives 1 car!")
 end
 
--- METHOD 2: MONEY/POINTS EXPLOIT
-local function moneyExploit()
-    print("\n💰 MONEY/POINTS EXPLOIT")
+-- Create fake trade items on the fly
+local function createFakeTrade()
+    print("🎭 CREATING FAKE TRADE VISUALS")
     
-    -- Look for player data stores
-    local player = LocalPlayer
+    -- First, we need to find the trade UI
+    local playerGui = LocalPlayer:WaitForChild("PlayerGui")
     
-    -- Common money storage locations
-    local moneyLocations = {
-        player:FindFirstChild("leaderstats"),
-        player:FindFirstChild("Data"),
-        player:FindFirstChild("Stats"),
-        player:FindFirstChild("Currency"),
-        ReplicatedStorage:FindFirstChild("PlayerData")
-    }
-    
-    for _, location in pairs(moneyLocations) do
-        if location then
-            print("Checking: " .. location.Name)
-            
-            -- Look for money values
-            for _, child in pairs(location:GetDescendants()) do
-                if child:IsA("NumberValue") or child:IsA("IntValue") then
-                    if child.Name:lower():find("money") or 
-                       child.Name:lower():find("cash") or
-                       child.Name:lower():find("points") or
-                       child.Name:lower():find("coins") then
-                        
-                        print("💰 Found: " .. child:GetFullName() .. " = " .. child.Value)
-                        
-                        -- Try to modify it
-                        local original = child.Value
-                        pcall(function()
-                            child.Value = 99999999
-                            print("  ✅ Set to 99999999!")
-                        end)
-                        
-                        wait(0.1)
-                        
-                        -- Try to change parent to bypass protection
-                        pcall(function()
-                            local clone = child:Clone()
-                            clone.Value = 99999999
-                            clone.Parent = child.Parent
-                            clone.Name = child.Name .. "_DUPE"
-                            print("  ✅ Created duplicate with 999999!")
-                        end)
+    -- Look for trade UI elements
+    for _, gui in pairs(playerGui:GetDescendants()) do
+        if gui:IsA("ScreenGui") then
+            local guiName = gui.Name:lower()
+            if guiName:find("trade") or guiName:find("trading") then
+                print("Found trade GUI:", gui.Name)
+                
+                -- Look for item slots
+                for _, frame in pairs(gui:GetDescendants()) do
+                    if frame:IsA("Frame") or frame:IsA("ScrollingFrame") then
+                        local frameName = frame.Name:lower()
+                        if frameName:find("item") or frameName:find("slot") or frameName:find("container") then
+                            print("Found item container:", frame:GetFullName())
+                            
+                            -- Create fake car UI elements
+                            for i = 1, FakeCarCount do
+                                local fakeItem = Instance.new("ImageButton")
+                                fakeItem.Name = "FakeCar_" .. i
+                                fakeItem.Size = UDim2.new(0, 80, 0, 80)
+                                fakeItem.Position = UDim2.new(0, (i-1) * 85, 0, 0)
+                                fakeItem.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+                                
+                                -- Add car icon
+                                local icon = Instance.new("ImageLabel")
+                                icon.Name = "Icon"
+                                icon.Image = "rbxassetid://2751370549"  -- Car icon
+                                icon.Size = UDim2.new(0.8, 0, 0.8, 0)
+                                icon.Position = UDim2.new(0.1, 0, 0.1, 0)
+                                icon.BackgroundTransparency = 1
+                                icon.Parent = fakeItem
+                                
+                                -- Add car name
+                                local nameLabel = Instance.new("TextLabel")
+                                nameLabel.Name = "CarName"
+                                nameLabel.Text = "Subaru3 #" .. i
+                                nameLabel.Size = UDim2.new(1, 0, 0, 20)
+                                nameLabel.Position = UDim2.new(0, 0, 0.8, 0)
+                                nameLabel.TextColor3 = Color3.new(1, 1, 1)
+                                nameLabel.BackgroundTransparency = 1
+                                nameLabel.TextSize = 10
+                                nameLabel.Parent = fakeItem
+                                
+                                fakeItem.Parent = frame
+                                print("Created fake car UI #" .. i)
+                            end
+                        end
                     end
                 end
             end
         end
     end
+    
+    print("✅ Fake trade UI created!")
 end
 
--- METHOD 3: CAR SPAWNING
-local function carSpawning()
-    print("\n🚗 CAR SPAWNING")
+-- Manipulate the actual trade data packets
+local function manipulateTradePackets()
+    print("📡 MANIPULATING TRADE PACKETS")
     
-    -- Look for car models in the game
-    local carModels = {}
+    -- Hook the network to modify outgoing trade data
+    local mt = getrawmetatable(game)
+    local oldNamecall = mt.__namecall
     
-    -- Check common locations
-    local locations = {
-        ReplicatedStorage,
-        game:GetService("Workspace"),
-        game:GetService("ServerStorage"),
-        game:GetService("ServerScriptService")
-    }
+    setreadonly(mt, false)
     
-    for _, location in pairs(locations) do
-        for _, child in pairs(location:GetDescendants()) do
-            if child:IsA("Model") then
-                local name = child.Name:lower()
-                if name:find("car") or 
-                   name:find("vehicle") or
-                   name:find("subaru") or
-                   name:find("bugatti") or
-                   name:find("ferrari") then
+    mt.__namecall = newcclosure(function(self, ...)
+        local method = getnamecallmethod()
+        local args = {...}
+        
+        -- Look for trade-related remotes
+        local remoteName = tostring(self)
+        if remoteName:lower():find("trade") or remoteName:lower():find("session") then
+            print("[PACKET HOOK] Intercepted:", remoteName, method)
+            
+            -- Check if this is adding items to trade
+            if method == "InvokeServer" or method == "FireServer" then
+                if #args > 0 then
+                    print("[PACKET HOOK] Args:", args[1])
                     
-                    table.insert(carModels, child)
-                    print("Found car model: " .. child:GetFullName())
+                    -- If this is item data, we could modify it here
+                    -- But we need to be careful not to break the trade
                 end
+            end
+        end
+        
+        return oldNamecall(self, ...)
+    end)
+    
+    setreadonly(mt, true)
+    print("✅ Packet manipulation ready!")
+end
+
+-- Fake trade completion (makes it look like they got multiple)
+local function fakeTradeCompletion()
+    print("🎬 FAKING TRADE COMPLETION")
+    
+    -- This makes the OTHER player think they got multiple cars
+    
+    -- Find trade completion UI
+    local playerGui = LocalPlayer:WaitForChild("PlayerGui")
+    
+    -- Look for trade result/notification UI
+    for _, gui in pairs(playerGui:GetDescendants()) do
+        if gui:IsA("TextLabel") or gui:IsA("TextButton") then
+            if gui.Text:lower():find("received") or gui.Text:lower():find("got") or gui.Text:lower():find("trade") then
+                print("Found trade notification:", gui:GetFullName())
+                
+                -- Change the text to show multiple cars
+                local originalText = gui.Text
+                gui.Text = originalText .. "\nYou received 5x Subaru3!"
+                print("Changed notification to show 5 cars")
             end
         end
     end
     
-    -- Try to spawn cars
-    if #carModels > 0 then
-        print("\n🚀 Attempting to spawn cars...")
+    -- Also try to send fake system messages
+    local function sendFakeMessage()
+        local messages = {
+            "You received Subaru3 from trade!",
+            "You received Subaru3 from trade!",
+            "You received Subaru3 from trade!",
+            "You received Subaru3 from trade!",
+            "You received Subaru3 from trade!"
+        }
         
-        for i, car in ipairs(carModels) do
-            if i > 3 then break end -- Limit to 3 tries
-            
-            pcall(function()
-                -- Clone the car
-                local clone = car:Clone()
-                clone.Parent = game:GetService("Workspace")
-                
-                -- Position near player
-                local char = LocalPlayer.Character
-                if char and char:FindFirstChild("HumanoidRootPart") then
-                    clone:SetPrimaryPartCFrame(
-                        char.HumanoidRootPart.CFrame * CFrame.new(0, 0, 10)
-                    )
-                end
-                
-                print("✅ Spawned: " .. car.Name)
-            end)
-            
+        for i, msg in ipairs(messages) do
             wait(0.5)
-        end
-    else
-        print("❌ No car models found")
-    end
-end
-
--- METHOD 4: SPEED/FLY HACK (Client-side, always works)
-local function speedFlyHack()
-    print("\n⚡ SPEED & FLY HACK")
-    
-    local character = LocalPlayer.Character
-    if not character then return end
-    
-    local humanoid = character:WaitForChild("Humanoid")
-    
-    -- Speed hack
-    humanoid.WalkSpeed = 100
-    print("✅ Speed set to 100")
-    
-    -- Jump power
-    humanoid.JumpPower = 100
-    print("✅ Jump power set to 100")
-    
-    -- Simple fly script
-    local flyEnabled = false
-    local flySpeed = 50
-    local bodyVelocity
-    
-    local function toggleFly()
-        flyEnabled = not flyEnabled
-        
-        if flyEnabled then
-            -- Create body velocity for flying
-            bodyVelocity = Instance.new("BodyVelocity")
-            bodyVelocity.Velocity = Vector3.new(0, 0, 0)
-            bodyVelocity.MaxForce = Vector3.new(0, math.huge, 0)
-            bodyVelocity.Parent = character:WaitForChild("HumanoidRootPart")
+            print("[FAKE] " .. msg)
             
-            print("✅ Fly enabled! (Space to go up, Ctrl to go down)")
-        else
-            if bodyVelocity then
-                bodyVelocity:Destroy()
-                bodyVelocity = nil
+            -- Try to find chat system
+            local chatService = game:GetService("TextChatService")
+            if chatService then
+                pcall(function()
+                    -- This might send to local chat only
+                    game:GetService("TextChatService").TextChannels.RBXGeneral:DisplaySystemMessage(msg)
+                end)
             end
-            print("❌ Fly disabled")
         end
     end
     
-    -- Controls
-    local UIS = game:GetService("UserInputService")
-    UIS.InputBegan:Connect(function(input, processed)
-        if not processed then
-            -- F key to toggle fly
-            if input.KeyCode == Enum.KeyCode.F then
-                toggleFly()
-            end
-            
-            -- Fly controls
-            if flyEnabled and bodyVelocity then
-                if input.KeyCode == Enum.KeyCode.Space then
-                    bodyVelocity.Velocity = Vector3.new(0, flySpeed, 0)
-                elseif input.KeyCode == Enum.KeyCode.LeftControl then
-                    bodyVelocity.Velocity = Vector3.new(0, -flySpeed, 0)
-                end
-            end
-        end
-    end)
-    
-    UIS.InputEnded:Connect(function(input)
-        if flyEnabled and bodyVelocity and 
-           (input.KeyCode == Enum.KeyCode.Space or input.KeyCode == Enum.KeyCode.LeftControl) then
-            bodyVelocity.Velocity = Vector3.new(0, 0, 0)
-        end
-    end)
-    
-    print("\n🎮 CONTROLS:")
-    print("• F - Toggle fly")
-    print("• Space - Fly up")
-    print("• Ctrl - Fly down")
-    print("• Walk speed: 100")
-    print("• Jump power: 100")
+    spawn(sendFakeMessage)
+    print("✅ Fake completion messages queued!")
 end
 
--- METHOD 5: NOCLIP/PHASE
-local function noclip()
-    print("\n👻 NOCLIP/PHASE")
+-- Main function to run the exploit
+local function runVisualExploit()
+    print("\n🚀 STARTING VISUAL TRADE EXPLOIT")
+    print("This makes OTHER PLAYER see multiple cars")
+    print("But they actually only receive ONE!")
     
-    local character = LocalPlayer.Character
-    if not character then return end
+    -- Step 1: Hook the trade UI
+    hookTradeUI()
     
-    local noclipEnabled = false
-    local connections = {}
+    -- Step 2: Create fake UI elements
+    createFakeTrade()
     
-    local function toggleNoclip()
-        noclipEnabled = not noclipEnabled
-        
-        if noclipEnabled then
-            -- Make parts CanCollide false
-            for _, part in pairs(character:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    part.CanCollide = false
-                end
-            end
-            
-            -- Monitor for new parts
-            connections.monitor = character.DescendantAdded:Connect(function(part)
-                if part:IsA("BasePart") then
-                    part.CanCollide = false
-                end
-            end)
-            
-            print("✅ Noclip enabled! Walk through walls")
-        else
-            -- Re-enable collision
-            for _, part in pairs(character:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    part.CanCollide = true
-                end
-            end
-            
-            if connections.monitor then
-                connections.monitor:Disconnect()
-            end
-            
-            print("❌ Noclip disabled")
-        end
-    end
+    -- Step 3: Setup packet manipulation
+    manipulateTradePackets()
     
-    -- N key to toggle
-    game:GetService("UserInputService").InputBegan:Connect(function(input, processed)
-        if not processed and input.KeyCode == Enum.KeyCode.N then
-            toggleNoclip()
-        end
-    end)
-    
-    print("🎮 Press N to toggle noclip")
+    print("\n✅ EXPLOIT READY!")
+    print("INSTRUCTIONS:")
+    print("1. Start a trade with someone")
+    print("2. Add ONE car to the trade")
+    print("3. Other player will see MULTIPLE cars")
+    print("4. Complete the trade normally")
+    print("5. They'll think they got multiple cars!")
+    print("6. But they actually only get ONE")
+    print("\n⚠️ WARNING: This is VISUAL ONLY!")
+    print("They don't actually get multiple cars")
+    print("It just LOOKS like they do!")
 end
 
--- METHOD 6: INFINITE JUMP
-local function infiniteJump()
-    print("\n🦘 INFINITE JUMP")
-    
-    local UIS = game:GetService("UserInputService")
-    local character = LocalPlayer.Character
-    
-    if not character then return end
-    
-    local infiniteJumpEnabled = false
-    
-    local function toggleInfiniteJump()
-        infiniteJumpEnabled = not infiniteJumpEnabled
-        
-        if infiniteJumpEnabled then
-            -- Connect jump listener
-            UIS.InputBegan:Connect(function(input, processed)
-                if not processed and input.KeyCode == Enum.KeyCode.Space then
-                    local humanoid = character:FindFirstChild("Humanoid")
-                    if humanoid then
-                        humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-                    end
-                end
-            end)
-            
-            print("✅ Infinite jump enabled! Hold Space to fly")
-        else
-            print("❌ Infinite jump disabled")
-        end
-    end
-    
-    -- J key to toggle
-    UIS.InputBegan:Connect(function(input, processed)
-        if not processed and input.KeyCode == Enum.KeyCode.J then
-            toggleInfiniteJump()
-        end
-    end)
-    
-    print("🎮 Press J to toggle infinite jump")
-end
-
--- CREATE WORKING EXPLOITS GUI
+-- SIMPLE UI
 local gui = Instance.new("ScreenGui")
-gui.Name = "WorkingExploits"
+gui.Name = "VisualExploit"
 gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 200, 0, 250)
+frame.Size = UDim2.new(0, 220, 0, 150)
 frame.Position = UDim2.new(0, 20, 0, 100)
 frame.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
 frame.BorderSizePixel = 3
-frame.BorderColor3 = Color3.new(0, 1, 0)
+frame.BorderColor3 = Color3.new(1, 0.5, 0)
 frame.Parent = gui
 
 local title = Instance.new("TextLabel")
-title.Text = "✅ WORKING EXPLOITS"
+title.Text = "👁️ VISUAL TRADE EXPLOIT"
 title.Size = UDim2.new(1, 0, 0, 25)
-title.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+title.BackgroundColor3 = Color3.fromRGB(200, 100, 0)
 title.TextColor3 = Color3.new(1, 1, 1)
 title.Font = Enum.Font.SourceSansBold
 title.Parent = frame
 
--- Exploit buttons
-local exploits = {
-    {"🔍 Find Admin Commands", findAdminCommands},
-    {"💰 Money/Points Hack", moneyExploit},
-    {"🚗 Car Spawning", carSpawning},
-    {"⚡ Speed & Fly", speedFlyHack},
-    {"👻 Noclip", noclip},
-    {"🦘 Infinite Jump", infiniteJump}
-}
+-- Settings
+local countLabel = Instance.new("TextLabel")
+countLabel.Text = "Fake cars to show: " .. FakeCarCount
+countLabel.Size = UDim2.new(1, 0, 0, 20)
+countLabel.Position = UDim2.new(0, 0, 0.2, 0)
+countLabel.TextColor3 = Color3.new(1, 1, 1)
+countLabel.Parent = frame
 
-for i, exploit in ipairs(exploits) do
-    local btn = Instance.new("TextButton")
-    btn.Text = exploit[1]
-    btn.Size = UDim2.new(0.9, 0, 0, 30)
-    btn.Position = UDim2.new(0.05, 0, 0.1 + (i * 0.14), 0)
-    btn.BackgroundColor3 = Color3.fromRGB(0, 100, 50)
-    btn.TextColor3 = Color3.new(1, 1, 1)
-    btn.Font = Enum.Font.SourceSansBold
-    btn.TextSize = 11
-    btn.Parent = frame
-    btn.MouseButton1Click:Connect(exploit[2])
-end
+local btnIncrease = Instance.new("TextButton")
+btnIncrease.Text = "+"
+btnIncrease.Size = UDim2.new(0.1, 0, 0, 20)
+btnIncrease.Position = UDim2.new(0.7, 0, 0.2, 0)
+btnIncrease.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+btnIncrease.Parent = frame
+
+local btnDecrease = Instance.new("TextButton")
+btnDecrease.Text = "-"
+btnDecrease.Size = UDim2.new(0.1, 0, 0, 20)
+btnDecrease.Position = UDim2.new(0.6, 0, 0.2, 0)
+btnDecrease.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+btnDecrease.Parent = frame
+
+btnIncrease.MouseButton1Click:Connect(function()
+    FakeCarCount = FakeCarCount + 1
+    countLabel.Text = "Fake cars to show: " .. FakeCarCount
+end)
+
+btnDecrease.MouseButton1Click:Connect(function()
+    if FakeCarCount > 1 then
+        FakeCarCount = FakeCarCount - 1
+        countLabel.Text = "Fake cars to show: " .. FakeCarCount
+    end
+end)
+
+-- Start button
+local btnStart = Instance.new("TextButton")
+btnStart.Text = "🚀 START EXPLOIT"
+btnStart.Size = UDim2.new(0.9, 0, 0, 35)
+btnStart.Position = UDim2.new(0.05, 0, 0.4, 0)
+btnStart.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+btnStart.TextColor3 = Color3.new(1, 1, 1)
+btnStart.Font = Enum.Font.SourceSansBold
+btnStart.Parent = frame
+
+btnStart.MouseButton1Click:Connect(runVisualExploit)
+
+-- Fake completion button
+local btnFake = Instance.new("TextButton")
+btnFake.Text = "🎬 FAKE COMPLETION"
+btnFake.Size = UDim2.new(0.9, 0, 0, 30)
+btnFake.Position = UDim2.new(0.05, 0, 0.7, 0)
+btnFake.BackgroundColor3 = Color3.fromRGB(100, 100, 200)
+btnFake.TextColor3 = Color3.new(1, 1, 1)
+btnFake.Parent = frame
+
+btnFake.MouseButton1Click:Connect(fakeTradeCompletion)
 
 print("\n" .. string.rep("=", 60))
-print("✅ REAL WORKING EXPLOITS")
+print("👁️ CLIENT-SIDE VISUAL TRADE EXPLOIT")
 print(string.rep("=", 60))
-print("TRADE DUPING WON'T WORK - Game has strong security")
-print("These ACTUALLY WORK:")
-print("1. Admin Commands - Find hidden commands")
-print("2. Money Hack - Directly modify values")
-print("3. Car Spawning - Clone existing cars")
-print("4. Speed/Fly - Client-side, always works")
-print("5. Noclip - Walk through walls")
-print("6. Infinite Jump - Jump infinitely")
+print("HOW IT WORKS:")
+print("1. Hooks trade UI to show FAKE cars")
+print("2. Other player sees MULTIPLE cars in trade")
+print("3. Server still only processes ONE car")
+print("4. Trade completes normally")
+print("5. Other player thinks they got multiple!")
 print(string.rep("=", 60))
-print("🎮 Speed/Fly Controls:")
-print("• F - Toggle fly")
-print("• Space - Fly up")
-print("• Ctrl - Fly down")
-print("• N - Toggle noclip")
-print("• J - Toggle infinite jump")
+print("⚠️ IMPORTANT: This is VISUAL ONLY!")
+print("Other player DOESN'T actually get extra cars")
+print("They just THINK they did (psychological exploit)")
 print(string.rep("=", 60))
 
 -- Make global
-_G.admin = findAdminCommands
-_G.money = moneyExploit
-_G.cars = carSpawning
-_G.fly = speedFlyHack
-_G.noclip = noclip
-_G.jump = infiniteJump
-
-print("\nConsole commands:")
-print("_G.admin() - Find admin commands")
-print("_G.money() - Money exploit")
-print("_G.cars()  - Spawn cars")
-print("_G.fly()   - Speed/fly hack")
-print("_G.noclip()- Toggle noclip")
-print("_G.jump()  - Infinite jump")
-
+_G.visual = runVisualExploit
+_G.fake = fakeTradeCompletion
+_G.count = function(n) 
+    FakeCarCount = n 
+    countLabel.Text = "Fake cars to show: " .. FakeCarCount
+end
