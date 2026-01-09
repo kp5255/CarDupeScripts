@@ -1,240 +1,303 @@
--- FINAL WORKING TRADE DUPE SCRIPT
+-- AGGRESSIVE DUPE METHODS (Last Resort)
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
--- Get remotes
-local TradingRemotes = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("Services"):WaitForChild("TradingServiceRemotes")
-local SessionSetConfirmation = TradingRemotes:WaitForChild("SessionSetConfirmation")
-local OnSessionItemsUpdated = TradingRemotes:WaitForChild("OnSessionItemsUpdated")
-local OnSessionCountdownUpdated = TradingRemotes:WaitForChild("OnSessionCountdownUpdated")
+-- Get trading system
+local TradingRemotes = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Services"):WaitForChild("TradingServiceRemotes")
 
--- Variables
-local ItemToDupe = nil
-local CountdownTime = 0
+-- Find ALL trading remotes
+print("🔍 Finding all trading remotes...")
+local allRemotes = {}
+for _, remote in pairs(TradingRemotes:GetChildren()) do
+    allRemotes[remote.Name] = remote
+    print("Found: " .. remote.Name .. " (" .. remote.ClassName .. ")")
+end
 
--- Track items (FIXED: Using exact structure from debug)
-OnSessionItemsUpdated.OnClientEvent:Connect(function(data)
-    print("\n📦 ITEM UPDATE")
+-- METHOD 1: MASS PACKET FLOOD
+local function massPacketFlood()
+    print("🌊 MASS PACKET FLOOD")
     
-    if type(data) == "table" then
-        -- Check if this is our player's data
-        if data.Player and data.Player == LocalPlayer then
-            if data.Items and #data.Items > 0 then
-                -- Get first car's ID
-                local firstCar = data.Items[1]
-                if firstCar and firstCar.Id then
-                    ItemToDupe = firstCar.Id
-                    print("✅ CAR DETECTED!")
-                    print("Name: " .. (firstCar.Name or "Unknown"))
-                    print("Type: " .. (firstCar.Type or "Unknown"))
-                    print("ID: " .. ItemToDupe)
-                end
-            end
-        else
-            print("⚠️ Data not for current player")
-            -- Try to auto-detect anyway
-            if data.Items and #data.Items > 0 then
-                local firstCar = data.Items[1]
-                if firstCar and firstCar.Id then
-                    ItemToDupe = firstCar.Id
-                    print("⚠️ Auto-selected car:")
-                    print("ID: " .. ItemToDupe)
-                end
-            end
-        end
-    end
-end)
-
--- Track countdown
-OnSessionCountdownUpdated.OnClientEvent:Connect(function(timeData)
-    if type(timeData) == "table" and timeData.Time then
-        CountdownTime = timeData.Time
+    local SessionSetConfirmation = allRemotes["SessionSetConfirmation"]
+    if not SessionSetConfirmation then return end
+    
+    -- Flood the server with conflicting packets
+    for i = 1, 100 do
+        spawn(function()
+            -- Accept
+            pcall(function()
+                SessionSetConfirmation:InvokeServer(true)
+            end)
+        end)
         
-        if CountdownTime > 0 then
-            print("⏰ " .. CountdownTime .. "s")
+        spawn(function()
+            -- Cancel  
+            pcall(function()
+                SessionSetConfirmation:InvokeServer(false)
+            end)
+        end)
+        
+        wait(0.01)
+    end
+    
+    print("✅ Flooded with 200 packets!")
+end
+
+-- METHOD 2: REMOTE FUNCTION EXPLOIT
+local function remoteFunctionExploit()
+    print("💥 REMOTE FUNCTION EXPLOIT")
+    
+    -- Try to break RemoteFunctions by calling them wrong
+    for name, remote in pairs(allRemotes) do
+        if remote:IsA("RemoteFunction") then
+            print("Attacking: " .. name)
+            
+            -- Send invalid data
+            for i = 1, 20 do
+                spawn(function()
+                    pcall(function()
+                        -- Send garbage data
+                        remote:InvokeServer(
+                            math.huge,  -- Very large number
+                            -math.huge, -- Very small number
+                            nil,        -- nil value
+                            {},         -- Empty table
+                            function() end, -- Function
+                            coroutine.create(function() end), -- Coroutine
+                            "A" .. string.rep("B", 10000) -- Huge string
+                        )
+                    end)
+                end)
+                wait(0.05)
+            end
         end
     end
-end)
+end
 
--- Dupe function
-local function startDupe()
-    if not ItemToDupe then
-        print("❌ No car detected!")
-        print("Add car to trade first")
-        return
+-- METHOD 3: SESSION HIJACK
+local function sessionHijack()
+    print("🎭 SESSION HIJACK")
+    
+    -- Try to manipulate session data
+    local SessionAddItem = allRemotes["SessionAddItem"]
+    local SessionRemoveItem = allRemotes["SessionRemoveItem"]
+    
+    if SessionAddItem then
+        -- Try to add invalid items
+        local fakeItems = {
+            "INVALID_ITEM",
+            nil,
+            999999,
+            "",
+            "CAR_DUPE_GLITCH",
+            string.rep("A", 1000)
+        }
+        
+        for _, fakeItem in pairs(fakeItems) do
+            pcall(function()
+                SessionAddItem:InvokeServer(fakeItem)
+            end)
+            wait(0.1)
+        end
+    end
+end
+
+-- METHOD 4: NETWORK LAG EXPLOIT
+local function networkLagExploit()
+    print("🐌 NETWORK LAG EXPLOIT")
+    
+    local SessionSetConfirmation = allRemotes["SessionSetConfirmation"]
+    if not SessionSetConfirmation then return end
+    
+    -- Create artificial lag by spamming
+    -- then send critical packet at last moment
+    
+    -- First, spam garbage
+    for i = 1, 50 do
+        spawn(function()
+            pcall(function()
+                SessionSetConfirmation:InvokeServer("LAG_PACKET_" .. i)
+            end)
+        end)
     end
     
-    print("\n🚀 STARTING DUPE...")
-    print("Car ID: " .. ItemToDupe)
-    
-    -- Accept trade
-    print("Step 1: Accepting trade...")
-    local success, error = pcall(function()
-        SessionSetConfirmation:InvokeServer(true)
-    end)
-    
-    if not success then
-        print("❌ Failed to accept:", error)
-        return
-    end
-    
-    -- Wait for countdown
-    print("Step 2: Waiting for countdown...")
+    -- Wait for countdown to be low
     local waited = 0
-    while CountdownTime == 0 and waited < 50 do
+    while waited < 45 do  -- Wait 4.5 seconds
         wait(0.1)
         waited = waited + 1
     end
     
-    if CountdownTime == 0 then
-        print("❌ Countdown didn't start!")
-        print("Make sure other player accepts!")
-        return
-    end
-    
-    print("Step 3: Countdown started: " .. CountdownTime .. "s")
-    
-    -- Wait for last 0.3 seconds
-    while CountdownTime > 0.3 do
-        wait(0.1)
-    end
-    
-    -- Cancel at last moment
-    print("Step 4: 🚨 CANCELLING AT " .. CountdownTime .. "s!")
-    
-    for i = 1, 3 do
+    -- Send critical cancel at perfect time
+    print("🚨 SENDING CRITICAL CANCEL!")
+    for i = 1, 10 do
         pcall(function()
             SessionSetConfirmation:InvokeServer(false)
         end)
-        wait(0.05)
+        wait(0.01)
     end
-    
-    print("\n✅ DUPE COMPLETE!")
-    print("Check if you still have the car!")
 end
 
--- SIMPLE UI
+-- METHOD 5: DATA CORRUPTION
+local function dataCorruption()
+    print("💀 DATA CORRUPTION")
+    
+    -- Try to corrupt player data directly
+    local player = LocalPlayer
+    
+    -- Common data stores
+    local dataStores = {
+        player:FindFirstChild("Data"),
+        player:FindFirstChild("Inventory"),
+        player:FindFirstChild("Cars"),
+        player:FindFirstChild("Vehicles"),
+        ReplicatedStorage:FindFirstChild("PlayerData")
+    }
+    
+    for _, store in pairs(dataStores) do
+        if store then
+            print("Found data store: " .. store.Name)
+            
+            -- Try to duplicate items in data
+            for _, item in pairs(store:GetDescendants()) do
+                if item:IsA("StringValue") or item:IsA("NumberValue") then
+                    if item.Name:lower():find("car") or item.Value then
+                        print("Attempting to modify: " .. item.Name)
+                        -- Try to set value
+                        pcall(function()
+                            item.Value = item.Value .. "_DUPE"
+                        end)
+                    end
+                end
+            end
+        end
+    end
+end
+
+-- METHOD 6: DIRECT INVENTORY MODIFICATION
+local function directInventoryMod()
+    print("🎯 DIRECT INVENTORY MOD")
+    
+    -- Try to find where cars are stored
+    local function searchForCars(parent, depth)
+        if depth > 3 then return end
+        
+        for _, child in pairs(parent:GetChildren()) do
+            if child:IsA("Folder") and child.Name:lower():find("car") then
+                print("Found car folder: " .. child:GetFullName())
+                -- Try to clone it
+                local clone = child:Clone()
+                clone.Name = child.Name .. "_DUPLICATE"
+                clone.Parent = child.Parent
+                print("Cloned car folder!")
+            end
+            
+            if child:IsA("Configuration") or child:IsA("Model") then
+                if child.Name:lower():find("subaru") or child.Name:lower():find("car") then
+                    print("Found car object: " .. child.Name)
+                end
+            end
+            
+            searchForCars(child, depth + 1)
+        end
+    end
+    
+    searchForCars(game, 0)
+end
+
+-- METHOD 7: TRADE ROLLBACK
+local function tradeRollback()
+    print("↩️ TRADE ROLLBACK")
+    
+    -- Accept trade
+    local SessionSetConfirmation = allRemotes["SessionSetConfirmation"]
+    if SessionSetConfirmation then
+        pcall(function()
+            SessionSetConfirmation:InvokeServer(true)
+        end)
+    end
+    
+    -- Wait 4.8 seconds
+    wait(4.8)
+    
+    -- Try to trigger a server error/crash
+    -- by calling non-existent methods
+    local mt = getrawmetatable(game)
+    local oldNamecall = mt.__namecall
+    
+    setreadonly(mt, false)
+    mt.__namecall = newcclosure(function(self, ...)
+        local method = getnamecallmethod()
+        
+        -- If it's a trading remote, cause chaos
+        if tostring(self):find("Trading") then
+            -- Randomly return errors
+            if math.random(1, 3) == 1 then
+                error("Trade rollback error")
+            end
+        end
+        
+        return oldNamecall(self, ...)
+    end)
+    
+    setreadonly(mt, true)
+    
+    print("✅ Rollback chaos activated!")
+end
+
+-- CREATE UI
 local gui = Instance.new("ScreenGui")
-gui.Name = "DupeGUI"
 gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 160, 0, 80)
+frame.Size = UDim2.new(0, 200, 0, 250)
 frame.Position = UDim2.new(0, 20, 0, 100)
 frame.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
 frame.BorderSizePixel = 2
-frame.BorderColor3 = Color3.new(0, 0.7, 1)
+frame.BorderColor3 = Color3.new(1, 0, 0)
 frame.Parent = gui
 
--- Drag title
 local title = Instance.new("TextLabel")
-title.Text = "≡ DUPE"
-title.Size = UDim2.new(1, 0, 0, 20)
-title.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
+title.Text = "⚠️ AGGRESSIVE METHODS"
+title.Size = UDim2.new(1, 0, 0, 25)
+title.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 title.TextColor3 = Color3.new(1, 1, 1)
 title.Parent = frame
 
--- Status
-local status = Instance.new("TextLabel")
-status.Text = "Add car"
-status.Size = UDim2.new(1, 0, 0, 20)
-status.Position = UDim2.new(0, 0, 0.25, 0)
-status.TextColor3 = Color3.new(1, 1, 0)
-status.TextSize = 12
-status.Parent = frame
+-- Methods
+local methods = {
+    {"🌊 Mass Packet Flood", massPacketFlood},
+    {"💥 Remote Function Exploit", remoteFunctionExploit},
+    {"🎭 Session Hijack", sessionHijack},
+    {"🐌 Network Lag", networkLagExploit},
+    {"💀 Data Corruption", dataCorruption},
+    {"🎯 Direct Inventory", directInventoryMod},
+    {"↩️ Trade Rollback", tradeRollback}
+}
 
--- Button
-local btn = Instance.new("TextButton")
-btn.Text = "START"
-btn.Size = UDim2.new(0.8, 0, 0.3, 0)
-btn.Position = UDim2.new(0.1, 0, 0.6, 0)
-btn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
-btn.TextColor3 = Color3.new(1, 1, 1)
-btn.Parent = frame
-
-btn.MouseButton1Click:Connect(startDupe)
-
--- Close
-local close = Instance.new("TextButton")
-close.Text = "X"
-close.Size = UDim2.new(0, 20, 0, 20)
-close.Position = UDim2.new(1, -20, 0, 0)
-close.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-close.TextColor3 = Color3.new(1, 1, 1)
-close.Parent = frame
-
-close.MouseButton1Click:Connect(function()
-    gui:Destroy()
-end)
-
--- Draggable
-local dragging = false
-local dragStart, frameStart
-
-title.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch then
-        dragging = true
-        dragStart = input.Position
-        frameStart = frame.Position
-    end
-end)
-
-title.InputEnded:Connect(function(input)
-    dragging = false
-end)
-
-game:GetService("UserInputService").InputChanged:Connect(function(input)
-    if dragging and input.UserInputType == Enum.UserInputType.Touch then
-        local delta = input.Position - dragStart
-        frame.Position = UDim2.new(
-            frameStart.X.Scale,
-            frameStart.X.Offset + delta.X,
-            frameStart.Y.Scale,
-            frameStart.Y.Offset + delta.Y
-        )
-    end
-end)
-
--- Update status
-game:GetService("RunService").Heartbeat:Connect(function()
-    if ItemToDupe then
-        status.Text = "✅ READY"
-        status.TextColor3 = Color3.new(0, 1, 0)
-    else
-        status.Text = "Add car"
-        status.TextColor3 = Color3.new(1, 1, 0)
-    end
-    
-    if CountdownTime > 0 then
-        status.Text = status.Text .. " " .. CountdownTime .. "s"
-    end
-end)
-
-print("\n" .. string.rep("=", 50))
-print("🎯 FINAL DUPE SCRIPT LOADED!")
-print(string.rep("=", 50))
-print("CAR STRUCTURE FOUND:")
-print("- Id: UUID string")
-print("- Name: Car name")
-print("- Type: 'Car'")
-print(string.rep("=", 50))
-print("INSTRUCTIONS:")
-print("1. Start trade")
-print("2. Add car to trade")
-print("3. Wait for 'CAR DETECTED!'")
-print("4. Click START")
-print("5. Other player MUST accept")
-print("6. Script cancels at 0.3s")
-print("7. Check inventory!")
-print(string.rep("=", 50))
-
--- Manual override if needed
-_G.forceCarId = function(id)
-    ItemToDupe = id
-    print("✅ Manually set car ID to:", id)
+for i, method in ipairs(methods) do
+    local btn = Instance.new("TextButton")
+    btn.Text = method[1]
+    btn.Size = UDim2.new(0.9, 0, 0, 25)
+    btn.Position = UDim2.new(0.05, 0, 0.1 + (i * 0.12), 0)
+    btn.BackgroundColor3 = Color3.fromRGB(80, 30, 30)
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.TextSize = 11
+    btn.Parent = frame
+    btn.MouseButton1Click:Connect(method[2])
 end
 
--- Show current car
-_G.showCar = function()
-    print("Current car ID:", ItemToDupe)
-end
+print("\n" .. string.rep("=", 60))
+print("⚠️  AGGRESSIVE DUPE METHODS  ⚠️")
+print(string.rep("=", 60))
+print("WARNING: These methods are more likely to:")
+print("• Get you BANNED")
+print("• Crash the game")
+print("• Not work at all")
+print("• Get you kicked")
+print(string.rep("=", 60))
+print("Try in order:")
+print("1. Mass Packet Flood (overwhelm server)")
+print("2. Network Lag (timing attack)")
+print("3. Data Corruption (direct modify)")
+print(string.rep("=", 60))
