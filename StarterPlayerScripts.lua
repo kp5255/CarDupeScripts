@@ -49,9 +49,9 @@ local function findAdminCommands()
         "!give car",
         "!giveme Subaru3",
         "!unlockall",
-        "!addmoney 999999",
+        "!addmoney 99999999",
         "!spawn Subaru3",
-        "givemoney 999999",
+        "givemoney 99999999",
         "unlockallcars",
         "freecars",
         "admin",
@@ -109,8 +109,8 @@ local function moneyExploit()
                         -- Try to modify it
                         local original = child.Value
                         pcall(function()
-                            child.Value = 999999
-                            print("  ✅ Set to 999999!")
+                            child.Value = 99999999
+                            print("  ✅ Set to 99999999!")
                         end)
                         
                         wait(0.1)
@@ -118,7 +118,7 @@ local function moneyExploit()
                         -- Try to change parent to bypass protection
                         pcall(function()
                             local clone = child:Clone()
-                            clone.Value = 999999
+                            clone.Value = 99999999
                             clone.Parent = child.Parent
                             clone.Name = child.Name .. "_DUPE"
                             print("  ✅ Created duplicate with 999999!")
@@ -444,3 +444,4 @@ print("_G.cars()  - Spawn cars")
 print("_G.fly()   - Speed/fly hack")
 print("_G.noclip()- Toggle noclip")
 print("_G.jump()  - Infinite jump")
+
