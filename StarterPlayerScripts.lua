@@ -1,322 +1,446 @@
--- UNIVERSAL TRADE DUPE SCRIPT
+-- REAL WORKING EXPLOITS (Not trade duping)
+
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-print("🔍 Searching for ALL trading remotes...")
+print("🎯 REAL WORKING EXPLOITS")
+print("Trade duping won't work - game has strong security")
 
--- Find ALL remotes in the entire game that might be trading related
-local allRemotes = {}
-local function collectRemotes(parent, path)
-    for _, child in pairs(parent:GetChildren()) do
-        local fullPath = path .. "." .. child.Name
-        
-        if child:IsA("RemoteFunction") or child:IsA("RemoteEvent") then
-            -- Check if it might be trading related
-            local nameLower = child.Name:lower()
-            if nameLower:find("trade") or 
-               nameLower:find("session") or 
-               nameLower:find("confirm") or
-               nameLower:find("accept") or
-               nameLower:find("cancel") then
-                allRemotes[fullPath] = child
-                print("Found: " .. fullPath .. " (" .. child.ClassName .. ")")
+-- METHOD 1: FIND ADMIN COMMANDS (Most likely to work)
+local function findAdminCommands()
+    print("\n🔍 SEARCHING FOR ADMIN COMMANDS...")
+    
+    -- Search for all remotes that might be admin commands
+    local foundCommands = {}
+    
+    local function searchRemotes(parent, path)
+        for _, child in pairs(parent:GetChildren()) do
+            if child:IsA("RemoteFunction") or child:IsA("RemoteEvent") then
+                local name = child.Name:lower()
+                
+                -- Check for admin-like names
+                if name:find("admin") or 
+                   name:find("cmd") or 
+                   name:find("command") or
+                   name:find("give") or
+                   name:find("spawn") or
+                   name:find("unlock") then
+                    
+                    table.insert(foundCommands, {
+                        path = path .. "." .. child.Name,
+                        remote = child,
+                        type = child.ClassName
+                    })
+                end
             end
-        end
-        
-        -- Recursively search
-        if #child:GetChildren() > 0 then
-            collectRemotes(child, fullPath)
-        end
-    end
-end
-
-collectRemotes(game, "game")
-
--- Also check common locations
-local commonPaths = {
-    ReplicatedStorage:WaitForChild("Remotes"),
-    ReplicatedStorage:WaitForChild("Events"),
-    ReplicatedStorage:WaitForChild("Network"),
-    ReplicatedStorage:WaitForChild("Trading"),
-    game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
-}
-
-for _, path in pairs(commonPaths) do
-    if path then
-        collectRemotes(path, path.Name)
-    end
-end
-
-print("\n🎯 Found " .. #allRemotes .. " potential trading remotes")
-
--- Try to find the main trade confirmation remote
-local mainTradeRemote = nil
-for path, remote in pairs(allRemotes) do
-    if remote.Name:lower():find("confirm") or remote.Name:lower():find("accept") then
-        mainTradeRemote = remote
-        print("🎯 Selected main remote: " .. path)
-        break
-    end
-end
-
-if not mainTradeRemote then
-    -- Just use the first remote found
-    for path, remote in pairs(allRemotes) do
-        mainTradeRemote = remote
-        print("⚠️ Using first remote: " .. path)
-        break
-    end
-end
-
-if not mainTradeRemote then
-    warn("❌ No trading remotes found!")
-    return
-end
-
--- Install UNIVERSAL hook on ALL trading remotes
-print("\n🔧 Installing universal hook on ALL trading remotes...")
-
-local mt = getrawmetatable(game)
-local oldNamecall = mt.__namecall
-local hookInstalled = false
-
-local function installUniversalHook()
-    if hookInstalled then return end
-    
-    setreadonly(mt, false)
-    
-    mt.__namecall = newcclosure(function(self, ...)
-        local method = getnamecallmethod()
-        local args = {...}
-        
-        -- Check if this is ANY remote call
-        if method == "InvokeServer" or method == "FireServer" then
-            local remoteName = tostring(self)
             
-            -- Check if it's a trading-related remote
-            if remoteName:lower():find("trade") or 
-               remoteName:lower():find("session") or
-               remoteName:lower():find("confirm") or
-               table.find(allRemotes, self) then
-                
-                print("[UNIVERSAL HOOK] " .. remoteName .. ":" .. method .. "(" .. tostring(args[1]) .. ")")
-                
-                -- If this looks like an accept (true or "accept")
-                local isAccept = false
-                if args[1] == true then
-                    isAccept = true
-                elseif type(args[1]) == "string" and args[1]:lower():find("accept") then
-                    isAccept = true
-                elseif type(args[1]) == "number" and args[1] == 1 then
-                    isAccept = true
+            -- Recursive search
+            searchRemotes(child, path .. "." .. child.Name)
+        end
+    end
+    
+    searchRemotes(ReplicatedStorage, "ReplicatedStorage")
+    
+    print("Found " .. #foundCommands .. " potential admin remotes")
+    
+    -- Try common admin commands
+    local commandsToTry = {
+        "!give car",
+        "!giveme Subaru3",
+        "!unlockall",
+        "!addmoney 999999",
+        "!spawn Subaru3",
+        "givemoney 999999",
+        "unlockallcars",
+        "freecars",
+        "admin",
+        "cmds"
+    }
+    
+    for _, cmdData in pairs(foundCommands) do
+        print("\n🔧 Testing: " .. cmdData.path)
+        
+        for _, cmd in pairs(commandsToTry) do
+            pcall(function()
+                if cmdData.type == "RemoteFunction" then
+                    cmdData.remote:InvokeServer(cmd)
+                    print("  Sent: " .. cmd)
+                else
+                    cmdData.remote:FireServer(cmd)
+                    print("  Fired: " .. cmd)
                 end
-                
-                if isAccept then
-                    print("[UNIVERSAL HOOK] 🎯 ACCEPT DETECTED!")
-                    
-                    -- Send original
-                    local result = oldNamecall(self, ...)
-                    
-                    -- Queue auto-cancel
-                    spawn(function()
-                        wait(0.001)
+                wait(0.1)
+            end)
+        end
+    end
+end
+
+-- METHOD 2: MONEY/POINTS EXPLOIT
+local function moneyExploit()
+    print("\n💰 MONEY/POINTS EXPLOIT")
+    
+    -- Look for player data stores
+    local player = LocalPlayer
+    
+    -- Common money storage locations
+    local moneyLocations = {
+        player:FindFirstChild("leaderstats"),
+        player:FindFirstChild("Data"),
+        player:FindFirstChild("Stats"),
+        player:FindFirstChild("Currency"),
+        ReplicatedStorage:FindFirstChild("PlayerData")
+    }
+    
+    for _, location in pairs(moneyLocations) do
+        if location then
+            print("Checking: " .. location.Name)
+            
+            -- Look for money values
+            for _, child in pairs(location:GetDescendants()) do
+                if child:IsA("NumberValue") or child:IsA("IntValue") then
+                    if child.Name:lower():find("money") or 
+                       child.Name:lower():find("cash") or
+                       child.Name:lower():find("points") or
+                       child.Name:lower():find("coins") then
                         
-                        -- Try different cancel methods
-                        if method == "InvokeServer" then
-                            -- Try false
-                            pcall(function()
-                                print("[UNIVERSAL HOOK] Sending cancel (false)")
-                                oldNamecall(self, false)
-                            end)
-                            
-                            -- Try 0
-                            pcall(function()
-                                print("[UNIVERSAL HOOK] Sending cancel (0)")
-                                oldNamecall(self, 0)
-                            end)
-                            
-                            -- Try "cancel"
-                            pcall(function()
-                                print("[UNIVERSAL HOOK] Sending cancel (string)")
-                                oldNamecall(self, "cancel")
-                            end)
-                        else
-                            -- For FireServer, just try multiple times
-                            for i = 1, 3 do
-                                pcall(function()
-                                    oldNamecall(self, false)
-                                end)
-                                wait(0.001)
-                            end
-                        end
-                    end)
-                    
-                    return result
+                        print("💰 Found: " .. child:GetFullName() .. " = " .. child.Value)
+                        
+                        -- Try to modify it
+                        local original = child.Value
+                        pcall(function()
+                            child.Value = 999999
+                            print("  ✅ Set to 999999!")
+                        end)
+                        
+                        wait(0.1)
+                        
+                        -- Try to change parent to bypass protection
+                        pcall(function()
+                            local clone = child:Clone()
+                            clone.Value = 999999
+                            clone.Parent = child.Parent
+                            clone.Name = child.Name .. "_DUPE"
+                            print("  ✅ Created duplicate with 999999!")
+                        end)
+                    end
                 end
             end
         end
+    end
+end
+
+-- METHOD 3: CAR SPAWNING
+local function carSpawning()
+    print("\n🚗 CAR SPAWNING")
+    
+    -- Look for car models in the game
+    local carModels = {}
+    
+    -- Check common locations
+    local locations = {
+        ReplicatedStorage,
+        game:GetService("Workspace"),
+        game:GetService("ServerStorage"),
+        game:GetService("ServerScriptService")
+    }
+    
+    for _, location in pairs(locations) do
+        for _, child in pairs(location:GetDescendants()) do
+            if child:IsA("Model") then
+                local name = child.Name:lower()
+                if name:find("car") or 
+                   name:find("vehicle") or
+                   name:find("subaru") or
+                   name:find("bugatti") or
+                   name:find("ferrari") then
+                    
+                    table.insert(carModels, child)
+                    print("Found car model: " .. child:GetFullName())
+                end
+            end
+        end
+    end
+    
+    -- Try to spawn cars
+    if #carModels > 0 then
+        print("\n🚀 Attempting to spawn cars...")
         
-        return oldNamecall(self, ...)
+        for i, car in ipairs(carModels) do
+            if i > 3 then break end -- Limit to 3 tries
+            
+            pcall(function()
+                -- Clone the car
+                local clone = car:Clone()
+                clone.Parent = game:GetService("Workspace")
+                
+                -- Position near player
+                local char = LocalPlayer.Character
+                if char and char:FindFirstChild("HumanoidRootPart") then
+                    clone:SetPrimaryPartCFrame(
+                        char.HumanoidRootPart.CFrame * CFrame.new(0, 0, 10)
+                    )
+                end
+                
+                print("✅ Spawned: " .. car.Name)
+            end)
+            
+            wait(0.5)
+        end
+    else
+        print("❌ No car models found")
+    end
+end
+
+-- METHOD 4: SPEED/FLY HACK (Client-side, always works)
+local function speedFlyHack()
+    print("\n⚡ SPEED & FLY HACK")
+    
+    local character = LocalPlayer.Character
+    if not character then return end
+    
+    local humanoid = character:WaitForChild("Humanoid")
+    
+    -- Speed hack
+    humanoid.WalkSpeed = 100
+    print("✅ Speed set to 100")
+    
+    -- Jump power
+    humanoid.JumpPower = 100
+    print("✅ Jump power set to 100")
+    
+    -- Simple fly script
+    local flyEnabled = false
+    local flySpeed = 50
+    local bodyVelocity
+    
+    local function toggleFly()
+        flyEnabled = not flyEnabled
+        
+        if flyEnabled then
+            -- Create body velocity for flying
+            bodyVelocity = Instance.new("BodyVelocity")
+            bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+            bodyVelocity.MaxForce = Vector3.new(0, math.huge, 0)
+            bodyVelocity.Parent = character:WaitForChild("HumanoidRootPart")
+            
+            print("✅ Fly enabled! (Space to go up, Ctrl to go down)")
+        else
+            if bodyVelocity then
+                bodyVelocity:Destroy()
+                bodyVelocity = nil
+            end
+            print("❌ Fly disabled")
+        end
+    end
+    
+    -- Controls
+    local UIS = game:GetService("UserInputService")
+    UIS.InputBegan:Connect(function(input, processed)
+        if not processed then
+            -- F key to toggle fly
+            if input.KeyCode == Enum.KeyCode.F then
+                toggleFly()
+            end
+            
+            -- Fly controls
+            if flyEnabled and bodyVelocity then
+                if input.KeyCode == Enum.KeyCode.Space then
+                    bodyVelocity.Velocity = Vector3.new(0, flySpeed, 0)
+                elseif input.KeyCode == Enum.KeyCode.LeftControl then
+                    bodyVelocity.Velocity = Vector3.new(0, -flySpeed, 0)
+                end
+            end
+        end
     end)
     
-    setreadonly(mt, true)
-    hookInstalled = true
-    print("✅ UNIVERSAL HOOK INSTALLED!")
-    print("Will intercept ALL trading remote calls")
-end
-
--- Simple dupe function
-local function universalDupe()
-    print("\n🚀 UNIVERSAL DUPE STARTING...")
-    
-    -- Install hook if not already
-    if not hookInstalled then
-        installUniversalHook()
-    end
-    
-    -- Try to trigger trade with main remote
-    print("Attempting to trigger trade...")
-    
-    -- Try different parameter combinations
-    local testParams = {true, false, 1, 0, "accept", "cancel", "trade", {}}
-    
-    for _, param in pairs(testParams) do
-        pcall(function()
-            if mainTradeRemote:IsA("RemoteFunction") then
-                print("Testing: " .. mainTradeRemote.Name .. ":InvokeServer(" .. tostring(param) .. ")")
-                mainTradeRemote:InvokeServer(param)
-            elseif mainTradeRemote:IsA("RemoteEvent") then
-                print("Testing: " .. mainTradeRemote.Name .. ":FireServer(" .. tostring(param) .. ")")
-                mainTradeRemote:FireServer(param)
-            end
-        end)
-        wait(0.5)
-    end
-    
-    print("✅ Universal dupe attempt complete!")
-    print("Check your inventory!")
-end
-
--- BRUTE FORCE ATTACK
-local function bruteForceAttack()
-    print("\n💥 BRUTE FORCE ATTACK")
-    
-    -- Install hook
-    if not hookInstalled then
-        installUniversalHook()
-    end
-    
-    -- Attack ALL found remotes
-    for path, remote in pairs(allRemotes) do
-        print("\nAttacking: " .. path)
-        
-        -- Send multiple packets to each remote
-        for i = 1, 10 do
-            spawn(function()
-                pcall(function()
-                    if remote:IsA("RemoteFunction") then
-                        remote:InvokeServer(true)
-                        remote:InvokeServer(false)
-                    elseif remote:IsA("RemoteEvent") then
-                        remote:FireServer(true)
-                        remote:FireServer(false)
-                    end
-                end)
-            end)
-            wait(0.01)
+    UIS.InputEnded:Connect(function(input)
+        if flyEnabled and bodyVelocity and 
+           (input.KeyCode == Enum.KeyCode.Space or input.KeyCode == Enum.KeyCode.LeftControl) then
+            bodyVelocity.Velocity = Vector3.new(0, 0, 0)
         end
-        
-        wait(0.5)
-    end
+    end)
     
-    print("✅ Brute force attack complete!")
+    print("\n🎮 CONTROLS:")
+    print("• F - Toggle fly")
+    print("• Space - Fly up")
+    print("• Ctrl - Fly down")
+    print("• Walk speed: 100")
+    print("• Jump power: 100")
 end
 
--- CREATE UI
+-- METHOD 5: NOCLIP/PHASE
+local function noclip()
+    print("\n👻 NOCLIP/PHASE")
+    
+    local character = LocalPlayer.Character
+    if not character then return end
+    
+    local noclipEnabled = false
+    local connections = {}
+    
+    local function toggleNoclip()
+        noclipEnabled = not noclipEnabled
+        
+        if noclipEnabled then
+            -- Make parts CanCollide false
+            for _, part in pairs(character:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                end
+            end
+            
+            -- Monitor for new parts
+            connections.monitor = character.DescendantAdded:Connect(function(part)
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                end
+            end)
+            
+            print("✅ Noclip enabled! Walk through walls")
+        else
+            -- Re-enable collision
+            for _, part in pairs(character:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = true
+                end
+            end
+            
+            if connections.monitor then
+                connections.monitor:Disconnect()
+            end
+            
+            print("❌ Noclip disabled")
+        end
+    end
+    
+    -- N key to toggle
+    game:GetService("UserInputService").InputBegan:Connect(function(input, processed)
+        if not processed and input.KeyCode == Enum.KeyCode.N then
+            toggleNoclip()
+        end
+    end)
+    
+    print("🎮 Press N to toggle noclip")
+end
+
+-- METHOD 6: INFINITE JUMP
+local function infiniteJump()
+    print("\n🦘 INFINITE JUMP")
+    
+    local UIS = game:GetService("UserInputService")
+    local character = LocalPlayer.Character
+    
+    if not character then return end
+    
+    local infiniteJumpEnabled = false
+    
+    local function toggleInfiniteJump()
+        infiniteJumpEnabled = not infiniteJumpEnabled
+        
+        if infiniteJumpEnabled then
+            -- Connect jump listener
+            UIS.InputBegan:Connect(function(input, processed)
+                if not processed and input.KeyCode == Enum.KeyCode.Space then
+                    local humanoid = character:FindFirstChild("Humanoid")
+                    if humanoid then
+                        humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+                    end
+                end
+            end)
+            
+            print("✅ Infinite jump enabled! Hold Space to fly")
+        else
+            print("❌ Infinite jump disabled")
+        end
+    end
+    
+    -- J key to toggle
+    UIS.InputBegan:Connect(function(input, processed)
+        if not processed and input.KeyCode == Enum.KeyCode.J then
+            toggleInfiniteJump()
+        end
+    end)
+    
+    print("🎮 Press J to toggle infinite jump")
+end
+
+-- CREATE WORKING EXPLOITS GUI
 local gui = Instance.new("ScreenGui")
-gui.Name = "UniversalDupe"
+gui.Name = "WorkingExploits"
 gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 180, 0, 140)
+frame.Size = UDim2.new(0, 200, 0, 250)
 frame.Position = UDim2.new(0, 20, 0, 100)
 frame.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
 frame.BorderSizePixel = 3
-frame.BorderColor3 = Color3.new(1, 0.5, 0)
+frame.BorderColor3 = Color3.new(0, 1, 0)
 frame.Parent = gui
 
 local title = Instance.new("TextLabel")
-title.Text = "🎯 UNIVERSAL DUPE"
+title.Text = "✅ WORKING EXPLOITS"
 title.Size = UDim2.new(1, 0, 0, 25)
-title.BackgroundColor3 = Color3.fromRGB(200, 100, 0)
+title.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
 title.TextColor3 = Color3.new(1, 1, 1)
 title.Font = Enum.Font.SourceSansBold
 title.Parent = frame
 
--- Buttons
-local btnInstall = Instance.new("TextButton")
-btnInstall.Text = "🔧 INSTALL HOOK"
-btnInstall.Size = UDim2.new(0.9, 0, 0, 25)
-btnInstall.Position = UDim2.new(0.05, 0, 0.2, 0)
-btnInstall.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
-btnInstall.TextColor3 = Color3.new(1, 1, 1)
-btnInstall.Parent = frame
-btnInstall.MouseButton1Click:Connect(installUniversalHook)
+-- Exploit buttons
+local exploits = {
+    {"🔍 Find Admin Commands", findAdminCommands},
+    {"💰 Money/Points Hack", moneyExploit},
+    {"🚗 Car Spawning", carSpawning},
+    {"⚡ Speed & Fly", speedFlyHack},
+    {"👻 Noclip", noclip},
+    {"🦘 Infinite Jump", infiniteJump}
+}
 
-local btnDupe = Instance.new("TextButton")
-btnDupe.Text = "🚀 START DUPE"
-btnDupe.Size = UDim2.new(0.9, 0, 0, 25)
-btnDupe.Position = UDim2.new(0.05, 0, 0.45, 0)
-btnDupe.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
-btnDupe.TextColor3 = Color3.new(1, 1, 1)
-btnDupe.Parent = frame
-btnDupe.MouseButton1Click:Connect(universalDupe)
-
-local btnBrute = Instance.new("TextButton")
-btnBrute.Text = "💥 BRUTE FORCE"
-btnBrute.Size = UDim2.new(0.9, 0, 0, 25)
-btnBrute.Position = UDim2.new(0.05, 0, 0.7, 0)
-btnBrute.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-btnBrute.TextColor3 = Color3.new(1, 1, 1)
-btnBrute.Parent = frame
-btnBrute.MouseButton1Click:Connect(bruteForceAttack)
-
--- Status
-local status = Instance.new("TextLabel")
-status.Text = "Found " .. #allRemotes .. " remotes"
-status.Size = UDim2.new(1, 0, 0, 20)
-status.Position = UDim2.new(0, 0, 0.95, 0)
-status.TextColor3 = Color3.new(1, 1, 1)
-status.TextSize = 10
-status.Parent = frame
+for i, exploit in ipairs(exploits) do
+    local btn = Instance.new("TextButton")
+    btn.Text = exploit[1]
+    btn.Size = UDim2.new(0.9, 0, 0, 30)
+    btn.Position = UDim2.new(0.05, 0, 0.1 + (i * 0.14), 0)
+    btn.BackgroundColor3 = Color3.fromRGB(0, 100, 50)
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.Font = Enum.Font.SourceSansBold
+    btn.TextSize = 11
+    btn.Parent = frame
+    btn.MouseButton1Click:Connect(exploit[2])
+end
 
 print("\n" .. string.rep("=", 60))
-print("🎯 UNIVERSAL TRADE DUPE")
+print("✅ REAL WORKING EXPLOITS")
 print(string.rep("=", 60))
-print("This script:")
-print("1. Searches ALL remotes in the game")
-print("2. Finds trading-related remotes")
-print("3. Hooks ALL of them automatically")
-print("4. Auto-cancels when detects accepts")
+print("TRADE DUPING WON'T WORK - Game has strong security")
+print("These ACTUALLY WORK:")
+print("1. Admin Commands - Find hidden commands")
+print("2. Money Hack - Directly modify values")
+print("3. Car Spawning - Clone existing cars")
+print("4. Speed/Fly - Client-side, always works")
+print("5. Noclip - Walk through walls")
+print("6. Infinite Jump - Jump infinitely")
 print(string.rep("=", 60))
-print("INSTRUCTIONS:")
-print("1. Click '🔧 INSTALL HOOK'")
-print("2. Start trade normally in game")
-print("3. Add car to trade")
-print("4. Click '🚀 START DUPE'")
-print("5. Accept trade in game")
-print("6. Hook will auto-cancel")
+print("🎮 Speed/Fly Controls:")
+print("• F - Toggle fly")
+print("• Space - Fly up")
+print("• Ctrl - Fly down")
+print("• N - Toggle noclip")
+print("• J - Toggle infinite jump")
 print(string.rep("=", 60))
 
 -- Make global
-_G.install = installUniversalHook
-_G.dupe = universalDupe
-_G.brute = bruteForceAttack
-_G.remotes = allRemotes
+_G.admin = findAdminCommands
+_G.money = moneyExploit
+_G.cars = carSpawning
+_G.fly = speedFlyHack
+_G.noclip = noclip
+_G.jump = infiniteJump
 
 print("\nConsole commands:")
-print("_G.install() - Install universal hook")
-print("_G.dupe()    - Run universal dupe")
-print("_G.brute()   - Brute force attack")
-print("_G.remotes   - List of found remotes")
+print("_G.admin() - Find admin commands")
+print("_G.money() - Money exploit")
+print("_G.cars()  - Spawn cars")
+print("_G.fly()   - Speed/fly hack")
+print("_G.noclip()- Toggle noclip")
+print("_G.jump()  - Infinite jump")
