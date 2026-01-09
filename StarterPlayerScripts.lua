@@ -1,6 +1,4 @@
--- CLIENT-SIDE VISUAL TRADE EXPLOIT
--- Shows multiple cars in trade UI but only trades one
-
+-- FIXED: Visual Trade Exploit
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -11,11 +9,12 @@ local OnSessionItemsUpdated = TradingRemotes:WaitForChild("OnSessionItemsUpdated
 
 -- Variables
 local OriginalCarData = nil
-local FakeCarCount = 5  -- How many fake cars to show
+local FakeCarCount = 5
 local IsHooked = false
+local OriginalConnection = nil
 
--- Store the real car data
-OnSessionItemsUpdated.OnClientEvent:Connect(function(data)
+-- Store real car data
+local function storeCarData(data)
     if data and data.Player == LocalPlayer then
         if data.Items and #data.Items > 0 then
             OriginalCarData = data
@@ -24,9 +23,12 @@ OnSessionItemsUpdated.OnClientEvent:Connect(function(data)
             print("Car Name:", data.Items[1].Name)
         end
     end
-end)
+end
 
--- Hook the OnSessionItemsUpdated event to send FAKE data
+-- Connect to store data
+OnSessionItemsUpdated:Connect(storeCarData)
+
+-- CORRECT WAY: Create our own event handler
 local function hookTradeUI()
     if IsHooked then
         print("✅ Already hooked")
@@ -35,10 +37,13 @@ local function hookTradeUI()
     
     print("🔧 Hooking trade UI...")
     
-    local originalEvent = OnSessionItemsUpdated.OnClientEvent
+    -- Disconnect original
+    if OriginalConnection then
+        OriginalConnection:Disconnect()
+    end
     
-    -- Replace with our hooked version
-    OnSessionItemsUpdated.OnClientEvent = function(data)
+    -- Create new connection with our logic
+    OriginalConnection = OnSessionItemsUpdated:Connect(function(data)
         print("[UI HOOK] Trade update received")
         
         if data and data.Player == LocalPlayer and OriginalCarData then
@@ -59,213 +64,166 @@ local function hookTradeUI()
                 table.insert(fakeData.Items, fakeCar)
             end
             
-            print("[UI HOOK] Showing " .. FakeCarCount .. " fake cars in trade UI")
+            print("[UI HOOK] Showing " .. FakeCarCount .. " fake cars")
             print("[UI HOOK] Other player sees multiple cars!")
             
-            -- Send fake data to UI
-            originalEvent(fakeData)
-            
-            -- Still send real data to server (only one car)
-            print("[UI HOOK] Server still only gets 1 real car")
+            -- Now we need to update the UI manually
+            updateTradeUI(fakeData)
             return
         end
         
-        -- For other players or no hook, send original
-        return originalEvent(data)
-    end
+        -- For other data, process normally
+        storeCarData(data)
+    })
     
     IsHooked = true
     print("✅ Trade UI hooked!")
-    print("Now when you trade, other player will see " .. FakeCarCount .. " cars")
-    print("But server only receives 1 car!")
 end
 
--- Create fake trade items on the fly
-local function createFakeTrade()
-    print("🎭 CREATING FAKE TRADE VISUALS")
+-- Function to manually update trade UI
+local function updateTradeUI(fakeData)
+    print("[UI UPDATE] Trying to update trade UI...")
     
-    -- First, we need to find the trade UI
+    -- Method 1: Try to find and modify existing UI
     local playerGui = LocalPlayer:WaitForChild("PlayerGui")
     
-    -- Look for trade UI elements
-    for _, gui in pairs(playerGui:GetDescendants()) do
-        if gui:IsA("ScreenGui") then
-            local guiName = gui.Name:lower()
-            if guiName:find("trade") or guiName:find("trading") then
-                print("Found trade GUI:", gui.Name)
-                
-                -- Look for item slots
-                for _, frame in pairs(gui:GetDescendants()) do
-                    if frame:IsA("Frame") or frame:IsA("ScrollingFrame") then
-                        local frameName = frame.Name:lower()
-                        if frameName:find("item") or frameName:find("slot") or frameName:find("container") then
-                            print("Found item container:", frame:GetFullName())
-                            
-                            -- Create fake car UI elements
-                            for i = 1, FakeCarCount do
-                                local fakeItem = Instance.new("ImageButton")
-                                fakeItem.Name = "FakeCar_" .. i
-                                fakeItem.Size = UDim2.new(0, 80, 0, 80)
-                                fakeItem.Position = UDim2.new(0, (i-1) * 85, 0, 0)
-                                fakeItem.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-                                
-                                -- Add car icon
-                                local icon = Instance.new("ImageLabel")
-                                icon.Name = "Icon"
-                                icon.Image = "rbxassetid://2751370549"  -- Car icon
-                                icon.Size = UDim2.new(0.8, 0, 0.8, 0)
-                                icon.Position = UDim2.new(0.1, 0, 0.1, 0)
-                                icon.BackgroundTransparency = 1
-                                icon.Parent = fakeItem
-                                
-                                -- Add car name
-                                local nameLabel = Instance.new("TextLabel")
-                                nameLabel.Name = "CarName"
-                                nameLabel.Text = "Subaru3 #" .. i
-                                nameLabel.Size = UDim2.new(1, 0, 0, 20)
-                                nameLabel.Position = UDim2.new(0, 0, 0.8, 0)
-                                nameLabel.TextColor3 = Color3.new(1, 1, 1)
-                                nameLabel.BackgroundTransparency = 1
-                                nameLabel.TextSize = 10
-                                nameLabel.Parent = fakeItem
-                                
-                                fakeItem.Parent = frame
-                                print("Created fake car UI #" .. i)
-                            end
-                        end
-                    end
-                end
-            end
-        end
-    end
-    
-    print("✅ Fake trade UI created!")
-end
-
--- Manipulate the actual trade data packets
-local function manipulateTradePackets()
-    print("📡 MANIPULATING TRADE PACKETS")
-    
-    -- Hook the network to modify outgoing trade data
-    local mt = getrawmetatable(game)
-    local oldNamecall = mt.__namecall
-    
-    setreadonly(mt, false)
-    
-    mt.__namecall = newcclosure(function(self, ...)
-        local method = getnamecallmethod()
-        local args = {...}
-        
-        -- Look for trade-related remotes
-        local remoteName = tostring(self)
-        if remoteName:lower():find("trade") or remoteName:lower():find("session") then
-            print("[PACKET HOOK] Intercepted:", remoteName, method)
-            
-            -- Check if this is adding items to trade
-            if method == "InvokeServer" or method == "FireServer" then
-                if #args > 0 then
-                    print("[PACKET HOOK] Args:", args[1])
-                    
-                    -- If this is item data, we could modify it here
-                    -- But we need to be careful not to break the trade
-                end
-            end
-        end
-        
-        return oldNamecall(self, ...)
-    end)
-    
-    setreadonly(mt, true)
-    print("✅ Packet manipulation ready!")
-end
-
--- Fake trade completion (makes it look like they got multiple)
-local function fakeTradeCompletion()
-    print("🎬 FAKING TRADE COMPLETION")
-    
-    -- This makes the OTHER player think they got multiple cars
-    
-    -- Find trade completion UI
-    local playerGui = LocalPlayer:WaitForChild("PlayerGui")
-    
-    -- Look for trade result/notification UI
+    -- Look for any UI showing trade items
     for _, gui in pairs(playerGui:GetDescendants()) do
         if gui:IsA("TextLabel") or gui:IsA("TextButton") then
-            if gui.Text:lower():find("received") or gui.Text:lower():find("got") or gui.Text:lower():find("trade") then
-                print("Found trade notification:", gui:GetFullName())
-                
-                -- Change the text to show multiple cars
-                local originalText = gui.Text
-                gui.Text = originalText .. "\nYou received 5x Subaru3!"
-                print("Changed notification to show 5 cars")
+            local text = gui.Text or ""
+            if text:find("Items") or text:find("Trading") or text:find("Offer") then
+                print("Found trade text:", gui:GetFullName())
+                gui.Text = "Trading " .. FakeCarCount .. "x " .. (OriginalCarData.Items[1].Name or "Car")
             end
         end
     end
     
-    -- Also try to send fake system messages
-    local function sendFakeMessage()
-        local messages = {
-            "You received Subaru3 from trade!",
-            "You received Subaru3 from trade!",
-            "You received Subaru3 from trade!",
-            "You received Subaru3 from trade!",
-            "You received Subaru3 from trade!"
-        }
-        
-        for i, msg in ipairs(messages) do
-            wait(0.5)
-            print("[FAKE] " .. msg)
-            
-            -- Try to find chat system
-            local chatService = game:GetService("TextChatService")
-            if chatService then
-                pcall(function()
-                    -- This might send to local chat only
-                    game:GetService("TextChatService").TextChannels.RBXGeneral:DisplaySystemMessage(msg)
-                end)
-            end
-        end
-    end
-    
-    spawn(sendFakeMessage)
-    print("✅ Fake completion messages queued!")
+    -- Method 2: Create overlay UI
+    createOverlayUI()
 end
 
--- Main function to run the exploit
+-- Create fake overlay UI
+local function createOverlayUI()
+    -- Remove old overlay if exists
+    local oldOverlay = LocalPlayer.PlayerGui:FindFirstChild("FakeTradeOverlay")
+    if oldOverlay then
+        oldOverlay:Destroy()
+    end
+    
+    -- Create new overlay
+    local overlay = Instance.new("ScreenGui")
+    overlay.Name = "FakeTradeOverlay"
+    overlay.DisplayOrder = 999  -- Show on top
+    overlay.Parent = LocalPlayer.PlayerGui
+    
+    -- Create fake item display
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 300, 0, 150)
+    frame.Position = UDim2.new(0.5, -150, 0.3, 0)
+    frame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+    frame.BorderSizePixel = 2
+    frame.BorderColor3 = Color3.fromRGB(0, 150, 255)
+    frame.Parent = overlay
+    
+    local title = Instance.new("TextLabel")
+    title.Text = "📦 YOUR TRADE OFFER"
+    title.Size = UDim2.new(1, 0, 0, 30)
+    title.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
+    title.TextColor3 = Color3.new(1, 1, 1)
+    title.Font = Enum.Font.SourceSansBold
+    title.Parent = frame
+    
+    local itemText = Instance.new("TextLabel")
+    itemText.Text = "Offering: " .. FakeCarCount .. "x " .. (OriginalCarData.Items[1].Name or "Car")
+    itemText.Size = UDim2.new(1, 0, 0, 40)
+    itemText.Position = UDim2.new(0, 0, 0.3, 0)
+    itemText.TextColor3 = Color3.new(1, 1, 1)
+    itemText.TextSize = 18
+    itemText.Parent = frame
+    
+    local hint = Instance.new("TextLabel")
+    hint.Text = "(Other player sees this)"
+    hint.Size = UDim2.new(1, 0, 0, 20)
+    hint.Position = UDim2.new(0, 0, 0.7, 0)
+    hint.TextColor3 = Color3.new(1, 0, 0)
+    hint.TextSize = 12
+    hint.Parent = frame
+    
+    print("✅ Created fake trade overlay")
+end
+
+-- Main function
 local function runVisualExploit()
-    print("\n🚀 STARTING VISUAL TRADE EXPLOIT")
-    print("This makes OTHER PLAYER see multiple cars")
-    print("But they actually only receive ONE!")
+    print("\n🚀 STARTING VISUAL EXPLOIT")
+    print("This shows fake multiple cars in YOUR UI")
+    print("Other player sees normal trade")
     
-    -- Step 1: Hook the trade UI
+    -- First capture real car data
+    print("1. Add a car to trade first...")
+    print("2. Then trade will show " .. FakeCarCount .. "x cars")
+    
     hookTradeUI()
-    
-    -- Step 2: Create fake UI elements
-    createFakeTrade()
-    
-    -- Step 3: Setup packet manipulation
-    manipulateTradePackets()
+    createOverlayUI()
     
     print("\n✅ EXPLOIT READY!")
     print("INSTRUCTIONS:")
-    print("1. Start a trade with someone")
-    print("2. Add ONE car to the trade")
-    print("3. Other player will see MULTIPLE cars")
-    print("4. Complete the trade normally")
-    print("5. They'll think they got multiple cars!")
-    print("6. But they actually only get ONE")
-    print("\n⚠️ WARNING: This is VISUAL ONLY!")
-    print("They don't actually get multiple cars")
-    print("It just LOOKS like they do!")
+    print("1. Start trade with someone")
+    print("2. Add ONE car to trade")
+    print("3. YOUR screen will show " .. FakeCarCount .. " cars")
+    print("4. Other player sees normal 1 car")
+    print("5. Use for screenshots/videos")
+end
+
+-- Fake chat messages
+local function sendFakeMessages()
+    print("💬 SENDING FAKE CHAT MESSAGES")
+    
+    -- Try to send to system chat
+    local chatService = game:GetService("TextChatService")
+    
+    if chatService then
+        local messages = {
+            "[System] Trade completed: Received " .. FakeCarCount .. " cars!",
+            "[Trade] Successfully traded for " .. FakeCarCount .. " vehicles!",
+            "[Notification] You received " .. FakeCarCount .. "x " .. (OriginalCarData and OriginalCarData.Items[1].Name or "Car") .. "!",
+        }
+        
+        for _, msg in pairs(messages) do
+            wait(1)
+            print("[FAKE CHAT] " .. msg)
+            
+            -- Try different chat methods
+            pcall(function()
+                -- Method 1: TextChatService
+                if chatService:FindFirstChild("TextChannels") then
+                    local channels = chatService.TextChannels
+                    if channels:FindFirstChild("RBXSystem") then
+                        channels.RBXSystem:DisplaySystemMessage(msg)
+                    elseif channels:FindFirstChild("RBXGeneral") then
+                        channels.RBXGeneral:DisplaySystemMessage(msg)
+                    end
+                end
+                
+                -- Method 2: Legacy chat
+                game:GetService("StarterGui"):SetCore("ChatMakeSystemMessage", {
+                    Text = msg,
+                    Color = Color3.new(0, 1, 0),
+                    Font = Enum.Font.SourceSansBold
+                })
+            end)
+        end
+    end
+    
+    print("✅ Fake messages sent!")
 end
 
 -- SIMPLE UI
 local gui = Instance.new("ScreenGui")
-gui.Name = "VisualExploit"
+gui.Name = "VisualExploitUI"
 gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 220, 0, 150)
+frame.Size = UDim2.new(0, 200, 0, 180)
 frame.Position = UDim2.new(0, 20, 0, 100)
 frame.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
 frame.BorderSizePixel = 3
@@ -273,89 +231,95 @@ frame.BorderColor3 = Color3.new(1, 0.5, 0)
 frame.Parent = gui
 
 local title = Instance.new("TextLabel")
-title.Text = "👁️ VISUAL TRADE EXPLOIT"
+title.Text = "👁️ FAKE TRADE UI"
 title.Size = UDim2.new(1, 0, 0, 25)
 title.BackgroundColor3 = Color3.fromRGB(200, 100, 0)
 title.TextColor3 = Color3.new(1, 1, 1)
 title.Font = Enum.Font.SourceSansBold
 title.Parent = frame
 
--- Settings
+-- Fake count control
 local countLabel = Instance.new("TextLabel")
-countLabel.Text = "Fake cars to show: " .. FakeCarCount
+countLabel.Text = "Show: " .. FakeCarCount .. " cars"
 countLabel.Size = UDim2.new(1, 0, 0, 20)
 countLabel.Position = UDim2.new(0, 0, 0.2, 0)
 countLabel.TextColor3 = Color3.new(1, 1, 1)
 countLabel.Parent = frame
 
-local btnIncrease = Instance.new("TextButton")
-btnIncrease.Text = "+"
-btnIncrease.Size = UDim2.new(0.1, 0, 0, 20)
-btnIncrease.Position = UDim2.new(0.7, 0, 0.2, 0)
-btnIncrease.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
-btnIncrease.Parent = frame
+local btnUp = Instance.new("TextButton")
+btnUp.Text = "+"
+btnUp.Size = UDim2.new(0.1, 0, 0, 20)
+btnUp.Position = UDim2.new(0.7, 0, 0.2, 0)
+btnUp.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+btnUp.Parent = frame
 
-local btnDecrease = Instance.new("TextButton")
-btnDecrease.Text = "-"
-btnDecrease.Size = UDim2.new(0.1, 0, 0, 20)
-btnDecrease.Position = UDim2.new(0.6, 0, 0.2, 0)
-btnDecrease.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-btnDecrease.Parent = frame
+local btnDown = Instance.new("TextButton")
+btnDown.Text = "-"
+btnDown.Size = UDim2.new(0.1, 0, 0, 20)
+btnDown.Position = UDim2.new(0.6, 0, 0.2, 0)
+btnDown.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+btnDown.Parent = frame
 
-btnIncrease.MouseButton1Click:Connect(function()
+btnUp.MouseButton1Click:Connect(function()
     FakeCarCount = FakeCarCount + 1
-    countLabel.Text = "Fake cars to show: " .. FakeCarCount
+    countLabel.Text = "Show: " .. FakeCarCount .. " cars"
 end)
 
-btnDecrease.MouseButton1Click:Connect(function()
+btnDown.MouseButton1Click:Connect(function()
     if FakeCarCount > 1 then
         FakeCarCount = FakeCarCount - 1
-        countLabel.Text = "Fake cars to show: " .. FakeCarCount
+        countLabel.Text = "Show: " .. FakeCarCount .. " cars"
     end
 end)
 
 -- Start button
 local btnStart = Instance.new("TextButton")
-btnStart.Text = "🚀 START EXPLOIT"
+btnStart.Text = "🚀 SHOW FAKE TRADE"
 btnStart.Size = UDim2.new(0.9, 0, 0, 35)
 btnStart.Position = UDim2.new(0.05, 0, 0.4, 0)
 btnStart.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
 btnStart.TextColor3 = Color3.new(1, 1, 1)
 btnStart.Font = Enum.Font.SourceSansBold
 btnStart.Parent = frame
-
 btnStart.MouseButton1Click:Connect(runVisualExploit)
 
--- Fake completion button
-local btnFake = Instance.new("TextButton")
-btnFake.Text = "🎬 FAKE COMPLETION"
-btnFake.Size = UDim2.new(0.9, 0, 0, 30)
-btnFake.Position = UDim2.new(0.05, 0, 0.7, 0)
-btnFake.BackgroundColor3 = Color3.fromRGB(100, 100, 200)
-btnFake.TextColor3 = Color3.new(1, 1, 1)
-btnFake.Parent = frame
-
-btnFake.MouseButton1Click:Connect(fakeTradeCompletion)
+-- Fake chat button
+local btnChat = Instance.new("TextButton")
+btnChat.Text = "💬 FAKE CHAT"
+btnChat.Size = UDim2.new(0.9, 0, 0, 30)
+btnChat.Position = UDim2.new(0.05, 0, 0.7, 0)
+btnChat.BackgroundColor3 = Color3.fromRGB(100, 100, 200)
+btnChat.TextColor3 = Color3.new(1, 1, 1)
+btnChat.Parent = frame
+btnChat.MouseButton1Click:Connect(sendFakeMessages)
 
 print("\n" .. string.rep("=", 60))
-print("👁️ CLIENT-SIDE VISUAL TRADE EXPLOIT")
+print("👁️ FAKE TRADE VISUAL EXPLOIT")
 print(string.rep("=", 60))
-print("HOW IT WORKS:")
-print("1. Hooks trade UI to show FAKE cars")
-print("2. Other player sees MULTIPLE cars in trade")
-print("3. Server still only processes ONE car")
-print("4. Trade completes normally")
-print("5. Other player thinks they got multiple!")
+print("This creates FAKE UI showing multiple cars")
+print("Perfect for:")
+print("• Screenshots")
+print("• Videos")
+print("• Tricking friends in calls")
+print("• Making trades look better")
 print(string.rep("=", 60))
-print("⚠️ IMPORTANT: This is VISUAL ONLY!")
-print("Other player DOESN'T actually get extra cars")
-print("They just THINK they did (psychological exploit)")
+print("LIMITATIONS:")
+print("• Only affects YOUR screen")
+print("• Other player sees normal trade")
+print("• Doesn't actually give extra cars")
 print(string.rep("=", 60))
 
 -- Make global
-_G.visual = runVisualExploit
-_G.fake = fakeTradeCompletion
-_G.count = function(n) 
-    FakeCarCount = n 
-    countLabel.Text = "Fake cars to show: " .. FakeCarCount
+_G.faketrade = runVisualExploit
+_G.fakechat = sendFakeMessages
+_G.setcount = function(n)
+    if n > 0 then
+        FakeCarCount = n
+        countLabel.Text = "Show: " .. FakeCarCount .. " cars"
+    end
 end
+
+print("\nCommands:")
+print("_G.faketrade() - Show fake trade UI")
+print("_G.fakechat()  - Send fake chat messages")
+print("_G.setcount(10)- Set fake car count")
