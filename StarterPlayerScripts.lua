@@ -1,69 +1,61 @@
--- DELTA TRADE DUPE SCRIPT (Optimized for Delta Executor)
--- Works with 5-second countdown trade system
+-- MOBILE TRADE DUPE SCRIPT (For Delta Android)
+-- Optimized for touch controls and mobile performance
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local LocalPlayer = Players.LocalPlayer
 
 -- Find trading remotes
-local TradingRemotes = ReplicatedStorage:FindFirstChild("Remotes")
+local TradingRemotes = ReplicatedStorage:WaitForChild("Remotes", 10)
 if TradingRemotes then
-    TradingRemotes = TradingRemotes:FindFirstChild("Services")
+    TradingRemotes = TradingRemotes:WaitForChild("Services", 10)
     if TradingRemotes then
-        TradingRemotes = TradingRemotes:FindFirstChild("TradingServiceRemotes")
+        TradingRemotes = TradingRemotes:WaitForChild("TradingServiceRemotes", 10)
     end
 end
 
 if not TradingRemotes then
-    warn("❌ Trading remotes not found!")
+    warn("❌ Trading system not found!")
     return
 end
 
-print("✅ Trading remotes found!")
+print("✅ Trading system found!")
 
--- Get specific remotes (with safe checking)
-local function getRemote(name)
+-- Get remotes with mobile-safe checks
+local function safeGetRemote(name)
     local remote = TradingRemotes:FindFirstChild(name)
     if remote then
-        print("✅ Found remote:", name)
+        print("📱 Found:", name)
         return remote
-    else
-        print("⚠️ Missing remote:", name)
-        return nil
     end
+    return nil
 end
 
-local SessionAddItem = getRemote("SessionAddItem")
-local SessionRemoveItem = getRemote("SessionRemoveItem")
-local SessionSetConfirmation = getRemote("SessionSetConfirmation")
-local SessionCancel = getRemote("SessionCancel")
-local OnSessionItemsUpdated = getRemote("OnSessionItemsUpdated")
-local OnSessionCountdownUpdated = getRemote("OnSessionCountdownUpdated")
+-- Essential remotes
+local SessionSetConfirmation = safeGetRemote("SessionSetConfirmation")
+local OnSessionItemsUpdated = safeGetRemote("OnSessionItemsUpdated")
+local OnSessionCountdownUpdated = safeGetRemote("OnSessionCountdownUpdated")
 
 if not SessionSetConfirmation then
-    warn("❌ Critical remote (SessionSetConfirmation) not found!")
+    warn("❌ Cannot find SessionSetConfirmation!")
     return
 end
 
-print("\n" .. string.rep("=", 50))
-print("DELTA TRADE DUPE SCRIPT LOADED!")
-print(string.rep("=", 50))
+print("\n📱 MOBILE TRADE DUPE LOADED")
 
--- Variables
+-- Variables for mobile
 local ItemToDupe = nil
-local CountdownActive = false
 local CountdownTime = 0
+local DupeAttempts = 0
 
--- Track items in trade
+-- Track items (MOBILE OPTIMIZED - less frequent updates)
 if OnSessionItemsUpdated then
     OnSessionItemsUpdated.OnClientEvent:Connect(function(itemsData)
-        if itemsData and type(itemsData) == "table" then
+        if type(itemsData) == "table" then
             for playerId, items in pairs(itemsData) do
-                if playerId == LocalPlayer.UserId then
-                    if #items > 0 then
-                        ItemToDupe = items[1]
-                        print("✅ Item detected for duping:", ItemToDupe)
-                    end
+                if playerId == LocalPlayer.UserId and #items > 0 then
+                    ItemToDupe = items[1]
+                    print("✅ Car detected!")
                 end
             end
         end
@@ -75,261 +67,258 @@ if OnSessionCountdownUpdated then
     OnSessionCountdownUpdated.OnClientEvent:Connect(function(timeLeft)
         if timeLeft then
             CountdownTime = timeLeft
-            CountdownActive = timeLeft > 0
-            if CountdownActive then
-                print("⏰ Countdown: " .. timeLeft .. "s")
+            if timeLeft > 0 then
+                print("⏰ " .. timeLeft .. "s")
             end
         end
     end)
 end
 
--- SIMPLE DUPE METHOD (Most reliable for Delta)
-local function simpleDupe()
+-- SIMPLE MOBILE DUPE (Most reliable)
+local function mobileSimpleDupe()
     if not ItemToDupe then
-        print("❌ No item detected!")
-        print("Please add a car to trade first")
+        print("❌ Add car to trade first!")
         return
     end
     
-    print("\n🚀 Starting SIMPLE DUPE method...")
-    print("Item:", ItemToDupe)
+    DupeAttempts = DupeAttempts + 1
+    print("\n🚀 Attempt #" .. DupeAttempts .. " starting...")
     
-    -- Step 1: Accept trade to start countdown
-    print("\n[1/4] Accepting trade...")
-    local success = pcall(function()
-        SessionSetConfirmation:InvokeServer(true)
-    end)
-    
-    if not success then
-        print("❌ Failed to accept trade")
-        return
-    end
-    
-    -- Step 2: Wait for countdown to start
-    print("[2/4] Waiting for countdown...")
-    for i = 1, 30 do  -- Wait up to 3 seconds
-        if CountdownActive then break end
-        wait(0.1)
-    end
-    
-    if not CountdownActive then
-        print("❌ Countdown didn't start!")
-        print("Make sure other player also accepted")
-        return
-    end
-    
-    -- Step 3: Wait until 0.5 seconds left
-    print("[3/4] Waiting for right moment...")
-    while CountdownTime > 0.5 do
-        wait(0.1)
-    end
-    
-    -- Step 4: Cancel at last moment
-    print("[4/4] Cancelling at last second!")
-    
-    -- Try multiple cancels for better chance
-    for i = 1, 3 do
-        pcall(function()
-            SessionSetConfirmation:InvokeServer(false) -- Cancel
-        end)
-        wait(0.05)
-    end
-    
-    -- Try to remove item
-    wait(0.1)
-    if SessionRemoveItem then
-        pcall(function()
-            SessionRemoveItem:InvokeServer(ItemToDupe)
-        end)
-    end
-    
-    print("\n✅ Dupe attempt complete!")
-    print("Check if you still have the car!")
-end
-
--- RAPID CANCEL METHOD
-local function rapidCancelDupe()
-    if not ItemToDupe then
-        print("❌ No item detected!")
-        return
-    end
-    
-    print("\n⚡ Starting RAPID CANCEL dupe...")
-    
-    -- Accept trade
+    -- Step 1: Accept trade
+    print("1️⃣ Accepting trade...")
     pcall(function()
         SessionSetConfirmation:InvokeServer(true)
     end)
     
-    wait(0.5)
+    -- Step 2: Wait for countdown
+    print("2️⃣ Waiting for countdown...")
+    local waited = 0
+    while CountdownTime == 0 and waited < 5 do
+        wait(1)
+        waited = waited + 1
+        print("   Waiting... " .. waited .. "s")
+    end
     
-    -- Rapid cancel spam
-    print("Spamming cancel...")
-    for i = 1, 15 do
+    if CountdownTime == 0 then
+        print("❌ Countdown didn't start!")
+        print("   Make sure other player accepts!")
+        return
+    end
+    
+    -- Step 3: Wait for last moment (MOBILE TIMING - slower)
+    print("3️⃣ Waiting for right moment...")
+    while CountdownTime > 1.0 do  -- Mobile needs more time
+        wait(0.5)
+    end
+    
+    -- Step 4: Cancel at last second
+    print("4️⃣ 🚨 CANCELLING NOW! 🚨")
+    
+    -- Mobile: Send cancel 3 times (network can be slower)
+    for i = 1, 3 do
         pcall(function()
             SessionSetConfirmation:InvokeServer(false)
         end)
-        wait(0.1)
+        wait(0.2)  -- Mobile-friendly delay
     end
     
-    print("✅ Rapid cancel complete!")
+    print("\n✅ Attempt complete!")
+    print("📱 Check your inventory!")
 end
 
--- CREATE SIMPLE GUI (Delta compatible)
+-- AUTOMATIC DUPE (One-click for mobile)
+local function autoDupe()
+    print("\n🤖 AUTOMATIC DUPE MODE")
+    print("Will try 3 times automatically")
+    
+    for attempt = 1, 3 do
+        print("\n--- Attempt " .. attempt .. " ---")
+        mobileSimpleDupe()
+        wait(2)  -- Wait between attempts
+    end
+    
+    print("\n🎯 All attempts complete!")
+end
+
+-- Create MOBILE-FRIENDLY GUI (Big buttons for touch)
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "DeltaDupeGUI"
+screenGui.Name = "MobileDupeGUI"
 screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
+-- Main container
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 300, 0, 180)
-mainFrame.Position = UDim2.new(0.5, -150, 0.5, -90)
-mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-mainFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-mainFrame.BorderSizePixel = 2
+mainFrame.Size = UDim2.new(0.8, 0, 0.6, 0)  -- Big for mobile
+mainFrame.Position = UDim2.new(0.1, 0, 0.2, 0)
+mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+mainFrame.BorderSizePixel = 3
 mainFrame.BorderColor3 = Color3.fromRGB(0, 150, 255)
 mainFrame.Parent = screenGui
 
--- Title
+-- Title (Big for mobile)
 local title = Instance.new("TextLabel")
-title.Text = "DELTA TRADE DUPE"
-title.Size = UDim2.new(1, 0, 0, 40)
+title.Text = "📱 MOBILE DUPE"
+title.Size = UDim2.new(1, 0, 0.15, 0)
 title.Position = UDim2.new(0, 0, 0, 0)
 title.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
 title.TextColor3 = Color3.new(1, 1, 1)
 title.Font = Enum.Font.SourceSansBold
-title.TextSize = 18
+title.TextSize = 24  -- Big text
 title.Parent = mainFrame
 
--- Status
+-- Status (Big text)
 local status = Instance.new("TextLabel")
 status.Name = "Status"
-status.Text = "Status: Waiting for item..."
-status.Size = UDim2.new(0.9, 0, 0, 30)
-status.Position = UDim2.new(0.05, 0, 0.25, 0)
+status.Text = "Waiting for car..."
+status.Size = UDim2.new(0.9, 0, 0.15, 0)
+status.Position = UDim2.new(0.05, 0, 0.2, 0)
 status.TextColor3 = Color3.new(1, 1, 0)
+status.TextSize = 18
 status.TextXAlignment = Enum.TextXAlignment.Left
 status.Parent = mainFrame
 
--- Simple Dupe Button
-local btn1 = Instance.new("TextButton")
-btn1.Text = "🚀 SIMPLE DUPE"
-btn1.Size = UDim2.new(0.9, 0, 0, 35)
-btn1.Position = UDim2.new(0.05, 0, 0.45, 0)
-btn1.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
-btn1.TextColor3 = Color3.new(1, 1, 1)
-btn1.Font = Enum.Font.SourceSansBold
-btn1.Parent = mainFrame
+-- Big button for simple dupe (Easy to tap)
+local btnDupe = Instance.new("TextButton")
+btnDupe.Text = "🚀 START DUPE"
+btnDupe.Size = UDim2.new(0.9, 0, 0.2, 0)  -- Big button
+btnDupe.Position = UDim2.new(0.05, 0, 0.4, 0)
+btnDupe.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
+btnDupe.TextColor3 = Color3.new(1, 1, 1)
+btnDupe.Font = Enum.Font.SourceSansBold
+btnDupe.TextSize = 22
+btnDupe.Parent = mainFrame
 
-btn1.MouseButton1Click:Connect(function()
-    simpleDupe()
+btnDupe.MouseButton1Click:Connect(function()
+    mobileSimpleDupe()
 end)
 
--- Rapid Cancel Button
-local btn2 = Instance.new("TextButton")
-btn2.Text = "⚡ RAPID CANCEL"
-btn2.Size = UDim2.new(0.9, 0, 0, 35)
-btn2.Position = UDim2.new(0.05, 0, 0.7, 0)
-btn2.BackgroundColor3 = Color3.fromRGB(200, 100, 0)
-btn2.TextColor3 = Color3.new(1, 1, 1)
-btn2.Parent = mainFrame
+-- Auto dupe button
+local btnAuto = Instance.new("TextButton")
+btnAuto.Text = "🤖 AUTO DUPE (3x)"
+btnAuto.Size = UDim2.new(0.9, 0, 0.2, 0)
+btnAuto.Position = UDim2.new(0.05, 0, 0.65, 0)
+btnAuto.BackgroundColor3 = Color3.fromRGB(200, 100, 0)
+btnAuto.TextColor3 = Color3.new(1, 1, 1)
+btnAuto.Font = Enum.Font.SourceSansBold
+btnAuto.TextSize = 20
+btnAuto.Parent = mainFrame
 
-btn2.MouseButton1Click:Connect(function()
-    rapidCancelDupe()
+btnAuto.MouseButton1Click:Connect(function()
+    autoDupe()
 end)
 
--- Close button
+-- Close button (Big X)
 local closeBtn = Instance.new("TextButton")
-closeBtn.Text = "X"
-closeBtn.Size = UDim2.new(0, 30, 0, 30)
-closeBtn.Position = UDim2.new(1, -30, 0, 0)
+closeBtn.Text = "✖️ CLOSE"
+closeBtn.Size = UDim2.new(0.4, 0, 0.1, 0)
+closeBtn.Position = UDim2.new(0.3, 0, 0.88, 0)
 closeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 closeBtn.TextColor3 = Color3.new(1, 1, 1)
 closeBtn.Parent = mainFrame
 
 closeBtn.MouseButton1Click:Connect(function()
     screenGui:Destroy()
+    print("GUI closed!")
 end)
 
--- Draggable GUI
-local dragToggle = nil
-local dragInput = nil
-local dragStart = nil
-local startPos = nil
-
-local function updateInput(input)
-    local delta = input.Position - dragStart
-    mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-end
-
-title.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragToggle = true
-        dragStart = input.Position
-        startPos = mainFrame.Position
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                dragToggle = false
-            end
-        end)
+-- Update status for mobile
+game:GetService("RunService").Heartbeat:Connect(function()
+    if ItemToDupe then
+        status.Text = "✅ READY: Tap START DUPE"
+        status.TextColor3 = Color3.new(0, 1, 0)
+    else
+        status.Text = "❌ Add car to trade..."
+        status.TextColor3 = Color3.new(1, 0.5, 0)
+    end
+    
+    if CountdownTime > 0 then
+        status.Text = status.Text .. "\n⏰ " .. CountdownTime .. "s"
     end
 end)
 
-title.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement then
-        dragInput = input
+-- Make GUI draggable for mobile (touch-friendly)
+local dragging = false
+local dragStart = nil
+local startPos = nil
+
+title.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = mainFrame.Position
+    end
+end)
+
+title.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch then
+        dragging = false
     end
 end)
 
 game:GetService("UserInputService").InputChanged:Connect(function(input)
-    if input == dragInput and dragToggle then
-        updateInput(input)
+    if dragging and input.UserInputType == Enum.UserInputType.Touch then
+        local delta = input.Position - dragStart
+        mainFrame.Position = UDim2.new(
+            startPos.X.Scale,
+            startPos.X.Offset + delta.X,
+            startPos.Y.Scale,
+            startPos.Y.Offset + delta.Y
+        )
     end
 end)
 
--- Update status
-game:GetService("RunService").Heartbeat:Connect(function()
-    if ItemToDupe then
-        status.Text = "✅ READY: Item detected"
-        status.TextColor3 = Color3.new(0, 1, 0)
-    else
-        status.Text = "❌ WAITING: Add car to trade"
-        status.TextColor3 = Color3.new(1, 0.5, 0)
-    end
+print("\n" .. string.rep("=", 40))
+print("📱 MOBILE DUPE INSTRUCTIONS:")
+print(string.rep("=", 40))
+print("1. Start trade with someone")
+print("2. Add your car to trade")
+print("3. Wait for ✅ READY message")
+print("4. Tap 🚀 START DUPE button")
+print("5. Other player MUST accept")
+print("6. Wait for countdown")
+print("7. Script cancels automatically")
+print("8. Check if car duplicated!")
+print(string.rep("=", 40))
+print("\n💡 TIPS FOR MOBILE:")
+print("• Use GOOD INTERNET (WiFi recommended)")
+print("• Keep screen ON during process")
+print("• Try multiple times if fails")
+print("• Drag title to move GUI")
+print("• Tap ✖️ CLOSE to remove GUI")
+
+-- Mobile notification system
+local function mobileNotify(message)
+    print("📢 " .. message)
     
-    if CountdownActive then
-        status.Text = status.Text .. " | ⏰ " .. CountdownTime .. "s"
-    end
-end)
-
-print("\n📋 INSTRUCTIONS:")
-print("1. Start a trade with someone")
-print("2. Add your car to the trade")
-print("3. Wait for 'READY: Item detected'")
-print("4. Click 'SIMPLE DUPE' button")
-print("5. Other player must ALSO accept trade")
-print("6. Script will cancel at last second")
-print("\n💡 TIP: Use an alt account for best results!")
-print("💡 TIP: Try multiple times if it fails!")
-
--- Keybind to toggle GUI
-local UserInputService = game:GetService("UserInputService")
-local guiVisible = true
-
-UserInputService.InputBegan:Connect(function(input, processed)
-    if not processed then
-        if input.KeyCode == Enum.KeyCode.RightControl then
-            guiVisible = not guiVisible
-            screenGui.Enabled = guiVisible
-            if guiVisible then
-                print("GUI shown (RightControl to hide)")
-            else
-                print("GUI hidden (RightControl to show)")
-            end
+    -- Try to create a popup (mobile-friendly)
+    local notify = Instance.new("TextLabel")
+    notify.Text = message
+    notify.Size = UDim2.new(0.8, 0, 0.1, 0)
+    notify.Position = UDim2.new(0.1, 0, 0.05, 0)
+    notify.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    notify.TextColor3 = Color3.new(1, 1, 1)
+    notify.TextSize = 16
+    notify.ZIndex = 100
+    notify.Parent = screenGui
+    
+    -- Auto-remove after 3 seconds
+    delay(3, function()
+        if notify then
+            notify:Destroy()
         end
-    end
-end)
+    end)
+end
 
-print("\n🎮 CONTROLS:")
-print("• RightControl: Hide/Show GUI")
-print("• Drag title bar: Move GUI")
-print("• X button: Close GUI")
+-- Auto-start detection
+mobileNotify("Mobile Dupe Script Loaded!")
+mobileNotify("Add car to trade to begin")
+
+-- Add help text at bottom
+local helpText = Instance.new("TextLabel")
+helpText.Text = "Need help? Make sure:\n1. Trade is active\n2. Car added to trade\n3. Other player accepts"
+helpText.Size = UDim2.new(1, 0, 0.2, 0)
+helpText.Position = UDim2.new(0, 0, 0.9, 0)
+helpText.TextColor3 = Color3.new(1, 1, 1)
+helpText.TextSize = 14
+helpText.TextYAlignment = Enum.TextYAlignment.Top
+helpText.BackgroundTransparency = 1
+helpText.Parent = mainFrame
