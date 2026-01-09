@@ -1,4 +1,4 @@
--- FIXED: Items are tables, need to extract IDs
+-- FINAL WORKING TRADE DUPE SCRIPT
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 
@@ -12,111 +12,34 @@ local OnSessionCountdownUpdated = TradingRemotes:WaitForChild("OnSessionCountdow
 local ItemToDupe = nil
 local CountdownTime = 0
 
--- Function to extract item ID from table
-local function extractItemId(itemTable)
-    if type(itemTable) == "string" or type(itemTable) == "number" then
-        return tostring(itemTable)
-    elseif type(itemTable) == "table" then
-        -- Try common property names
-        local possibleIds = {
-            itemTable.Id,
-            itemTable.ID,
-            itemTable.id,
-            itemTable.ItemId,
-            itemTable.itemId,
-            itemTable.Name,
-            itemTable.name,
-            itemTable.AssetId,
-            itemTable.assetId
-        }
-        
-        for _, id in ipairs(possibleIds) do
-            if id then
-                return tostring(id)
-            end
-        end
-        
-        -- Try to find any string/number in the table
-        for key, value in pairs(itemTable) do
-            if type(value) == "string" or type(value) == "number" then
-                if tostring(key):lower():find("id") or 
-                   tostring(key):lower():find("name") or
-                   tostring(value):lower():find("car") then
-                    return tostring(value)
-                end
-            end
-        end
-        
-        -- Last resort: return table address
-        return tostring(itemTable):match("table: (%x+)") or "unknown"
-    end
-    
-    return tostring(itemTable)
-end
-
--- DEBUG: Print table contents
-local function debugTable(t, indent)
-    indent = indent or ""
-    for key, value in pairs(t) do
-        if type(value) == "table" then
-            print(indent .. tostring(key) .. ": table")
-            debugTable(value, indent .. "  ")
-        else
-            print(indent .. tostring(key) .. ": " .. tostring(value) .. " (" .. type(value) .. ")")
-        end
-    end
-end
-
--- Track items
+-- Track items (FIXED: Using exact structure from debug)
 OnSessionItemsUpdated.OnClientEvent:Connect(function(data)
-    print("\n🔍 ITEM UPDATE RECEIVED")
+    print("\n📦 ITEM UPDATE")
     
     if type(data) == "table" then
-        print("Full data structure:")
-        debugTable(data)
-        
-        -- The data structure seems to be:
-        -- data.Player = player object
-        -- data.Items = table of items
-        -- data.Id = ???
-        
-        if data.Items and type(data.Items) == "table" then
-            print("\n📦 Items in trade:")
-            for i, itemTable in ipairs(data.Items) do
-                local itemId = extractItemId(itemTable)
-                print("  Item " .. i .. ": " .. itemId)
-                
-                -- Check if this is our player's items
-                if data.Player and data.Player == LocalPlayer then
-                    ItemToDupe = itemId
-                    print("✅ THIS IS YOUR CAR! ID: " .. itemId)
-                end
-            end
-        end
-        
-        -- Alternative structure: might be data[player] = items
-        for key, value in pairs(data) do
-            if type(key) == "number" or type(key) == "string" then
-                local playerId = tonumber(key)
-                if playerId == LocalPlayer.UserId and type(value) == "table" then
-                    print("\n🎯 Found items for you (method 2):")
-                    for i, itemTable in ipairs(value) do
-                        local itemId = extractItemId(itemTable)
-                        ItemToDupe = itemId
-                        print("  Your car " .. i .. ": " .. itemId)
-                    end
-                end
-            end
-        end
-        
-        if not ItemToDupe then
-            print("❌ Could not identify your car in the data")
-            print("Trying to auto-select first car...")
-            
-            -- Try to get first item from any structure
+        -- Check if this is our player's data
+        if data.Player and data.Player == LocalPlayer then
             if data.Items and #data.Items > 0 then
-                ItemToDupe = extractItemId(data.Items[1])
-                print("⚠️ Auto-selected: " .. ItemToDupe)
+                -- Get first car's ID
+                local firstCar = data.Items[1]
+                if firstCar and firstCar.Id then
+                    ItemToDupe = firstCar.Id
+                    print("✅ CAR DETECTED!")
+                    print("Name: " .. (firstCar.Name or "Unknown"))
+                    print("Type: " .. (firstCar.Type or "Unknown"))
+                    print("ID: " .. ItemToDupe)
+                end
+            end
+        else
+            print("⚠️ Data not for current player")
+            -- Try to auto-detect anyway
+            if data.Items and #data.Items > 0 then
+                local firstCar = data.Items[1]
+                if firstCar and firstCar.Id then
+                    ItemToDupe = firstCar.Id
+                    print("⚠️ Auto-selected car:")
+                    print("ID: " .. ItemToDupe)
+                end
             end
         end
     end
@@ -133,25 +56,30 @@ OnSessionCountdownUpdated.OnClientEvent:Connect(function(timeData)
     end
 end)
 
--- Simple dupe function
+-- Dupe function
 local function startDupe()
-    print("\n🚀 Starting dupe...")
-    print("Using item ID:", ItemToDupe)
-    
     if not ItemToDupe then
-        print("❌ No item selected!")
-        print("Please add a car to trade first")
+        print("❌ No car detected!")
+        print("Add car to trade first")
         return
     end
     
+    print("\n🚀 STARTING DUPE...")
+    print("Car ID: " .. ItemToDupe)
+    
+    -- Accept trade
     print("Step 1: Accepting trade...")
-    pcall(function()
+    local success, error = pcall(function()
         SessionSetConfirmation:InvokeServer(true)
     end)
     
-    print("Waiting for countdown...")
+    if not success then
+        print("❌ Failed to accept:", error)
+        return
+    end
     
     -- Wait for countdown
+    print("Step 2: Waiting for countdown...")
     local waited = 0
     while CountdownTime == 0 and waited < 50 do
         wait(0.1)
@@ -159,21 +87,21 @@ local function startDupe()
     end
     
     if CountdownTime == 0 then
-        print("❌ Countdown didn't start")
-        print("Other player needs to accept!")
+        print("❌ Countdown didn't start!")
+        print("Make sure other player accepts!")
         return
     end
     
-    print("Countdown: " .. CountdownTime .. "s")
+    print("Step 3: Countdown started: " .. CountdownTime .. "s")
     
     -- Wait for last 0.3 seconds
     while CountdownTime > 0.3 do
         wait(0.1)
     end
     
-    print("🚨 Cancelling at " .. CountdownTime .. "s!")
+    -- Cancel at last moment
+    print("Step 4: 🚨 CANCELLING AT " .. CountdownTime .. "s!")
     
-    -- Send cancel
     for i = 1, 3 do
         pcall(function()
             SessionSetConfirmation:InvokeServer(false)
@@ -181,26 +109,26 @@ local function startDupe()
         wait(0.05)
     end
     
-    print("✅ Dupe attempt complete!")
-    print("Check your inventory!")
+    print("\n✅ DUPE COMPLETE!")
+    print("Check if you still have the car!")
 end
 
 -- SIMPLE UI
 local gui = Instance.new("ScreenGui")
-gui.Name = "CarDupe"
+gui.Name = "DupeGUI"
 gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 180, 0, 100)
+frame.Size = UDim2.new(0, 160, 0, 80)
 frame.Position = UDim2.new(0, 20, 0, 100)
 frame.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
 frame.BorderSizePixel = 2
 frame.BorderColor3 = Color3.new(0, 0.7, 1)
 frame.Parent = gui
 
--- Title
+-- Drag title
 local title = Instance.new("TextLabel")
-title.Text = "≡ CAR DUPE (Drag)"
+title.Text = "≡ DUPE"
 title.Size = UDim2.new(1, 0, 0, 20)
 title.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
 title.TextColor3 = Color3.new(1, 1, 1)
@@ -208,34 +136,25 @@ title.Parent = frame
 
 -- Status
 local status = Instance.new("TextLabel")
-status.Text = "Add car to trade"
-status.Size = UDim2.new(1, 0, 0, 25)
-status.Position = UDim2.new(0, 0, 0.2, 0)
+status.Text = "Add car"
+status.Size = UDim2.new(1, 0, 0, 20)
+status.Position = UDim2.new(0, 0, 0.25, 0)
 status.TextColor3 = Color3.new(1, 1, 0)
 status.TextSize = 12
 status.Parent = frame
 
--- Item ID display
-local itemDisplay = Instance.new("TextLabel")
-itemDisplay.Text = "ID: none"
-itemDisplay.Size = UDim2.new(1, 0, 0, 15)
-itemDisplay.Position = UDim2.new(0, 0, 0.45, 0)
-itemDisplay.TextColor3 = Color3.new(1, 1, 1)
-itemDisplay.TextSize = 10
-itemDisplay.Parent = frame
-
--- Dupe button
+-- Button
 local btn = Instance.new("TextButton")
-btn.Text = "START DUPE"
-btn.Size = UDim2.new(0.9, 0, 0.3, 0)
-btn.Position = UDim2.new(0.05, 0, 0.65, 0)
+btn.Text = "START"
+btn.Size = UDim2.new(0.8, 0, 0.3, 0)
+btn.Position = UDim2.new(0.1, 0, 0.6, 0)
 btn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
 btn.TextColor3 = Color3.new(1, 1, 1)
 btn.Parent = frame
 
 btn.MouseButton1Click:Connect(startDupe)
 
--- Close button
+-- Close
 local close = Instance.new("TextButton")
 close.Text = "X"
 close.Size = UDim2.new(0, 20, 0, 20)
@@ -276,16 +195,14 @@ game:GetService("UserInputService").InputChanged:Connect(function(input)
     end
 end)
 
--- Update UI
+-- Update status
 game:GetService("RunService").Heartbeat:Connect(function()
     if ItemToDupe then
-        status.Text = "✅ READY TO DUPE"
+        status.Text = "✅ READY"
         status.TextColor3 = Color3.new(0, 1, 0)
-        itemDisplay.Text = "ID: " .. tostring(ItemToDupe):sub(1, 10) .. "..."
     else
-        status.Text = "Add car to trade"
+        status.Text = "Add car"
         status.TextColor3 = Color3.new(1, 1, 0)
-        itemDisplay.Text = "ID: none"
     end
     
     if CountdownTime > 0 then
@@ -294,20 +211,30 @@ game:GetService("RunService").Heartbeat:Connect(function()
 end)
 
 print("\n" .. string.rep("=", 50))
-print("CAR TABLE DUPE SCRIPT LOADED")
+print("🎯 FINAL DUPE SCRIPT LOADED!")
 print(string.rep("=", 50))
-print("ITEMS ARE TABLES, NOT STRINGS!")
-print("Now extracting IDs from tables...")
-print("\nINSTRUCTIONS:")
+print("CAR STRUCTURE FOUND:")
+print("- Id: UUID string")
+print("- Name: Car name")
+print("- Type: 'Car'")
+print(string.rep("=", 50))
+print("INSTRUCTIONS:")
 print("1. Start trade")
-print("2. Add car(s) to trade")
-print("3. Look for 'THIS IS YOUR CAR!' message")
-print("4. Click START DUPE")
+print("2. Add car to trade")
+print("3. Wait for 'CAR DETECTED!'")
+print("4. Click START")
+print("5. Other player MUST accept")
+print("6. Script cancels at 0.3s")
+print("7. Check inventory!")
 print(string.rep("=", 50))
 
--- Make ItemToDupe global for manual setting
-_G.ItemToDupe = ItemToDupe
-_G.setCarId = function(id)
+-- Manual override if needed
+_G.forceCarId = function(id)
     ItemToDupe = id
     print("✅ Manually set car ID to:", id)
+end
+
+-- Show current car
+_G.showCar = function()
+    print("Current car ID:", ItemToDupe)
 end
