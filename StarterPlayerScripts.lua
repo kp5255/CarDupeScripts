@@ -1,4 +1,4 @@
--- WORKING TRADE DUPE SCRIPT
+-- FIXED: SessionSetConfirmation is RemoteFunction
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -6,18 +6,19 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 -- Get trading remotes
 local TradingRemotes = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Services"):WaitForChild("TradingServiceRemotes")
 
--- Find ALL important remotes
+-- CORRECT: SessionSetConfirmation is RemoteFunction
 local SessionSetConfirmation = TradingRemotes:WaitForChild("SessionSetConfirmation")
 local OnSessionItemsUpdated = TradingRemotes:WaitForChild("OnSessionItemsUpdated")
 local OnSessionCountdownUpdated = TradingRemotes:WaitForChild("OnSessionCountdownUpdated")
 local SessionCancel = TradingRemotes:WaitForChild("SessionCancel")
-local OnSessionFinished = TradingRemotes:WaitForChild("OnSessionFinished")
-local OnSessionCancelled = TradingRemotes:WaitForChild("OnSessionCancelled")
+
+print("✅ Remotes found:")
+print("SessionSetConfirmation type:", SessionSetConfirmation.ClassName)
+print("SessionCancel type:", SessionCancel and SessionCancel.ClassName or "nil")
 
 -- Variables
 local ItemToDupe = nil
 local CountdownTime = 0
-local OtherPlayerAccepted = false
 
 -- Track items
 OnSessionItemsUpdated.OnClientEvent:Connect(function(data)
@@ -39,21 +40,28 @@ OnSessionCountdownUpdated.OnClientEvent:Connect(function(timeData)
     end
 end)
 
--- WORKING METHOD 1: PACKET REPLAY ATTACK
-local function packetReplayAttack()
+-- WORKING METHOD: REMOTEFUNCTION HOOK
+local function remoteFunctionHook()
     if not ItemToDupe then
         print("❌ Add car first")
         return
     end
     
-    print("🚀 PACKET REPLAY ATTACK")
+    print("🚀 REMOTEFUNCTION HOOK METHOD")
     
-    -- Step 1: Accept trade normally
-    pcall(function()
-        SessionSetConfirmation:InvokeServer(true)
+    -- Accept trade normally
+    print("Step 1: Accepting trade...")
+    local success, result = pcall(function()
+        return SessionSetConfirmation:InvokeServer(true)
     end)
     
+    if not success then
+        print("❌ Failed to accept:", result)
+        return
+    end
+    
     -- Wait for countdown
+    print("Step 2: Waiting for countdown...")
     local waited = 0
     while CountdownTime == 0 and waited < 50 do
         wait(0.1)
@@ -62,189 +70,144 @@ local function packetReplayAttack()
     
     if CountdownTime == 0 then
         print("❌ Countdown didn't start")
+        print("Make sure other player accepts!")
         return
     end
     
-    -- Step 2: Store original remote function
+    print("Countdown started: " .. CountdownTime .. "s")
+    
+    -- Hook the RemoteFunction
+    print("Step 3: Hooking RemoteFunction...")
+    
     local originalInvoke = SessionSetConfirmation.InvokeServer
     
-    -- Step 3: Hook and modify packets
+    -- Replace InvokeServer method
     SessionSetConfirmation.InvokeServer = function(...)
         local args = {...}
+        print("[HOOK] RemoteFunction called with:", args[1])
         
-        -- If this is an accept packet
+        -- If accepting, also send cancel
         if args[1] == true then
-            print("[HOOK] Intercepted ACCEPT packet")
+            print("[HOOK] Accept detected - sending cancel too!")
             
             -- Send original accept
-            local result = originalInvoke(SessionSetConfirmation, true)
+            local acceptResult = originalInvoke(SessionSetConfirmation, true)
             
-            -- IMMEDIATELY send cancel (creates race condition)
+            -- Immediately send cancel (race condition)
             spawn(function()
-                wait(0.001) -- Minimal delay
-                print("[HOOK] Sending CANCEL packet")
-                originalInvoke(SessionSetConfirmation, false)
+                wait(0.001)
+                print("[HOOK] Sending cancel...")
+                pcall(function()
+                    originalInvoke(SessionSetConfirmation, false)
+                end)
                 
                 -- Send more cancels
-                for i = 1, 5 do
+                for i = 1, 3 do
                     wait(0.001)
-                    originalInvoke(SessionSetConfirmation, false)
+                    pcall(function()
+                        originalInvoke(SessionSetConfirmation, false)
+                    end)
                 end
             end)
             
-            return result
+            return acceptResult
         end
         
+        -- Normal call
         return originalInvoke(SessionSetConfirmation, ...)
     end
     
-    print("✅ Packet hook installed!")
-    print("Now waiting for countdown...")
+    print("✅ RemoteFunction hooked!")
     
-    -- Step 4: At last moment, trigger the hook
-    while CountdownTime > 0.1 do
+    -- Wait for optimal timing
+    print("Step 4: Waiting for right moment...")
+    while CountdownTime > 0.2 do
         wait(0.1)
     end
     
-    print("🚨 Triggering packet replay...")
-    
-    -- This will trigger our hook
+    -- Trigger the hook by "accepting" again
+    print("🚨 Triggering hook at " .. CountdownTime .. "s...")
     pcall(function()
         SessionSetConfirmation:InvokeServer(true)
     end)
     
-    print("✅ Attack executed!")
+    print("✅ Hook triggered!")
+    print("Check if car duplicated!")
 end
 
--- WORKING METHOD 2: REMOTE EVENT SPOOFING
-local function remoteEventSpoofing()
-    print("🎭 REMOTE EVENT SPOOFING")
+-- METHOD 2: DIRECT PACKET MANIPULATION
+local function directPacketManipulation()
+    print("💉 DIRECT PACKET MANIPULATION")
     
-    -- Step 1: Listen for trade completion
-    if OnSessionFinished then
-        OnSessionFinished.OnClientEvent:Connect(function(result)
-            print("Trade finished! Trying to revert...")
-            
-            -- Immediately try to cancel/revert
-            for i = 1, 10 do
-                pcall(function()
-                    if SessionCancel then
-                        SessionCancel:InvokeServer()
-                    end
-                    SessionSetConfirmation:InvokeServer(false)
-                end)
-                wait(0.05)
-            end
-            
-            -- Try to fire cancelled event manually
-            if OnSessionCancelled then
-                pcall(function()
-                    OnSessionCancelled:FireServer()
-                end)
-            end
-        end)
-    end
-    
-    -- Step 2: Accept trade
-    pcall(function()
-        SessionSetConfirmation:InvokeServer(true)
-    end)
-    
-    print("✅ Spoofing setup complete!")
-end
-
--- WORKING METHOD 3: NETWORK DESYNC
-local function networkDesync()
-    print("🌐 NETWORK DESYNC")
-    
-    -- Create network congestion
-    local packets = {}
-    
-    -- Spam packets to create lag
-    for i = 1, 50 do
-        spawn(function()
-            pcall(function()
-                SessionSetConfirmation:InvokeServer(true)
-                table.insert(packets, {type = "accept", time = os.time()})
-            end)
-        end)
-        
-        spawn(function()
-            pcall(function()
-                SessionSetConfirmation:InvokeServer(false)
-                table.insert(packets, {type = "cancel", time = os.time()})
-            end)
-        end)
-        
-        wait(0.01)
-    end
-    
-    -- Wait for optimal moment
-    while CountdownTime > 0.5 do
-        wait(0.1)
-    end
-    
-    -- Send critical packet
-    print("🚨 Sending critical desync packet...")
-    
-    -- Create a corrupted packet
+    -- Hook at the metatable level
     local mt = getrawmetatable(game)
     local oldNamecall = mt.__namecall
     
     setreadonly(mt, false)
+    
     mt.__namecall = newcclosure(function(self, ...)
         local method = getnamecallmethod()
+        local args = {...}
         
+        -- Target our trading RemoteFunction
         if method == "InvokeServer" and tostring(self) == "SessionSetConfirmation" then
-            -- Corrupt the packet data
-            print("[DESYNC] Corrupting packet...")
-            return oldNamecall(self, "corrupted_packet", math.random(), os.time())
+            print("[METATABLE HOOK] Intercepted trade packet:", args[1])
+            
+            -- If this is an accept (true)
+            if args[1] == true then
+                -- Send the accept normally
+                local result = oldNamecall(self, ...)
+                
+                -- But also queue a cancel
+                spawn(function()
+                    wait(0.001)  -- Tiny delay
+                    print("[METATABLE HOOK] Queueing cancel...")
+                    for i = 1, 5 do
+                        pcall(function()
+                            oldNamecall(self, false)
+                        end)
+                        wait(0.001)
+                    end
+                end)
+                
+                return result
+            end
         end
         
         return oldNamecall(self, ...)
     end)
     
-    -- Send corrupted packet
-    pcall(function()
-        SessionSetConfirmation:InvokeServer(true)
-    end)
-    
     setreadonly(mt, true)
-    print("✅ Desync attack complete!")
+    
+    print("✅ Metatable hook installed!")
+    print("Now accept the trade normally...")
 end
 
--- WORKING METHOD 4: TIMING EXPLOIT WITH ALT
-local function timingExploitWithAlt()
-    print("👥 ALT ACCOUNT TIMING EXPLOIT")
-    print("REQUIRES 2 ACCOUNTS!")
+-- METHOD 3: SIMULTANEOUS INVOKE
+local function simultaneousInvoke()
+    print("⚡ SIMULTANEOUS INVOKE")
     
-    -- Account A (main): Accepts at 4.9s
-    -- Account B (alt): Cancels at 4.9s
-    
-    local function acceptAtTime(time)
-        while CountdownTime > time do
-            wait(0.01)
-        end
-        print("⏱️ Accepting at " .. CountdownTime .. "s")
-        pcall(function()
-            SessionSetConfirmation:InvokeServer(true)
-        end)
-    end
-    
-    local function cancelAtTime(time)
-        while CountdownTime > time do
-            wait(0.01)
-        end
-        print("⏱️ Cancelling at " .. CountdownTime .. "s")
-        for i = 1, 5 do
-            pcall(function()
-                SessionSetConfirmation:InvokeServer(false)
+    -- Create race condition by calling both at "same" time
+    local function createRace()
+        -- Call accept and cancel in rapid succession
+        for i = 1, 20 do
+            spawn(function()
+                pcall(function()
+                    SessionSetConfirmation:InvokeServer(true)
+                end)
             end)
+            
+            spawn(function()
+                pcall(function()
+                    SessionSetConfirmation:InvokeServer(false)
+                end)
+            end)
+            
             wait(0.001)
         end
     end
     
-    -- Start countdown first
+    -- Start trade
     pcall(function()
         SessionSetConfirmation:InvokeServer(true)
     end)
@@ -254,76 +217,92 @@ local function timingExploitWithAlt()
         wait(0.1)
     end
     
-    print("Countdown started: " .. CountdownTime .. "s")
+    print("Countdown: " .. CountdownTime .. "s")
     
-    -- Execute both at ~4.9 seconds
-    spawn(function() acceptAtTime(0.15) end)  -- Accept at 0.15s left
-    spawn(function() cancelAtTime(0.1) end)   -- Cancel at 0.1s left
+    -- Create race at different timings
+    local timings = {4.5, 4.0, 3.5, 3.0, 2.5, 2.0, 1.5, 1.0, 0.5, 0.3, 0.2, 0.1}
     
-    print("✅ Timing exploit activated!")
+    for _, timing in ipairs(timings) do
+        while CountdownTime > timing do
+            wait(0.1)
+        end
+        
+        print("🚨 Race condition at " .. CountdownTime .. "s")
+        createRace()
+        wait(0.5)
+    end
+    
+    print("✅ Race conditions created!")
 end
 
--- WORKING METHOD 5: FORCEFUL TRADE CANCELLATION
-local function forcefulCancellation()
-    print("💥 FORCEFUL CANCELLATION")
+-- METHOD 4: SESSION CANCELLATION SPAM
+local function sessionCancellationSpam()
+    print("🔁 SESSION CANCELLATION SPAM")
     
-    -- Accept trade
+    -- Start trade
     pcall(function()
         SessionSetConfirmation:InvokeServer(true)
     end)
     
-    -- Wait for countdown to reach 1 second
-    while CountdownTime > 1 do
+    -- Wait for countdown
+    while CountdownTime == 0 do
         wait(0.1)
     end
     
-    print("🚨 Starting forceful cancellation...")
+    print("Countdown: " .. CountdownTime .. "s")
     
-    -- Method A: Spam cancel packets
-    for i = 1, 100 do
-        spawn(function()
-            pcall(function()
-                SessionSetConfirmation:InvokeServer(false)
-            end)
-        end)
-        wait(0.001)
-    end
-    
-    -- Method B: Try to call SessionCancel remote
+    -- Spam SessionCancel if it exists
     if SessionCancel then
-        for i = 1, 20 do
-            pcall(function()
-                SessionCancel:InvokeServer()
+        print("Found SessionCancel remote!")
+        
+        -- Wait for last second
+        while CountdownTime > 1 do
+            wait(0.1)
+        end
+        
+        print("🚨 Spamming SessionCancel...")
+        
+        -- Spam cancellation
+        for i = 1, 50 do
+            spawn(function()
+                pcall(function()
+                    SessionCancel:InvokeServer()
+                end)
             end)
             wait(0.01)
         end
+        
+        -- Also spam SetConfirmation false
+        for i = 1, 50 do
+            spawn(function()
+                pcall(function()
+                    SessionSetConfirmation:InvokeServer(false)
+                end)
+            end)
+            wait(0.01)
+        end
+    else
+        print("❌ SessionCancel not found")
     end
     
-    -- Method C: Try to fire cancelled event
-    if OnSessionCancelled then
-        pcall(function()
-            OnSessionCancelled:FireServer()
-        end)
-    end
-    
-    print("✅ Forceful cancellation attempted!")
+    print("✅ Cancellation spam complete!")
 end
 
--- CREATE WORKING UI
+-- SIMPLE UI
 local gui = Instance.new("ScreenGui")
-gui.Name = "WorkingDupeGUI"
+gui.Name = "RemoteFunctionDupe"
 gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 220, 0, 220)
+frame.Size = UDim2.new(0, 200, 0, 180)
 frame.Position = UDim2.new(0, 20, 0, 100)
 frame.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-frame.BorderSizePixel = 3
+frame.BorderSizePixel = 2
 frame.BorderColor3 = Color3.new(0, 1, 0)
 frame.Parent = gui
 
 local title = Instance.new("TextLabel")
-title.Text = "✅ WORKING DUPE METHODS"
+title.Text = "✅ REMOTEFUNCTION DUPE"
 title.Size = UDim2.new(1, 0, 0, 25)
 title.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
 title.TextColor3 = Color3.new(1, 1, 1)
@@ -332,18 +311,17 @@ title.Parent = frame
 
 -- Methods
 local methods = {
-    {"🚀 Packet Replay Attack", packetReplayAttack},
-    {"🎭 Remote Event Spoofing", remoteEventSpoofing},
-    {"🌐 Network Desync", networkDesync},
-    {"👥 Alt Account Timing", timingExploitWithAlt},
-    {"💥 Forceful Cancellation", forcefulCancellation}
+    {"🚀 RemoteFunction Hook", remoteFunctionHook},
+    {"💉 Direct Packet Manip", directPacketManipulation},
+    {"⚡ Simultaneous Invoke", simultaneousInvoke},
+    {"🔁 Session Cancel Spam", sessionCancellationSpam}
 }
 
 for i, method in ipairs(methods) do
     local btn = Instance.new("TextButton")
     btn.Text = method[1]
     btn.Size = UDim2.new(0.9, 0, 0, 30)
-    btn.Position = UDim2.new(0.05, 0, 0.12 + (i * 0.16), 0)
+    btn.Position = UDim2.new(0.05, 0, 0.15 + (i * 0.2), 0)
     btn.BackgroundColor3 = Color3.fromRGB(0, 100, 50)
     btn.TextColor3 = Color3.new(1, 1, 1)
     btn.Font = Enum.Font.SourceSansBold
@@ -352,21 +330,21 @@ for i, method in ipairs(methods) do
 end
 
 print("\n" .. string.rep("=", 60))
-print("🎯 WORKING DUPE METHODS")
+print("✅ FIXED: SessionSetConfirmation is REMOTEFUNCTION")
 print(string.rep("=", 60))
-print("Try these in order:")
-print("1. Packet Replay Attack - Best success rate")
-print("2. Alt Account Timing - Needs 2 accounts")
-print("3. Forceful Cancellation - Aggressive")
+print("RemoteFunctions use: :InvokeServer(args)")
+print("RemoteEvents use: :FireServer(args)")
 print(string.rep("=", 60))
-print("IMPORTANT: Use with ALT ACCOUNT!")
-print("Trade with yourself for best results.")
+print("BEST METHOD: RemoteFunction Hook")
+print("It intercepts and modifies packets in real-time")
 print(string.rep("=", 60))
 
--- Make ItemToDupe global for manual setting
-_G.setCar = function(id)
-    ItemToDupe = id
-    print("✅ Car set to:", id)
-end
+-- Make functions global
+_G.dupe = remoteFunctionHook
+_G.hook = directPacketManipulation
+_G.race = simultaneousInvoke
 
-_G.startDupe = packetReplayAttack
+print("\nCommands available:")
+print("_G.dupe() - Run main dupe method")
+print("_G.hook() - Install packet hook")
+print("_G.race() - Create race conditions")
