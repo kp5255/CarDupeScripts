@@ -1,492 +1,535 @@
--- REAL ITEM INJECTION EXPLOIT
--- Actually obtains items for free, visible to others, disappears on relog
+-- WRAP UNLOCKER FOR SELECTED CAR
+-- Targets exact UI structure: PlayerGui.Customization.Bottom.Customization.Items.Pages.List.Wrap
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local HttpService = game:GetService("HttpService")
 
-print("🎯 REAL ITEM INJECTION EXPLOIT")
-print("Obtains items for free, visible to others, disappears on relog")
+print("🎯 WRAP UNLOCKER FOR SELECTED CAR")
+print("Targeting: PlayerGui.Customization.Bottom.Customization.Items.Pages.List.Wrap")
 
--- Get the customization system
-local CarCustomization
-local CustomizationItemsRemotes
-local PlayerDataController
-
-pcall(function()
-    CarCustomization = require(ReplicatedStorage.Databases.CarCustomization)
-    CustomizationItemsRemotes = require(ReplicatedStorage.Remotes.Services.CustomizationItemsRemotes)
-    PlayerDataController = require(ReplicatedStorage.Controllers.PlayerDataController)
-    print("✅ Found customization systems")
-end)
-
--- Generate fake UUIDs
-local function generateFakeUUID()
-    return HttpService:GenerateGUID(false)
+-- Find the exact UI structure
+local function findWrapUI()
+    print("\n🔍 FINDING WRAP UI...")
+    
+    local customizationUI = LocalPlayer.PlayerGui:FindFirstChild("Customization")
+    if not customizationUI then
+        print("❌ Customization UI not found")
+        return nil
+    end
+    
+    local bottom = customizationUI:FindFirstChild("Bottom")
+    if not bottom then
+        print("❌ Bottom not found")
+        return nil
+    end
+    
+    local customization = bottom:FindFirstChild("Customization")
+    if not customization then
+        print("❌ Customization not found")
+        return nil
+    end
+    
+    local items = customization:FindFirstChild("Items")
+    if not items then
+        print("❌ Items not found")
+        return nil
+    end
+    
+    local pages = items:FindFirstChild("Pages")
+    if not pages then
+        print("❌ Pages not found")
+        return nil
+    end
+    
+    local list = pages:FindFirstChild("List")
+    if not list then
+        print("❌ List not found")
+        return nil
+    end
+    
+    local wrap = list:FindFirstChild("Wrap")
+    if not wrap then
+        print("❌ Wrap category not found in List")
+        -- Try to find Wrap elsewhere
+        for _, child in pairs(list:GetChildren()) do
+            if child.Name:find("Wrap") then
+                print("Found similar:", child.Name)
+                return child
+            end
+        end
+        return nil
+    end
+    
+    print("✅ Found Wrap UI at:", wrap:GetFullName())
+    return wrap
 end
 
--- Function to inject ANY customization item
-local function injectCustomizationItem(category, itemName, carName)
-    print("\n💉 INJECTING CUSTOMIZATION ITEM...")
-    print("Category:", category)
-    print("Item:", itemName)
-    print("For car:", carName or "All cars")
+-- Get currently selected car
+local function getSelectedCar()
+    print("\n🚗 FINDING SELECTED CAR...")
     
-    -- Create fake item data
-    local fakeItem = {
-        Id = generateFakeUUID(),
-        Type = "Customization",
-        Category = category,
-        Name = itemName,
-        ObtainedAt = os.time(),
-        -- Add car-specific data if needed
-        CarName = carName
-    }
-    
-    print("Fake item created:", fakeItem)
-    
-    -- Method 1: Try to add via CustomizationItemsRemotes
-    if CustomizationItemsRemotes then
-        pcall(function()
-            -- Try different remote functions
-            if CustomizationItemsRemotes.AddItem then
-                CustomizationItemsRemotes.AddItem:InvokeServer(fakeItem)
-                print("✅ Added via AddItem")
+    -- Method 1: Check garage UI
+    local garageUI = LocalPlayer.PlayerGui:FindFirstChild("Garage")
+    if garageUI then
+        for _, element in pairs(garageUI:GetDescendants()) do
+            if element:IsA("TextLabel") and element.Text:find("Selected:") then
+                local carName = element.Text:gsub("Selected: ", "")
+                print("✅ Selected car from Garage:", carName)
+                return carName
             end
-            
-            if CustomizationItemsRemotes.UnlockItem then
-                CustomizationItemsRemotes.UnlockItem:InvokeServer(category, itemName)
-                print("✅ Unlocked via UnlockItem")
-            end
-            
-            if CustomizationItemsRemotes.EquipItem then
-                CustomizationItemsRemotes.EquipItem:InvokeServer(category, itemName, carName)
-                print("✅ Equipped via EquipItem")
-            end
-        end)
+        end
     end
     
-    -- Method 2: Try to modify player data directly
-    if PlayerDataController then
-        pcall(function()
-            local inventory = PlayerDataController:GetContainer("Inventory")
-            if inventory then
-                -- Get current inventory
-                local currentItems = inventory:GetWeak() or {}
-                
-                -- Add our fake item
-                table.insert(currentItems, fakeItem)
-                
-                -- Try to update (might not work if server validates)
-                inventory:SetWeak(currentItems)
-                print("✅ Added to player inventory")
+    -- Method 2: Check current vehicle
+    local character = LocalPlayer.Character
+    if character then
+        for _, part in pairs(character:GetDescendants()) do
+            if part:IsA("Model") and (part.Name:find("Car") or part.Name:find("Vehicle")) then
+                print("✅ Current vehicle:", part.Name)
+                return part.Name
             end
-        end)
+        end
     end
     
-    -- Method 3: Try to trigger the UI update
-    spawn(function()
-        wait(0.5)
-        print("Attempting to update UI...")
+    -- Method 3: Check customization UI for car reference
+    local customizationUI = LocalPlayer.PlayerGui:FindFirstChild("Customization")
+    if customizationUI then
+        for _, element in pairs(customizationUI:GetDescendants()) do
+            if element:IsA("TextLabel") and (element.Text:find("Car:") or element.Text:find("Vehicle:")) then
+                local carName = element.Text:gsub("Car: ", ""):gsub("Vehicle: ", "")
+                print("✅ Car from Customization UI:", carName)
+                return carName
+            end
+        end
+    end
+    
+    print("❌ Could not detect selected car")
+    print("Please select a car in garage first!")
+    return nil
+end
+
+-- Get all available wraps for a specific car
+local function getWrapsForCar(carName)
+    print("\n🎨 FINDING WRAPS FOR CAR:", carName)
+    
+    local wraps = {}
+    
+    -- Check ReplicatedStorage for wrap data
+    local customizationFolder = ReplicatedStorage:FindFirstChild("Customization")
+    if customizationFolder then
+        -- Look for Wrap category
+        local wrapFolder = customizationFolder:FindFirstChild("Wrap")
+        if wrapFolder then
+            print("Found Wrap folder with items:")
+            for _, wrapItem in pairs(wrapFolder:GetChildren()) do
+                if wrapItem:IsA("Model") or wrapItem:IsA("Part") then
+                    table.insert(wraps, wrapItem.Name)
+                    print("  • " .. wrapItem.Name)
+                end
+            end
+        end
         
-        -- Look for inventory update events
-        local events = game:GetDescendants()
-        for _, event in pairs(events) do
-            if event:IsA("RemoteEvent") and event.Name:find("Inventory") then
-                pcall(function()
-                    event:FireServer({fakeItem})
-                    print("Fired inventory update to:", event.Name)
-                end)
+        -- Check for car-specific wraps
+        local wrapsPerCar = customizationFolder:FindFirstChild("WrapsPerCar")
+        if wrapsPerCar then
+            local carWraps = wrapsPerCar:FindFirstChild(carName)
+            if carWraps then
+                print("\nFound car-specific wraps for", carName)
+                for _, wrapItem in pairs(carWraps:GetChildren()) do
+                    table.insert(wraps, carName .. "/" .. wrapItem.Name)
+                    print("  • " .. wrapItem.Name .. " (car-specific)")
+                end
+            end
+        end
+    end
+    
+    -- Also check databases
+    pcall(function()
+        local CarCustomization = require(ReplicatedStorage.Databases.CarCustomization)
+        local wrapData = CarCustomization.Wrap
+        if wrapData and wrapData.GetAllItems then
+            local allWraps = wrapData.GetAllItems()
+            print("\nFound wraps in database:")
+            for wrapName, wrapInfo in pairs(allWraps) do
+                if not table.find(wraps, wrapName) then
+                    table.insert(wraps, wrapName)
+                    print("  • " .. wrapName .. " (" .. (wrapInfo.Rarity or "Common") .. ")")
+                end
             end
         end
     end)
     
-    print("✅ Item injection attempted!")
-    print("Item should be visible to other players!")
-    print("⚠️ Will disappear after relog (client-side only)")
+    print("✅ Total wraps found:", #wraps)
+    return wraps
 end
 
--- Function to inject legendary underglow (from your decompiled code)
-local function injectLegendaryUnderglow()
-    print("\n✨ INJECTING LEGENDARY UNDERGLOW...")
+-- Unlock wraps in UI for selected car
+local function unlockWrapsInUI()
+    print("\n🔓 UNLOCKING WRAPS IN UI...")
     
-    -- From decompiled code: Underglow items are in ReplicatedStorage.Customization.Underglows
-    local underglowsFolder = ReplicatedStorage:FindFirstChild("Customization")
-    if underglowsFolder then
-        underglowsFolder = underglowsFolder:FindFirstChild("Underglows")
+    local wrapUI = findWrapUI()
+    if not wrapUI then
+        print("❌ Could not find Wrap UI")
+        return
     end
     
-    if underglowsFolder then
-        print("Found underglows folder with items:")
-        for _, underglow in pairs(underglowsFolder:GetChildren()) do
-            print("  • " .. underglow.Name)
-            
-            -- Try to inject each underglow
-            if underglow.Name:find("Legendary") or underglow.Name:find("Zenvo") then
-                injectCustomizationItem("UnderglowTexture", underglow.Name, "ZenvoOfficial1")
-            end
+    local selectedCar = getSelectedCar()
+    if not selectedCar then
+        print("❌ No car selected")
+        return
+    end
+    
+    local wraps = getWrapsForCar(selectedCar)
+    if #wraps == 0 then
+        print("❌ No wraps found for this car")
+        return
+    end
+    
+    -- Clear existing wrap items (optional)
+    for _, child in pairs(wrapUI:GetChildren()) do
+        if child.Name ~= "UIListLayout" then
+            child:Destroy()
         end
     end
     
-    -- Also check per-car underglows
-    local underglowsPerCar = ReplicatedStorage:FindFirstChild("Customization")
-    if underglowsPerCar then
-        underglowsPerCar = underglowsPerCar:FindFirstChild("UnderglowsPerCar")
-    end
+    -- Add all wraps as unlocked
+    local unlockedCount = 0
     
-    if underglowsPerCar then
-        print("\nFound per-car underglows:")
-        for _, carFolder in pairs(underglowsPerCar:GetChildren()) do
-            print("  Car: " .. carFolder.Name)
-            for _, underglow in pairs(carFolder:GetChildren()) do
-                print("    • " .. underglow.Name)
-            end
-        end
-    end
-end
-
--- Function to inject ALL customization items
-local function injectAllCustomizations()
-    print("\n🎨 INJECTING ALL CUSTOMIZATION ITEMS...")
-    
-    -- Get all customization categories from the database
-    if CarCustomization then
-        pcall(function()
-            -- Get all categories
-            for category, categoryData in pairs(CarCustomization) do
-                if type(categoryData) == "table" and categoryData.GetAllItems then
-                    print("\nCategory: " .. category)
-                    
-                    -- Get all items in this category
-                    local items = categoryData.GetAllItems()
-                    if items then
-                        for itemName, itemData in pairs(items) do
-                            print("  • " .. itemName .. " (" .. (itemData.Rarity or "Common") .. ")")
-                            
-                            -- Inject rare/legendary items
-                            if itemData.Rarity == "Legendary" or itemData.Rarity == "Epic" then
-                                injectCustomizationItem(category, itemName)
-                                wait(0.1) -- Prevent rate limiting
-                            end
-                        end
-                    end
-                end
-            end
-        end)
-    else
-        print("❌ CarCustomization database not accessible")
+    for i, wrapName in pairs(wraps) do
+        -- Create wrap item frame
+        local wrapFrame = Instance.new("Frame")
+        wrapFrame.Name = "Wrap_" .. wrapName
+        wrapFrame.Size = UDim2.new(1, -10, 0, 60)
+        wrapFrame.Position = UDim2.new(0, 5, 0, (i-1) * 65)
+        wrapFrame.BackgroundColor3 = i % 2 == 0 and Color3.fromRGB(50, 50, 70) or Color3.fromRGB(60, 60, 80)
+        wrapFrame.BorderSizePixel = 1
         
-        -- Try to find items manually
-        local customizationFolder = ReplicatedStorage:FindFirstChild("Customization")
-        if customizationFolder then
-            print("\nScanning Customization folder:")
-            for _, categoryFolder in pairs(customizationFolder:GetChildren()) do
-                print("Category: " .. categoryFolder.Name)
-                
-                -- Inject items from this category
-                for _, item in pairs(categoryFolder:GetChildren()) do
-                    if item:IsA("Model") or item:IsA("Part") then
-                        print("  • " .. item.Name)
-                        injectCustomizationItem(categoryFolder.Name, item.Name)
-                        wait(0.05)
+        -- Wrap name
+        local nameLabel = Instance.new("TextLabel")
+        nameLabel.Text = "✅ " .. wrapName
+        nameLabel.Size = UDim2.new(0.7, 0, 1, 0)
+        nameLabel.TextColor3 = Color3.new(0, 1, 0)
+        nameLabel.Font = Enum.Font.SourceSansBold
+        nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+        nameLabel.PaddingLeft = UDim.new(0, 10)
+        nameLabel.Parent = wrapFrame
+        
+        -- For car-specific wraps
+        if wrapName:find("/") then
+            local carSpecific = Instance.new("TextLabel")
+            carSpecific.Text = "For: " .. selectedCar
+            carSpecific.Size = UDim2.new(0.7, 0, 0, 15)
+            carSpecific.Position = UDim2.new(0, 10, 0.7, 0)
+            carSpecific.TextColor3 = Color3.new(1, 1, 0)
+            carSpecific.TextSize = 12
+            carSpecific.Parent = wrapFrame
+        end
+        
+        -- Equip button
+        local equipBtn = Instance.new("TextButton")
+        equipBtn.Text = "EQUIP"
+        equipBtn.Size = UDim2.new(0.2, 0, 0.6, 0)
+        equipBtn.Position = UDim2.new(0.75, 0, 0.2, 0)
+        equipBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+        equipBtn.TextColor3 = Color3.new(1, 1, 1)
+        equipBtn.Font = Enum.Font.SourceSansBold
+        equipBtn.Parent = wrapFrame
+        
+        equipBtn.MouseButton1Click:Connect(function()
+            print("Equipping wrap:", wrapName, "on car:", selectedCar)
+            equipWrapOnCar(wrapName, selectedCar)
+        end)
+        
+        -- Preview button
+        local previewBtn = Instance.new("TextButton")
+        previewBtn.Text = "PREVIEW"
+        previewBtn.Size = UDim2.new(0.2, 0, 0.6, 0)
+        previewBtn.Position = UDim2.new(0.55, 0, 0.2, 0)
+        previewBtn.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
+        previewBtn.TextColor3 = Color3.new(1, 1, 1)
+        previewBtn.Parent = wrapFrame
+        
+        previewBtn.MouseButton1Click:Connect(function()
+            previewWrapOnCar(wrapName, selectedCar)
+        end)
+        
+        wrapFrame.Parent = wrapUI
+        unlockedCount = unlockedCount + 1
+    end
+    
+    print("✅ Added " .. unlockedCount .. " wraps to UI")
+    print("⚠️ UI only - for client-side display")
+end
+
+-- Actually equip a wrap on the car (client-side)
+local function equipWrapOnCar(wrapName, carName)
+    print("\n🔧 EQUIPPING WRAP:", wrapName, "on", carName)
+    
+    -- Generate fake item data
+    local fakeWrapItem = {
+        Id = HttpService:GenerateGUID(false),
+        Type = "Customization",
+        Category = "Wrap",
+        Name = wrapName,
+        CarName = carName,
+        ObtainedAt = os.time(),
+        Rarity = "Legendary"
+    }
+    
+    -- Try to use the game's customization system
+    pcall(function()
+        local CustomizationItemsRemotes = require(ReplicatedStorage.Remotes.Services.CustomizationItemsRemotes)
+        if CustomizationItemsRemotes and CustomizationItemsRemotes.EquipItem then
+            CustomizationItemsRemotes.EquipItem:InvokeServer("Wrap", wrapName, carName)
+            print("✅ Equipped via game system")
+        end
+    end)
+    
+    -- Also try direct remote events
+    for _, remote in pairs(ReplicatedStorage:GetDescendants()) do
+        if remote:IsA("RemoteEvent") or remote:IsA("RemoteFunction") then
+            if remote.Name:find("Wrap") or remote.Name:find("Customization") then
+                pcall(function()
+                    if remote:IsA("RemoteFunction") then
+                        remote:InvokeServer("Wrap", wrapName, carName)
+                    else
+                        remote:FireServer("Wrap", wrapName, carName)
                     end
-                end
+                    print("Sent to remote:", remote.Name)
+                end)
             end
         end
     end
     
-    print("\n✅ All items injection complete!")
-    print("Check your customization menu!")
+    -- Apply visual wrap to current car
+    applyWrapVisual(wrapName, carName)
+    
+    print("✅ Wrap equipped (client-side)")
+    print("Visible to you, may not persist")
 end
 
--- Function to make injected items equip on cars
-local function equipInjectedItems()
-    print("\n🔧 EQUIPPING INJECTED ITEMS ON CARS...")
+-- Apply wrap visual to car (client-side only)
+local function applyWrapVisual(wrapName, carName)
+    print("🎨 APPLYING WRAP VISUAL...")
     
-    -- Get current car
-    local currentCar = nil
-    local char = LocalPlayer.Character
-    if char then
-        -- Look for car in character
-        for _, part in pairs(char:GetDescendants()) do
-            if part:IsA("Model") and part.Name:find("Car") then
-                currentCar = part.Name
+    -- Find the car in workspace
+    local targetCar = nil
+    
+    -- Check player's current vehicle
+    local character = LocalPlayer.Character
+    if character then
+        for _, part in pairs(character:GetDescendants()) do
+            if part:IsA("Model") and part.Name == carName then
+                targetCar = part
                 break
             end
         end
     end
     
-    if not currentCar then
-        -- Try to get from garage
-        local garage = LocalPlayer.PlayerGui:FindFirstChild("Garage")
-        if garage then
-            -- Look for selected car
-            for _, frame in pairs(garage:GetDescendants()) do
-                if frame:IsA("TextLabel") and frame.Text:find("Selected:") then
-                    currentCar = frame.Text:gsub("Selected: ", "")
-                    break
-                end
-            end
-        end
+    -- If not found, search workspace
+    if not targetCar then
+        targetCar = workspace:FindFirstChild(carName)
     end
     
-    if currentCar then
-        print("Current car: " .. currentCar)
+    if targetCar then
+        print("Found car to apply wrap:", targetCar.Name)
         
-        -- Try to equip legendary items
-        local itemsToEquip = {
-            {"UnderglowTexture", "ZenvoOfficial1/LegendaryUnderglow"},
-            {"BodyKit", "LegendaryKit"},
-            {"Spoiler", "LegendaryWing"},
-            {"Rims", "LegendaryRims"},
-            {"Wrap", "LegendaryWrap"}
-        }
-        
-        for _, item in pairs(itemsToEquip) do
-            local category, itemName = item[1], item[2]
-            
-            -- First inject the item
-            injectCustomizationItem(category, itemName, currentCar)
-            wait(0.2)
-            
-            -- Then try to equip it
-            if CustomizationItemsRemotes and CustomizationItemsRemotes.EquipItem then
-                pcall(function()
-                    CustomizationItemsRemotes.EquipItem:InvokeServer(category, itemName, currentCar)
-                    print("✅ Equipped " .. itemName .. " on " .. currentCar)
-                end)
+        -- Remove existing wrap materials
+        for _, part in pairs(targetCar:GetDescendants()) do
+            if part:IsA("BasePart") then
+                -- Try to apply a special material/color
+                part.BrickColor = BrickColor.new("Bright blue") -- Visual indicator
+                part.Material = EnumMaterial.Neon
+                
+                -- Add a decal if possible
+                local decal = Instance.new("Decal")
+                decal.Name = "Wrap_" .. wrapName
+                decal.Texture = "rbxassetid://276934160" -- Some texture
+                decal.Face = Enum.NormalId.Top
+                decal.Parent = part
             end
         end
+        
+        print("✅ Applied wrap visual to car")
     else
-        print("❌ No car found to equip items on")
+        print("❌ Could not find car to apply wrap")
     end
 end
 
--- Function to show off in trade
-local function showOffInTrade()
-    print("\n🤝 SHOWING OFF IN TRADES...")
+-- Preview wrap on car
+local function previewWrapOnCar(wrapName, carName)
+    print("\n👁️ PREVIEWING WRAP:", wrapName)
     
-    -- This makes your injected items visible when trading
+    -- Create preview window
+    local previewUI = Instance.new("ScreenGui")
+    previewUI.Name = "WrapPreview"
+    previewUI.DisplayOrder = 999
+    previewUI.Parent = LocalPlayer.PlayerGui
     
-    -- First, inject some legendary items
-    injectLegendaryUnderglow()
-    wait(1)
+    local previewFrame = Instance.new("Frame")
+    previewFrame.Size = UDim2.new(0, 400, 0, 300)
+    previewFrame.Position = UDim2.new(0.5, -200, 0.5, -150)
+    previewFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+    previewFrame.BorderSizePixel = 3
+    previewFrame.BorderColor3 = Color3.new(0, 1, 0)
+    previewFrame.Parent = previewUI
     
-    -- Try to start a trade with someone
-    local TradingServiceRemotes = require(ReplicatedStorage.Remotes.Services.TradingServiceRemotes)
+    local title = Instance.new("TextLabel")
+    title.Text = "👁️ WRAP PREVIEW"
+    title.Size = UDim2.new(1, 0, 0, 40)
+    title.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+    title.TextColor3 = Color3.new(1, 1, 1)
+    title.Font = Enum.Font.SourceSansBold
+    title.Parent = previewFrame
     
-    if TradingServiceRemotes then
-        -- Create fake trade session
-        local fakeSession = {
-            Id = "SHOWOFF_SESSION_" .. generateFakeUUID(),
-            OtherPlayer = {
-                Name = "Trade Viewer",
-                UserId = 999999
-            }
-        }
-        
-        -- Trigger trade UI
-        pcall(function()
-            TradingServiceRemotes.OnSessionStarted:Fire(fakeSession)
-            print("✅ Fake trade session started for showing off!")
-        })
-        
-        -- Add injected items to trade
-        wait(0.5)
-        
-        local showOffItems = {
-            {Type = "Customization", Category = "UnderglowTexture", Name = "ZenvoOfficial1/LegendaryUnderglow", Id = generateFakeUUID()},
-            {Type = "Customization", Category = "BodyKit", Name = "LegendaryKit", Id = generateFakeUUID()},
-            {Type = "Customization", Category = "Rims", Name = "LegendaryRims", Id = generateFakeUUID()}
-        }
-        
-        for _, item in pairs(showOffItems) do
-            pcall(function()
-                if TradingServiceRemotes.SessionAddItem then
-                    TradingServiceRemotes.SessionAddItem:InvokeServer(item)
-                    print("Added to trade: " .. item.Name)
-                end
-            end)
-            wait(0.2)
-        end
-    end
+    local wrapInfo = Instance.new("TextLabel")
+    wrapInfo.Text = "Wrap: " .. wrapName .. "\nCar: " .. carName
+    wrapInfo.Size = UDim2.new(1, 0, 0, 60)
+    wrapInfo.Position = UDim2.new(0, 0, 0.15, 0)
+    wrapInfo.TextColor3 = Color3.new(1, 1, 1)
+    wrapInfo.TextSize = 18
+    wrapInfo.Parent = previewFrame
     
-    print("✅ Items should be visible in trade!")
-    print("Other players can see your legendary items!")
-end
-
--- Function to test if items are server-side
-local function testItemPersistence()
-    print("\n🔍 TESTING ITEM PERSISTENCE...")
-    print("These items will DISAPPEAR after relog!")
-    print("Perfect for temporary flexing!")
+    local previewText = Instance.new("TextLabel")
+    previewText.Text = "This wrap would be applied to your " .. carName
+    previewText.Size = UDim2.new(1, 0, 0, 40)
+    previewText.Position = UDim2.new(0, 0, 0.4, 0)
+    previewText.TextColor3 = Color3.new(1, 1, 0)
+    previewText.Parent = previewFrame
     
-    -- Create a test item
-    local testItem = {
-        Id = generateFakeUUID(),
-        Type = "Customization",
-        Category = "TestCategory",
-        Name = "TestLegendaryItem",
-        Rarity = "Legendary",
-        CreatedAt = os.time()
-    }
+    local equipBtn = Instance.new("TextButton")
+    equipBtn.Text = "EQUIP THIS WRAP"
+    equipBtn.Size = UDim2.new(0.6, 0, 0, 50)
+    equipBtn.Position = UDim2.new(0.2, 0, 0.7, 0)
+    equipBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+    equipBtn.TextColor3 = Color3.new(1, 1, 1)
+    equipBtn.Font = Enum.Font.SourceSansBold
+    equipBtn.Parent = previewFrame
     
-    print("Test item created:", testItem)
-    
-    -- Save to client storage (will be lost on relog)
-    local success = pcall(function()
-        local dataStore = game:GetService("DataStoreService"):GetDataStore("ClientItems")
-        dataStore:SetAsync(LocalPlayer.UserId .. "_test", testItem)
-        print("✅ Saved to client storage (will be lost on relog)")
+    equipBtn.MouseButton1Click:Connect(function()
+        equipWrapOnCar(wrapName, carName)
+        previewUI:Destroy()
     end)
     
-    if not success then
-        print("❌ Couldn't save to data store")
-        print("Items will only exist in current session")
-    end
+    local closeBtn = Instance.new("TextButton")
+    closeBtn.Text = "CLOSE"
+    closeBtn.Size = UDim2.new(0.3, 0, 0, 30)
+    closeBtn.Position = UDim2.new(0.7, 0, 0, 0)
+    closeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    closeBtn.TextColor3 = Color3.new(1, 1, 1)
+    closeBtn.Parent = previewFrame
+    
+    closeBtn.MouseButton1Click:Connect(function()
+        previewUI:Destroy()
+    end)
+    
+    print("✅ Preview window created")
 end
 
--- CREATE EXPLOIT UI
-local exploitUI = Instance.new("ScreenGui")
-exploitUI.Name = "ItemInjectionUI"
-exploitUI.Parent = LocalPlayer.PlayerGui
+-- CREATE CONTROL UI
+local controlUI = Instance.new("ScreenGui")
+controlUI.Name = "WrapUnlockerUI"
+controlUI.Parent = LocalPlayer.PlayerGui
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 280, 0, 350)
+mainFrame.Size = UDim2.new(0, 250, 0, 250)
 mainFrame.Position = UDim2.new(0, 20, 0, 100)
 mainFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
 mainFrame.BorderSizePixel = 3
-mainFrame.BorderColor3 = Color3.new(0, 1, 0)
-mainFrame.Parent = exploitUI
+mainFrame.BorderColor3 = Color3.new(0, 0.7, 1)
+mainFrame.Parent = controlUI
 
 local title = Instance.new("TextLabel")
-title.Text = "💉 ITEM INJECTION"
+title.Text = "🎨 WRAP UNLOCKER"
 title.Size = UDim2.new(1, 0, 0, 30)
-title.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+title.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
 title.TextColor3 = Color3.new(1, 1, 1)
 title.Font = Enum.Font.SourceSansBold
 title.Parent = mainFrame
 
-local warning = Instance.new("TextLabel")
-warning.Text = "⚠️ Items disappear after relog"
-warning.Size = UDim2.new(1, 0, 0, 20)
-warning.Position = UDim2.new(0, 0, 0.1, 0)
-warning.TextColor3 = Color3.new(1, 0, 0)
-warning.Parent = mainFrame
+local subtitle = Instance.new("TextLabel")
+subtitle.Text = "For selected car only"
+subtitle.Size = UDim2.new(1, 0, 0, 20)
+subtitle.Position = UDim2.new(0, 0, 0.12, 0)
+subtitle.TextColor3 = Color3.new(1, 1, 0)
+subtitle.Parent = mainFrame
+
+-- Car display
+local carDisplay = Instance.new("TextLabel")
+carDisplay.Name = "CarDisplay"
+carDisplay.Text = "Car: Not selected"
+carDisplay.Size = UDim2.new(1, 0, 0, 25)
+carDisplay.Position = UDim2.new(0, 0, 0.25, 0)
+carDisplay.TextColor3 = Color3.new(1, 1, 1)
+carDisplay.Parent = mainFrame
 
 -- Buttons
-local functions = {
-    {"✨ Legendary Underglow", injectLegendaryUnderglow},
-    {"🎨 All Customizations", injectAllCustomizations},
-    {"🔧 Equip on Car", equipInjectedItems},
-    {"🤝 Show in Trade", showOffInTrade},
-    {"🔍 Test Persistence", testItemPersistence},
-    {"💎 Inject Specific", function()
-        -- Custom injection dialog
-        local dialog = Instance.new("ScreenGui")
-        dialog.Name = "CustomInjectionDialog"
-        dialog.Parent = LocalPlayer.PlayerGui
-        
-        local dialogFrame = Instance.new("Frame")
-        dialogFrame.Size = UDim2.new(0, 300, 0, 200)
-        dialogFrame.Position = UDim2.new(0.5, -150, 0.5, -100)
-        dialogFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
-        dialogFrame.Parent = dialog
-        
-        local catLabel = Instance.new("TextLabel")
-        catLabel.Text = "Category:"
-        catLabel.Size = UDim2.new(0.4, 0, 0, 30)
-        catLabel.Position = UDim2.new(0.05, 0, 0.2, 0)
-        catLabel.TextColor3 = Color3.new(1, 1, 1)
-        catLabel.Parent = dialogFrame
-        
-        local catInput = Instance.new("TextBox")
-        catInput.PlaceholderText = "e.g., UnderglowTexture"
-        catInput.Size = UDim2.new(0.5, 0, 0, 30)
-        catInput.Position = UDim2.new(0.45, 0, 0.2, 0)
-        catInput.Parent = dialogFrame
-        
-        local itemLabel = Instance.new("TextLabel")
-        itemLabel.Text = "Item Name:"
-        itemLabel.Size = UDim2.new(0.4, 0, 0, 30)
-        itemLabel.Position = UDim2.new(0.05, 0, 0.4, 0)
-        itemLabel.TextColor3 = Color3.new(1, 1, 1)
-        itemLabel.Parent = dialogFrame
-        
-        local itemInput = Instance.new("TextBox")
-        itemInput.PlaceholderText = "e.g., ZenvoOfficial1/LegendaryUnderglow"
-        itemInput.Size = UDim2.new(0.5, 0, 0, 30)
-        itemInput.Position = UDim2.new(0.45, 0, 0.4, 0)
-        itemInput.Parent = dialogFrame
-        
-        local injectBtn = Instance.new("TextButton")
-        injectBtn.Text = "INJECT ITEM"
-        injectBtn.Size = UDim2.new(0.6, 0, 0, 40)
-        injectBtn.Position = UDim2.new(0.2, 0, 0.7, 0)
-        injectBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
-        injectBtn.TextColor3 = Color3.new(1, 1, 1)
-        injectBtn.Parent = dialogFrame
-        
-        injectBtn.MouseButton1Click:Connect(function()
-            injectCustomizationItem(catInput.Text, itemInput.Text)
-            dialog:Destroy()
-        end)
-        
-        local closeBtn = Instance.new("TextButton")
-        closeBtn.Text = "CLOSE"
-        closeBtn.Size = UDim2.new(0.3, 0, 0, 30)
-        closeBtn.Position = UDim2.new(0.7, 0, 0, 0)
-        closeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-        closeBtn.TextColor3 = Color3.new(1, 1, 1)
-        closeBtn.Parent = dialogFrame
-        
-        closeBtn.MouseButton1Click:Connect(function()
-            dialog:Destroy()
-        end)
+local buttons = {
+    {"🔍 Detect Car", function()
+        local car = getSelectedCar()
+        if car then
+            carDisplay.Text = "Car: " .. car
+            carDisplay.TextColor3 = Color3.new(0, 1, 0)
+        end
+    end},
+    {"🎨 Unlock All Wraps", unlockWrapsInUI},
+    {"✨ Unlock & Equip Best", function()
+        local car = getSelectedCar()
+        if car then
+            equipWrapOnCar(car .. "/LegendaryWrap", car)
+        end
+    end},
+    {"👁️ Preview Wraps", function()
+        local car = getSelectedCar()
+        if car then
+            previewWrapOnCar(car .. "/PreviewWrap", car)
+        end
+    end},
+    {"🔄 Refresh UI", function()
+        unlockWrapsInUI()
     end}
 }
 
-for i, func in ipairs(functions) do
+for i, btnData in ipairs(buttons) do
     local btn = Instance.new("TextButton")
-    btn.Text = func[1]
-    btn.Size = UDim2.new(0.9, 0, 0, 40)
-    btn.Position = UDim2.new(0.05, 0, 0.15 + (i * 0.13), 0)
+    btn.Text = btnData[1]
+    btn.Size = UDim2.new(0.9, 0, 0, 35)
+    btn.Position = UDim2.new(0.05, 0, 0.35 + (i * 0.13), 0)
     btn.BackgroundColor3 = Color3.fromRGB(0, 100, 50)
     btn.TextColor3 = Color3.new(1, 1, 1)
     btn.Font = Enum.Font.SourceSansBold
     btn.Parent = mainFrame
-    btn.MouseButton1Click:Connect(func[2])
+    btn.MouseButton1Click:Connect(btnData[2])
 end
 
 print("\n" .. string.rep("=", 60))
-print("💉 REAL ITEM INJECTION EXPLOIT")
+print("🎯 WRAP UNLOCKER FOR SELECTED CAR")
 print(string.rep("=", 60))
-print("WHAT THIS DOES:")
-print("• Actually obtains items (not just visual)")
-print("• Items are visible to OTHER PLAYERS")
-print("• Works in trades, on cars, etc.")
-print("• Items DISAPPEAR after relog (not permanent)")
+print("TARGETING EXACT UI PATH:")
+print("PlayerGui.Customization.Bottom.Customization.Items.Pages.List.Wrap")
 print(string.rep("=", 60))
-print("PERFECT FOR:")
-print("• Flexing in trades temporarily")
-print("• Showing off to friends")
-print("• Testing items before buying")
-print("• Content creation")
+print("HOW TO USE:")
+print("1. Select a car in Garage first")
+print("2. Click '🔍 Detect Car' to confirm")
+print("3. Click '🎨 Unlock All Wraps'")
+print("4. All wraps will appear in Wrap category")
+print("5. Click EQUIP on any wrap")
+print(string.rep("=", 60))
+print("FEATURES:")
+print("• Unlocks wraps FOR SELECTED CAR ONLY")
+print("• Shows in exact UI location")
+print("• Preview before equipping")
+print("• Client-side (disappears on relog)")
 print(string.rep("=", 60))
 
 -- Make global
-_G.injectunderglow = injectLegendaryUnderglow
-_G.injectall = injectAllCustomizations
-_G.equipitems = equipInjectedItems
-_G.showtrade = showOffInTrade
-_G.inject = function(cat, item)
-    injectCustomizationItem(cat, item)
-end
+_G.detectcar = getSelectedCar
+_G.unlockwraps = unlockWrapsInUI
+_G.equipwrap = equipWrapOnCar
 
 print("\nConsole commands:")
-print("_G.injectunderglow() - Get legendary underglow")
-print("_G.injectall() - Get all customizations")
-print("_G.equipitems() - Equip items on your car")
-print("_G.showtrade() - Show items in trade")
-print("_G.inject('UnderglowTexture', 'LegendaryUnderglow') - Inject specific")
+print("_G.detectcar() - Detect selected car")
+print("_G.unlockwraps() - Unlock all wraps for current car")
+print("_G.equipwrap('WrapName', 'CarName') - Equip specific wrap")
