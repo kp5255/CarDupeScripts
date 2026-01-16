@@ -1,448 +1,312 @@
--- ADMIN PANEL EXPLOIT (FIXED)
+-- REAL TRADE EXPLOIT BASED ON DECOMPILED SCRIPT
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
-local StarterGui = game:GetService("StarterGui")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TradingServiceRemotes = require(ReplicatedStorage.Remotes.Services.TradingServiceRemotes)
 
-print("🔍 ADMIN PANEL EXPLOIT")
+print("🎯 REAL TRADE EXPLOIT FROM DECOMPILED CODE")
+print("Found trading system structure!")
 
--- SAFE: Check if admin panel exists without WaitForChild
-local function findAdminPanel()
-    print("Searching for admin panel...")
-    
-    local menu = StarterGui:FindFirstChild("Menu")
-    if not menu then
-        print("❌ 'Menu' not found in StarterGui")
-        return nil
-    end
-    
-    local pages = menu:FindFirstChild("Pages")
-    if not pages then
-        print("❌ 'Pages' not found in Menu")
-        return nil
-    end
-    
-    local adminPanel = pages:FindFirstChild("AdminPanel")
-    if not adminPanel then
-        print("❌ 'AdminPanel' not found in Pages")
-        return nil
-    end
-    
-    print("✅ Found AdminPanel!")
-    print("Path: StarterGui.Menu.Pages.AdminPanel")
-    
-    -- List contents
-    print("\n📂 Admin Panel Contents:")
-    for _, child in pairs(adminPanel:GetChildren()) do
-        print("  • " .. child.Name .. " (" .. child.ClassName .. ")")
-    end
-    
-    return adminPanel
-end
+-- From decompiled code analysis:
+-- SessionUpdateTokens:InvokeServer(tokens) - Updates token offer
+-- SessionAddItem:InvokeServer(item) - Adds item to trade
+-- SessionRemoveItem:InvokeServer(item) - Removes item from trade
+-- SessionSetConfirmation:InvokeServer(bool) - Accept/cancel trade
+-- SessionCancel:InvokeServer() - Cancels entire trade
 
--- Find admin panel
-local AdminPanel = findAdminPanel()
+-- KEY DISCOVERY: Items have structure:
+-- Car item: {Type = "Car", Name = "Subaru3", Id = "uuid"}
+-- Customization item: {Type = "Customization", Category = "Category", Name = "ItemName"}
 
--- Check IsLegacyAdmin
-local IsLegacyAdmin = ReplicatedStorage:FindFirstChild("IsLegacyAdmin")
-if IsLegacyAdmin then
-    print("\n✅ Found IsLegacyAdmin (" .. IsLegacyAdmin.ClassName .. ")")
-else
-    print("\n❌ IsLegacyAdmin not found")
-end
-
--- METHOD 1: CLONE ADMIN PANEL TO PLAYERGUI
-local function cloneAdminPanel()
-    print("\n📋 CLONING ADMIN PANEL...")
+-- EXPLOIT 1: ITEM INJECTION
+local function injectFakeItem()
+    print("\n💉 INJECTING FAKE ITEM INTO TRADE...")
     
-    if not AdminPanel then
-        print("❌ No admin panel found to clone")
-        return
-    end
-    
-    -- Remove old clone
-    local oldClone = LocalPlayer.PlayerGui:FindFirstChild("AdminPanelClone")
-    if oldClone then
-        oldClone:Destroy()
-    end
-    
-    -- Clone the admin panel
-    local clone = AdminPanel:Clone()
-    clone.Name = "AdminPanelClone"
-    
-    -- Make it visible and enabled
-    clone.Visible = true
-    clone.Enabled = true
-    
-    -- Position it nicely
-    if clone:IsA("Frame") or clone:IsA("ScrollingFrame") then
-        clone.Position = UDim2.new(0.5, -150, 0.5, -100)
-        clone.Size = UDim2.new(0, 300, 0, 200)
-    end
-    
-    clone.Parent = LocalPlayer.PlayerGui
-    
-    print("✅ Admin panel cloned to your screen!")
-    print("Look for 'AdminPanelClone' in your GUI")
-    
-    -- Enable all buttons in clone
-    local enabledCount = 0
-    for _, button in pairs(clone:GetDescendants()) do
-        if button:IsA("TextButton") or button:IsA("ImageButton") then
-            button.Active = true
-            button.Visible = true
-            enabledCount = enabledCount + 1
-        end
-    end
-    
-    print("Enabled " .. enabledCount .. " buttons")
-end
-
--- METHOD 2: SEARCH FOR ADMIN COMMANDS IN SCRIPTS
-local function searchAdminScripts()
-    print("\n🔍 SEARCHING SCRIPTS FOR ADMIN COMMANDS...")
-    
-    local foundCommands = {}
-    
-    -- Search in key locations
-    local locations = {
-        game:GetService("ServerScriptService"),
-        game:GetService("ServerStorage"),
-        ReplicatedStorage,
-        game:GetService("Workspace")
+    -- Create a fake car item
+    local fakeCar = {
+        Type = "Car",
+        Name = "Subaru3",
+        Id = "FAKE_CAR_" .. math.random(10000, 99999)
     }
     
-    for _, location in pairs(locations) do
-        for _, script in pairs(location:GetDescendants()) do
-            if script:IsA("Script") or script:IsA("LocalScript") then
-                pcall(function()
-                    local source = script.Source
-                    
-                    -- Look for admin command patterns
-                    local patterns = {
-                        "givecar", "!give", "admincmd", "spawncar",
-                        "unlockall", "givemoney", "addmoney", "freecars",
-                        "IsLegacyAdmin", "CheckAdmin", "IsAdmin"
-                    }
-                    
-                    for _, pattern in pairs(patterns) do
-                        if source:lower():find(pattern:lower()) then
-                            table.insert(foundCommands, {
-                                script = script,
-                                pattern = pattern,
-                                path = script:GetFullName()
-                            })
-                            break
-                        end
-                    end
-                end)
-            end
-        end
-    end
+    print("Fake car created:", fakeCar)
     
-    print("Found " .. #foundCommands .. " scripts with admin patterns:")
-    for i, cmd in ipairs(foundCommands) do
-        if i <= 10 then  -- Limit output
-            print("  " .. i .. ". " .. cmd.path .. " (contains: " .. cmd.pattern .. ")")
-        end
-    end
-    
-    if #foundCommands > 10 then
-        print("  ... and " .. (#foundCommands - 10) .. " more")
-    end
-    
-    return foundCommands
-end
-
--- METHOD 3: TEST ALL REMOTES FOR ADMIN COMMANDS
-local function testAdminRemotes()
-    print("\n🎯 TESTING ALL REMOTES...")
-    
-    local commandsToTry = {
-        "givecar Subaru3",
-        "!give Subaru3",
-        "spawn Subaru3",
-        "unlockall",
-        "unlockallcars",
-        "givemoney 999999",
-        "addmoney 999999",
-        "freecars",
-        "allcars",
-        "admin",
-        "cmds",
-        "help",
-        "!help"
-    }
-    
-    -- Collect all remotes
-    local allRemotes = {}
-    for _, remote in pairs(ReplicatedStorage:GetDescendants()) do
-        if remote:IsA("RemoteEvent") or remote:IsA("RemoteFunction") then
-            table.insert(allRemotes, remote)
-        end
-    end
-    
-    print("Found " .. #allRemotes .. " remotes in ReplicatedStorage")
-    
-    -- Test each remote
-    for i, remote in pairs(allRemotes) do
-        print("\nTesting remote " .. i .. "/" .. #allRemotes .. ": " .. remote.Name)
-        
-        for _, cmd in pairs(commandsToTry) do
-            pcall(function()
-                if remote:IsA("RemoteFunction") then
-                    local result = remote:InvokeServer(cmd)
-                    print("  ✅ " .. cmd .. " → " .. tostring(result))
-                else
-                    remote:FireServer(cmd)
-                    print("  ✅ Fired: " .. cmd)
-                end
-            end)
-            wait(0.1)
-        end
-    end
-    
-    print("\n✅ Finished testing all remotes!")
-end
-
--- METHOD 4: BRUTE FORCE ISLEGACYADMIN
-local function bruteForceLegacyAdmin()
-    print("\n💥 BRUTE FORCE ISLEGACYADMIN...")
-    
-    if not IsLegacyAdmin then
-        print("❌ IsLegacyAdmin not found")
-        return
-    end
-    
-    if IsLegacyAdmin:IsA("RemoteFunction") then
-        -- Try different parameters
-        local testParams = {
-            LocalPlayer.UserId,
-            LocalPlayer.Name,
-            "admin",
-            "true",
-            "1",
-            1,
-            true,
-            "legacyadmin",
-            "owner"
-        }
-        
-        for _, param in pairs(testParams) do
-            pcall(function()
-                local result = IsLegacyAdmin:InvokeServer(param)
-                print("IsLegacyAdmin(" .. tostring(param) .. ") = " .. tostring(result))
-            end)
-            wait(0.2)
-        end
-        
-        -- Try command-like parameters
-        local commands = {
-            "givecar Subaru3",
-            "unlockall",
-            "addadmin " .. LocalPlayer.UserId,
-            "makeadmin " .. LocalPlayer.Name
-        }
-        
-        for _, cmd in pairs(commands) do
-            pcall(function()
-                local result = IsLegacyAdmin:InvokeServer(cmd)
-                print("IsLegacyAdmin('" .. cmd .. "') = " .. tostring(result))
-            end)
-            wait(0.2)
-        end
-    else
-        print("IsLegacyAdmin is a " .. IsLegacyAdmin.ClassName)
-        print("Trying to fire events...")
-        
-        local events = {
-            LocalPlayer.UserId,
-            LocalPlayer.Name,
-            "admin",
-            "givecar Subaru3"
-        }
-        
-        for _, event in pairs(events) do
-            pcall(function()
-                IsLegacyAdmin:FireServer(event)
-                print("Fired: " .. tostring(event))
-            end)
-            wait(0.2)
-        end
-    end
-end
-
--- METHOD 5: DIRECT GUI INJECTION
-local function injectAdminGUI()
-    print("\n💉 INJECTING ADMIN GUI...")
-    
-    -- Create a custom admin panel
-    local adminGUI = Instance.new("ScreenGui")
-    adminGUI.Name = "InjectedAdminPanel"
-    adminGUI.Parent = LocalPlayer.PlayerGui
-    
-    local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(0, 300, 0, 400)
-    frame.Position = UDim2.new(0.5, -150, 0.5, -200)
-    frame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-    frame.BorderSizePixel = 3
-    frame.BorderColor3 = Color3.new(0, 1, 0)
-    frame.Parent = adminGUI
-    
-    local title = Instance.new("TextLabel")
-    title.Text = "⚡ INJECTED ADMIN PANEL ⚡"
-    title.Size = UDim2.new(1, 0, 0, 40)
-    title.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
-    title.TextColor3 = Color3.new(1, 1, 1)
-    title.Font = Enum.Font.SourceSansBold
-    title.Parent = frame
-    
-    -- Create admin command buttons
-    local commands = {
-        {"🚗 Give Subaru3", "givecar Subaru3"},
-        {"💰 999,999 Money", "givemoney 999999"},
-        {"🔓 Unlock All Cars", "unlockallcars"},
-        {"🎮 Unlock All", "unlockall"},
-        {"⚡ Fly Mode", "fly on"},
-        {"👻 Noclip", "noclip"},
-        {"🏎️ Speed", "speed 100"},
-        {"🔧 Admin Tools", "admin tools"}
-    }
-    
-    for i, cmdData in ipairs(commands) do
-        local btn = Instance.new("TextButton")
-        btn.Text = cmdData[1]
-        btn.Size = UDim2.new(0.9, 0, 0, 35)
-        btn.Position = UDim2.new(0.05, 0, 0.1 + (i * 0.1), 0)
-        btn.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
-        btn.TextColor3 = Color3.new(1, 1, 1)
-        btn.Font = Enum.Font.SourceSansBold
-        btn.Parent = frame
-        
-        btn.MouseButton1Click:Connect(function()
-            print("Executing: " .. cmdData[2])
-            executeCommand(cmdData[2])
-        end)
-    end
-    
-    -- Custom command input
-    local inputBox = Instance.new("TextBox")
-    inputBox.PlaceholderText = "Enter admin command..."
-    inputBox.Size = UDim2.new(0.9, 0, 0, 30)
-    inputBox.Position = UDim2.new(0.05, 0, 0.9, 0)
-    inputBox.Parent = frame
-    
-    inputBox.FocusLost:Connect(function(enterPressed)
-        if enterPressed and inputBox.Text ~= "" then
-            executeCommand(inputBox.Text)
-            inputBox.Text = ""
-        end
+    -- Try to add it to trade
+    local success, result = pcall(function()
+        return TradingServiceRemotes.SessionAddItem:InvokeServer(fakeCar)
     end)
     
-    print("✅ Injected admin GUI created!")
-    print("Try clicking the buttons!")
+    if success then
+        print("✅ Fake car injected!")
+        print("Result:", result)
+    else
+        print("❌ Failed:", result)
+    end
 end
 
--- Execute command through all possible channels
-local function executeCommand(cmd)
-    print("\n⚡ EXECUTING: " .. cmd)
+-- EXPLOIT 2: TOKEN MANIPULATION
+local function manipulateTokens()
+    print("\n💰 MANIPULATING TRADE TOKENS...")
     
-    -- Try IsLegacyAdmin first
-    if IsLegacyAdmin and IsLegacyAdmin:IsA("RemoteFunction") then
+    -- Try different token amounts
+    local tokenAmounts = {
+        999999,
+        1000000,
+        5000000,
+        -1,  -- Negative (might cause bug)
+        0,
+        1
+    }
+    
+    for _, amount in pairs(tokenAmounts) do
         pcall(function()
-            local result = IsLegacyAdmin:InvokeServer(cmd)
-            print("IsLegacyAdmin result: " .. tostring(result))
+            TradingServiceRemotes.SessionUpdateTokens:InvokeServer(amount)
+            print("Set tokens to:", amount)
         end)
+        wait(0.1)
+    end
+end
+
+-- EXPLOIT 3: SESSION HIJACK
+local function hijackSession()
+    print("\n🎭 HIJACKING TRADE SESSION...")
+    
+    -- Try to create fake session data
+    local fakeSession = {
+        Id = "HACKED_SESSION_" .. math.random(10000, 99999),
+        OtherPlayer = {
+            Name = "HACKED_PLAYER",
+            UserId = 999999
+        }
+    }
+    
+    -- Try to trigger OnSessionStarted manually
+    pcall(function()
+        -- This might trigger the UI to think we're in a trade
+        TradingServiceRemotes.OnSessionStarted:Fire(fakeSession)
+        print("✅ Fake session started!")
+    end)
+end
+
+-- EXPLOIT 4: PACKET REPLAY WITH MODIFIED DATA
+local function packetReplayExploit()
+    print("\n📡 PACKET REPLAY EXPLOIT")
+    
+    -- Store original functions
+    local originalUpdateTokens = TradingServiceRemotes.SessionUpdateTokens.InvokeServer
+    local originalAddItem = TradingServiceRemotes.SessionAddItem.InvokeServer
+    local originalSetConfirmation = TradingServiceRemotes.SessionSetConfirmation.InvokeServer
+    
+    -- Hook the functions
+    TradingServiceRemotes.SessionUpdateTokens.InvokeServer = function(...)
+        local args = {...}
+        print("[HOOK] SessionUpdateTokens called with:", args[1])
+        
+        -- Modify token amount
+        if type(args[1]) == "number" then
+            local modifiedAmount = args[1] * 10  -- 10x the tokens!
+            print("[HOOK] Modifying tokens from", args[1], "to", modifiedAmount)
+            return originalUpdateTokens(TradingServiceRemotes.SessionUpdateTokens, modifiedAmount)
+        end
+        
+        return originalUpdateTokens(TradingServiceRemotes.SessionUpdateTokens, ...)
     end
     
-    -- Try all remotes
-    for _, remote in pairs(ReplicatedStorage:GetDescendants()) do
-        if remote:IsA("RemoteEvent") or remote:IsA("RemoteFunction") then
+    TradingServiceRemotes.SessionAddItem.InvokeServer = function(...)
+        local args = {...}
+        print("[HOOK] SessionAddItem called with item:", args[1])
+        
+        -- Duplicate the item
+        spawn(function()
+            wait(0.01)
+            print("[HOOK] Sending duplicate item...")
             pcall(function()
-                if remote:IsA("RemoteFunction") then
-                    remote:InvokeServer(cmd)
-                else
-                    remote:FireServer(cmd)
-                end
-                print("Sent to: " .. remote.Name)
+                originalAddItem(TradingServiceRemotes.SessionAddItem, args[1])
             end)
-            wait(0.05)
+        end)
+        
+        return originalAddItem(TradingServiceRemotes.SessionAddItem, ...)
+    end
+    
+    print("✅ Packet hooks installed!")
+    print("Now when you trade, tokens will be 10x and items will duplicate!")
+end
+
+-- EXPLOIT 5: DIRECT UI MANIPULATION
+local function manipulateTradeUI()
+    print("\n🎨 MANIPULATING TRADE UI...")
+    
+    -- Find the trading UI component
+    local tradingUI = nil
+    for _, obj in pairs(game:GetDescendants()) do
+        if obj:GetAttribute("Tag") == "UI_Menus_Trading_PeerToPeer" then
+            tradingUI = obj
+            print("Found trading UI:", obj:GetFullName())
+            break
         end
     end
     
-    print("✅ Command execution attempted")
+    if tradingUI then
+        -- Try to modify UI values
+        for _, descendant in pairs(tradingUI:GetDescendants()) do
+            if descendant:IsA("TextLabel") then
+                -- Look for token display
+                if descendant.Text and descendant.Text:find("Tokens") then
+                    print("Found token display:", descendant:GetFullName())
+                    descendant.Text = "Tokens: 999,999"
+                end
+                
+                -- Look for item counts
+                if descendant.Name:find("Item") or descendant.Text:find("Item") then
+                    descendant.Text = "Items: 10"
+                end
+            end
+            
+            -- Look for buttons and make them do different things
+            if descendant:IsA("TextButton") then
+                local originalClick = descendant.MouseButton1Click
+                descendant.MouseButton1Click = function()
+                    print("[UI HOOK] Button clicked:", descendant.Name)
+                    -- Call original
+                    if originalClick then
+                        originalClick()
+                    end
+                    -- Add our exploit
+                    injectFakeItem()
+                end
+            end
+        end
+    else
+        print("❌ Trading UI not found")
+    end
 end
 
--- CREATE CONTROL PANEL
-local controlGUI = Instance.new("ScreenGui")
-controlGUI.Name = "AdminExploitControl"
-controlGUI.Parent = LocalPlayer.PlayerGui
+-- EXPLOIT 6: TRADE COMPLETION HIJACK
+local function tradeCompletionHijack()
+    print("\n✅ TRADE COMPLETION HIJACK")
+    
+    -- Listen for trade completion
+    TradingServiceRemotes.OnSessionFinished.OnClientEvent:Connect(function(result)
+        print("[COMPLETION HOOK] Trade finished!")
+        print("Result:", result)
+        
+        -- Try to add items after trade completes
+        spawn(function()
+            wait(0.5)
+            print("[COMPLETION HOOK] Adding bonus items...")
+            injectFakeItem()
+        end)
+    end)
+    
+    -- Also listen for cancellations
+    TradingServiceRemotes.OnSessionCancelled.OnClientEvent:Connect(function(reason)
+        print("[CANCELLATION HOOK] Trade cancelled:", reason)
+        
+        -- Try to keep items anyway
+        spawn(function()
+            wait(0.5)
+            print("[CANCELLATION HOOK] Attempting to keep items...")
+        end)
+    end)
+    
+    print("✅ Trade completion hooks installed!")
+end
 
-local controlFrame = Instance.new("Frame")
-controlFrame.Size = UDim2.new(0, 250, 0, 350)
-controlFrame.Position = UDim2.new(0, 20, 0, 100)
-controlFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-controlFrame.BorderSizePixel = 3
-controlFrame.BorderColor3 = Color3.new(1, 0.5, 0)
-controlFrame.Parent = controlGUI
+-- CREATE EXPLOIT CONTROL PANEL
+local exploitGUI = Instance.new("ScreenGui")
+exploitGUI.Name = "TradeExploitPanel"
+exploitGUI.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
-local controlTitle = Instance.new("TextLabel")
-controlTitle.Text = "⚡ ADMIN EXPLOIT"
-controlTitle.Size = UDim2.new(1, 0, 0, 30)
-controlTitle.BackgroundColor3 = Color3.fromRGB(200, 100, 0)
-controlTitle.TextColor3 = Color3.new(1, 1, 1)
-controlTitle.Font = Enum.Font.SourceSansBold
-controlTitle.Parent = controlFrame
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 250, 0, 350)
+mainFrame.Position = UDim2.new(0, 20, 0, 100)
+mainFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+mainFrame.BorderSizePixel = 3
+mainFrame.BorderColor3 = Color3.new(0, 1, 0)
+mainFrame.Parent = exploitGUI
 
--- Buttons
-local methods = {
-    {"📋 Clone Admin Panel", cloneAdminPanel},
-    {"🔍 Search Scripts", searchAdminScripts},
-    {"🎯 Test All Remotes", testAdminRemotes},
-    {"💥 Brute Force LegacyAdmin", bruteForceLegacyAdmin},
-    {"💉 Inject Admin GUI", injectAdminGUI},
-    {"🚗 Give Car", function() executeCommand("givecar Subaru3") end},
-    {"💰 999K Money", function() executeCommand("givemoney 999999") end},
-    {"🔓 Unlock All", function() executeCommand("unlockall") end}
+local title = Instance.new("TextLabel")
+title.Text = "🎯 TRADE EXPLOITS"
+title.Size = UDim2.new(1, 0, 0, 30)
+title.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+title.TextColor3 = Color3.new(1, 1, 1)
+title.Font = Enum.Font.SourceSansBold
+title.Parent = mainFrame
+
+-- Exploit buttons
+local exploits = {
+    {"💉 Inject Fake Item", injectFakeItem},
+    {"💰 Manipulate Tokens", manipulateTokens},
+    {"🎭 Hijack Session", hijackSession},
+    {"📡 Packet Replay", packetReplayExploit},
+    {"🎨 Manipulate UI", manipulateTradeUI},
+    {"✅ Completion Hijack", tradeCompletionHijack}
 }
 
-for i, method in ipairs(methods) do
+for i, exploit in ipairs(exploits) do
     local btn = Instance.new("TextButton")
-    btn.Text = method[1]
+    btn.Text = exploit[1]
     btn.Size = UDim2.new(0.9, 0, 0, 35)
-    btn.Position = UDim2.new(0.05, 0, 0.08 + (i * 0.11), 0)
+    btn.Position = UDim2.new(0.05, 0, 0.1 + (i * 0.14), 0)
     btn.BackgroundColor3 = Color3.fromRGB(0, 100, 50)
     btn.TextColor3 = Color3.new(1, 1, 1)
     btn.Font = Enum.Font.SourceSansBold
-    btn.Parent = controlFrame
-    btn.MouseButton1Click:Connect(method[2])
+    btn.Parent = mainFrame
+    btn.MouseButton1Click:Connect(exploit[2])
 end
 
 print("\n" .. string.rep("=", 60))
-print("⚡ ADMIN EXPLOIT CONTROL PANEL LOADED")
+print("🎯 REAL TRADE EXPLOITS FROM DECOMPILED CODE")
 print(string.rep("=", 60))
-print("Found: StarterGui.Menu.Pages.AdminPanel")
+print("ANALYSIS OF DECOMPILED TRADING SCRIPT:")
+print("1. Items have structure: {Type, Name, Id}")
+print("2. Cars: Type='Car', Name='CarName', Id='uuid'")
+print("3. Customizations: Type='Customization', Category, Name")
+print("4. SessionUpdateTokens: Updates token amount")
+print("5. SessionAddItem/RemoveItem: Add/remove items")
+print("6. SessionSetConfirmation: Accept/cancel trade")
 print(string.rep("=", 60))
-print("RECOMMENDED ORDER:")
-print("1. Clone Admin Panel - Copy admin UI to your screen")
-print("2. Search Scripts - Find admin command patterns")
-print("3. Test All Remotes - Try commands on every remote")
-print("4. Brute Force LegacyAdmin - Test IsLegacyAdmin")
-print("5. Inject Admin GUI - Create custom admin panel")
+print("EXPLOIT METHODS:")
+print("1. Inject Fake Item - Add non-existent items")
+print("2. Manipulate Tokens - Change token amounts")
+print("3. Hijack Session - Create fake trade sessions")
+print("4. Packet Replay - Modify packets in transit")
+print("5. Manipulate UI - Change displayed values")
+print("6. Completion Hijack - Intercept trade completion")
 print(string.rep("=", 60))
 
--- Make global
-_G.cloneadmin = cloneAdminPanel
-_G.searchcmds = searchAdminScripts
-_G.testremotes = testAdminRemotes
-_G.bruteforce = bruteForceLegacyAdmin
-_G.injectgui = injectAdminGUI
-_G.admin = executeCommand
+-- Make functions global
+_G.inject = injectFakeItem
+_G.tokens = manipulateTokens
+_G.hijack = hijackSession
+_G.packet = packetReplayExploit
+_G.ui = manipulateTradeUI
+_G.complete = tradeCompletionHijack
+
+-- DIRECT ACCESS TO TRADING FUNCTIONS
+_G.addCar = function(carName)
+    local carItem = {
+        Type = "Car",
+        Name = carName,
+        Id = "EXPLOIT_" .. carName .. "_" .. math.random(10000, 99999)
+    }
+    
+    pcall(function()
+        TradingServiceRemotes.SessionAddItem:InvokeServer(carItem)
+        print("Added car:", carName)
+    end)
+end
+
+_G.setTokens = function(amount)
+    pcall(function()
+        TradingServiceRemotes.SessionUpdateTokens:InvokeServer(amount)
+        print("Set tokens to:", amount)
+    end)
+end
 
 print("\nConsole commands:")
-print("_G.cloneadmin() - Clone admin panel")
-print("_G.searchcmds() - Search for admin commands")
-print("_G.testremotes() - Test all remotes")
-print("_G.bruteforce() - Brute force IsLegacyAdmin")
-print("_G.injectgui() - Inject custom admin GUI")
-print("_G.admin('givecar Subaru3') - Execute command")
+print("_G.inject() - Inject fake item")
+print("_G.tokens() - Manipulate tokens")
+print("_G.hijack() - Hijack session")
+print("_G.addCar('Subaru3') - Add car to trade")
+print("_G.setTokens(999999) - Set token amount")
