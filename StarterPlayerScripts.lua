@@ -1,440 +1,322 @@
--- WRAP UNLOCKER FOR SELECTED CAR
--- Targets exact UI structure: PlayerGui.Customization.Bottom.Customization.Items.Pages.List.Wrap
-
+-- FIXED CAR DETECTION USING REAL CAR DATA
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local HttpService = game:GetService("HttpService")
 
-print("🎯 WRAP UNLOCKER FOR SELECTED CAR")
-print("Targeting: PlayerGui.Customization.Bottom.Customization.Items.Pages.List.Wrap")
+print("🚗 FIXED CAR DETECTION USING REAL CAR DATA")
 
--- Find the exact UI structure
-local function findWrapUI()
-    print("\n🔍 FINDING WRAP UI...")
-    
-    local customizationUI = LocalPlayer.PlayerGui:FindFirstChild("Customization")
-    if not customizationUI then
-        print("❌ Customization UI not found")
-        return nil
-    end
-    
-    local bottom = customizationUI:FindFirstChild("Bottom")
-    if not bottom then
-        print("❌ Bottom not found")
-        return nil
-    end
-    
-    local customization = bottom:FindFirstChild("Customization")
-    if not customization then
-        print("❌ Customization not found")
-        return nil
-    end
-    
-    local items = customization:FindFirstChild("Items")
-    if not items then
-        print("❌ Items not found")
-        return nil
-    end
-    
-    local pages = items:FindFirstChild("Pages")
-    if not pages then
-        print("❌ Pages not found")
-        return nil
-    end
-    
-    local list = pages:FindFirstChild("List")
-    if not list then
-        print("❌ List not found")
-        return nil
-    end
-    
-    local wrap = list:FindFirstChild("Wrap")
-    if not wrap then
-        print("❌ Wrap category not found in List")
-        -- Try to find Wrap elsewhere
-        for _, child in pairs(list:GetChildren()) do
-            if child.Name:find("Wrap") then
-                print("Found similar:", child.Name)
-                return child
-            end
-        end
-        return nil
-    end
-    
-    print("✅ Found Wrap UI at:", wrap:GetFullName())
-    return wrap
-end
+-- Get car service
+local carService = nil
+pcall(function()
+    carService = require(ReplicatedStorage.Remotes.Services.CarServiceRemotes)
+    print("✅ Found CarServiceRemotes")
+end)
 
--- Get currently selected car
-local function getSelectedCar()
-    print("\n🚗 FINDING SELECTED CAR...")
+-- Function to get ALL owned cars with real data
+local function getAllOwnedCars()
+    print("\n📋 GETTING ALL OWNED CARS...")
     
-    -- Method 1: Check garage UI
-    local garageUI = LocalPlayer.PlayerGui:FindFirstChild("Garage")
-    if garageUI then
-        for _, element in pairs(garageUI:GetDescendants()) do
-            if element:IsA("TextLabel") and element.Text:find("Selected:") then
-                local carName = element.Text:gsub("Selected: ", "")
-                print("✅ Selected car from Garage:", carName)
-                return carName
-            end
-        end
-    end
+    local ownedCars = {}
     
-    -- Method 2: Check current vehicle
-    local character = LocalPlayer.Character
-    if character then
-        for _, part in pairs(character:GetDescendants()) do
-            if part:IsA("Model") and (part.Name:find("Car") or part.Name:find("Vehicle")) then
-                print("✅ Current vehicle:", part.Name)
-                return part.Name
-            end
-        end
-    end
-    
-    -- Method 3: Check customization UI for car reference
-    local customizationUI = LocalPlayer.PlayerGui:FindFirstChild("Customization")
-    if customizationUI then
-        for _, element in pairs(customizationUI:GetDescendants()) do
-            if element:IsA("TextLabel") and (element.Text:find("Car:") or element.Text:find("Vehicle:")) then
-                local carName = element.Text:gsub("Car: ", ""):gsub("Vehicle: ", "")
-                print("✅ Car from Customization UI:", carName)
-                return carName
-            end
-        end
-    end
-    
-    print("❌ Could not detect selected car")
-    print("Please select a car in garage first!")
-    return nil
-end
-
--- Get all available wraps for a specific car
-local function getWrapsForCar(carName)
-    print("\n🎨 FINDING WRAPS FOR CAR:", carName)
-    
-    local wraps = {}
-    
-    -- Check ReplicatedStorage for wrap data
-    local customizationFolder = ReplicatedStorage:FindFirstChild("Customization")
-    if customizationFolder then
-        -- Look for Wrap category
-        local wrapFolder = customizationFolder:FindFirstChild("Wrap")
-        if wrapFolder then
-            print("Found Wrap folder with items:")
-            for _, wrapItem in pairs(wrapFolder:GetChildren()) do
-                if wrapItem:IsA("Model") or wrapItem:IsA("Part") then
-                    table.insert(wraps, wrapItem.Name)
-                    print("  • " .. wrapItem.Name)
-                end
-            end
-        end
+    if carService and carService.GetOwnedCars then
+        local success, result = pcall(function()
+            return carService.GetOwnedCars:InvokeServer()
+        end)
         
-        -- Check for car-specific wraps
-        local wrapsPerCar = customizationFolder:FindFirstChild("WrapsPerCar")
-        if wrapsPerCar then
-            local carWraps = wrapsPerCar:FindFirstChild(carName)
-            if carWraps then
-                print("\nFound car-specific wraps for", carName)
-                for _, wrapItem in pairs(carWraps:GetChildren()) do
-                    table.insert(wraps, carName .. "/" .. wrapItem.Name)
-                    print("  • " .. wrapItem.Name .. " (car-specific)")
+        if success and type(result) == "table" then
+            print("✅ Got " .. #result .. " cars from server")
+            
+            -- Analyze car structure
+            for i, carData in ipairs(result) do
+                if type(carData) == "table" then
+                    -- Extract key information
+                    local carInfo = {
+                        index = i,
+                        name = carData.Name or carData.CarName or "Unknown",
+                        id = carData.Id or carData.CarId or i,
+                        isSelected = carData.IsSelected or carData.Selected or false,
+                        rawData = carData
+                    }
+                    
+                    table.insert(ownedCars, carInfo)
+                    
+                    -- Show first car's structure for debugging
+                    if i == 1 then
+                        print("\n🔬 FIRST CAR STRUCTURE:")
+                        for key, value in pairs(carData) do
+                            local valueType = type(value)
+                            local displayValue = tostring(value)
+                            
+                            if valueType == "string" and #displayValue > 20 then
+                                displayValue = displayValue:sub(1, 20) .. "..."
+                            end
+                            
+                            print("  " .. key .. " = " .. displayValue .. " (" .. valueType .. ")")
+                        end
+                    end
                 end
             end
+        else
+            print("❌ Failed to get cars:", result)
         end
+    else
+        print("❌ CarService not available")
     end
     
-    -- Also check databases
-    pcall(function()
-        local CarCustomization = require(ReplicatedStorage.Databases.CarCustomization)
-        local wrapData = CarCustomization.Wrap
-        if wrapData and wrapData.GetAllItems then
-            local allWraps = wrapData.GetAllItems()
-            print("\nFound wraps in database:")
-            for wrapName, wrapInfo in pairs(allWraps) do
-                if not table.find(wraps, wrapName) then
-                    table.insert(wraps, wrapName)
-                    print("  • " .. wrapName .. " (" .. (wrapInfo.Rarity or "Common") .. ")")
-                end
-            end
-        end
-    end)
-    
-    print("✅ Total wraps found:", #wraps)
-    return wraps
+    return ownedCars
 end
 
--- Unlock wraps in UI for selected car
-local function unlockWrapsInUI()
-    print("\n🔓 UNLOCKING WRAPS IN UI...")
+-- Function to get CURRENTLY SELECTED car
+local function getCurrentSelectedCar()
+    print("\n🎯 GETTING CURRENTLY SELECTED CAR...")
     
-    local wrapUI = findWrapUI()
-    if not wrapUI then
-        print("❌ Could not find Wrap UI")
-        return
+    local ownedCars = getAllOwnedCars()
+    local selectedCar = nil
+    
+    -- Method 1: Check IsSelected field
+    for _, carInfo in ipairs(ownedCars) do
+        if carInfo.rawData.IsSelected == true or carInfo.rawData.Selected == true then
+            selectedCar = carInfo
+            print("✅ Found selected car via IsSelected field: " .. carInfo.name)
+            break
+        end
     end
     
-    local selectedCar = getSelectedCar()
+    -- Method 2: Check garage UI
+    if not selectedCar then
+        local garageUI = LocalPlayer.PlayerGui:FindFirstChild("Menu")
+        if garageUI then
+            -- Look for selected car in UI
+            for _, element in pairs(garageUI:GetDescendants()) do
+                if element:IsA("TextLabel") then
+                    local text = element.Text or ""
+                    if text:find("Selected:") then
+                        local carName = text:gsub("Selected: ", ""):gsub("Vehicle: ", "")
+                        print("✅ Found selected car in UI: " .. carName)
+                        
+                        -- Find this car in owned cars
+                        for _, carInfo in ipairs(ownedCars) do
+                            if carInfo.name == carName then
+                                selectedCar = carInfo
+                                break
+                            end
+                        end
+                        break
+                    end
+                end
+            end
+        end
+    end
+    
+    -- Method 3: Check current character vehicle
+    if not selectedCar then
+        local character = LocalPlayer.Character
+        if character then
+            for _, part in pairs(character:GetDescendants()) do
+                if part:IsA("Model") and (part.Name:find("Car") or part.Name:find("Vehicle")) then
+                    print("✅ Found current vehicle: " .. part.Name)
+                    
+                    -- Find this car in owned cars
+                    for _, carInfo in ipairs(ownedCars) do
+                        if carInfo.name == part.Name then
+                            selectedCar = carInfo
+                            break
+                        end
+                    end
+                    break
+                end
+            end
+        end
+    end
+    
+    -- Method 4: Use first car if none selected
+    if not selectedCar and #ownedCars > 0 then
+        selectedCar = ownedCars[1]
+        print("⚠️ No selected car found, using first car: " .. selectedCar.name)
+    end
+    
+    if selectedCar then
+        print("\n🎯 CURRENT SELECTED CAR:")
+        print("Name: " .. selectedCar.name)
+        print("ID: " .. tostring(selectedCar.id))
+        print("Index: " .. selectedCar.index)
+        return selectedCar
+    else
+        print("❌ No cars found!")
+        return nil
+    end
+end
+
+-- Function to unlock wraps for SPECIFIC car using real car data
+local function unlockWrapsForSpecificCar()
+    print("\n🎨 UNLOCKING WRAPS FOR SPECIFIC CAR...")
+    
+    local selectedCar = getCurrentSelectedCar()
     if not selectedCar then
         print("❌ No car selected")
         return
     end
     
-    local wraps = getWrapsForCar(selectedCar)
+    print("Target car: " .. selectedCar.name)
+    
+    -- Get wraps for this specific car
+    local wraps = getWrapsForCar(selectedCar.name)
     if #wraps == 0 then
         print("❌ No wraps found for this car")
         return
     end
     
-    -- Clear existing wrap items (optional)
+    -- Find wrap UI
+    local wrapUI = findWrapUI()
+    if not wrapUI then
+        print("❌ Wrap UI not found")
+        return
+    end
+    
+    -- Clear existing items
     for _, child in pairs(wrapUI:GetChildren()) do
         if child.Name ~= "UIListLayout" then
             child:Destroy()
         end
     end
     
-    -- Add all wraps as unlocked
-    local unlockedCount = 0
+    -- Add wraps specifically for this car
+    local addedCount = 0
     
     for i, wrapName in pairs(wraps) do
-        -- Create wrap item frame
-        local wrapFrame = Instance.new("Frame")
-        wrapFrame.Name = "Wrap_" .. wrapName
-        wrapFrame.Size = UDim2.new(1, -10, 0, 60)
-        wrapFrame.Position = UDim2.new(0, 5, 0, (i-1) * 65)
-        wrapFrame.BackgroundColor3 = i % 2 == 0 and Color3.fromRGB(50, 50, 70) or Color3.fromRGB(60, 60, 80)
-        wrapFrame.BorderSizePixel = 1
-        
-        -- Wrap name
-        local nameLabel = Instance.new("TextLabel")
-        nameLabel.Text = "✅ " .. wrapName
-        nameLabel.Size = UDim2.new(0.7, 0, 1, 0)
-        nameLabel.TextColor3 = Color3.new(0, 1, 0)
-        nameLabel.Font = Enum.Font.SourceSansBold
-        nameLabel.TextXAlignment = Enum.TextXAlignment.Left
-        nameLabel.PaddingLeft = UDim.new(0, 10)
-        nameLabel.Parent = wrapFrame
-        
-        -- For car-specific wraps
+        -- Check if wrap is for this car or universal
+        local isForThisCar = false
         if wrapName:find("/") then
-            local carSpecific = Instance.new("TextLabel")
-            carSpecific.Text = "For: " .. selectedCar
-            carSpecific.Size = UDim2.new(0.7, 0, 0, 15)
-            carSpecific.Position = UDim2.new(0, 10, 0.7, 0)
-            carSpecific.TextColor3 = Color3.new(1, 1, 0)
-            carSpecific.TextSize = 12
-            carSpecific.Parent = wrapFrame
+            local carSpecific = wrapName:match("^(.-)/")
+            isForThisCar = (carSpecific == selectedCar.name)
+        else
+            isForThisCar = true  -- Universal wrap
         end
         
-        -- Equip button
-        local equipBtn = Instance.new("TextButton")
-        equipBtn.Text = "EQUIP"
-        equipBtn.Size = UDim2.new(0.2, 0, 0.6, 0)
-        equipBtn.Position = UDim2.new(0.75, 0, 0.2, 0)
-        equipBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
-        equipBtn.TextColor3 = Color3.new(1, 1, 1)
-        equipBtn.Font = Enum.Font.SourceSansBold
-        equipBtn.Parent = wrapFrame
-        
-        equipBtn.MouseButton1Click:Connect(function()
-            print("Equipping wrap:", wrapName, "on car:", selectedCar)
-            equipWrapOnCar(wrapName, selectedCar)
-        end)
-        
-        -- Preview button
-        local previewBtn = Instance.new("TextButton")
-        previewBtn.Text = "PREVIEW"
-        previewBtn.Size = UDim2.new(0.2, 0, 0.6, 0)
-        previewBtn.Position = UDim2.new(0.55, 0, 0.2, 0)
-        previewBtn.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
-        previewBtn.TextColor3 = Color3.new(1, 1, 1)
-        previewBtn.Parent = wrapFrame
-        
-        previewBtn.MouseButton1Click:Connect(function()
-            previewWrapOnCar(wrapName, selectedCar)
-        end)
-        
-        wrapFrame.Parent = wrapUI
-        unlockedCount = unlockedCount + 1
+        if isForThisCar then
+            -- Create wrap item
+            local wrapFrame = Instance.new("Frame")
+            wrapFrame.Name = "Wrap_" .. wrapName:gsub("/", "_")
+            wrapFrame.Size = UDim2.new(1, -10, 0, 70)
+            wrapFrame.Position = UDim2.new(0, 5, 0, addedCount * 75)
+            
+            -- Color coding
+            if wrapName:find("/") then
+                wrapFrame.BackgroundColor3 = Color3.fromRGB(138, 43, 226) -- Purple for car-specific
+            else
+                wrapFrame.BackgroundColor3 = addedCount % 2 == 0 and 
+                    Color3.fromRGB(50, 50, 70) or 
+                    Color3.fromRGB(60, 60, 80)
+            end
+            
+            wrapFrame.BorderSizePixel = 2
+            wrapFrame.BorderColor3 = Color3.new(0.2, 0.6, 1)
+            
+            -- Wrap name with car indicator
+            local displayName = wrapName
+            if wrapName:find("/") then
+                displayName = wrapName:gsub("^.-/", "") .. " (For: " .. selectedCar.name .. ")"
+            end
+            
+            local nameLabel = Instance.new("TextLabel")
+            nameLabel.Text = "✅ " .. displayName
+            nameLabel.Size = UDim2.new(0.7, 0, 0.6, 0)
+            nameLabel.TextColor3 = Color3.new(0, 1, 0)
+            nameLabel.Font = Enum.Font.SourceSansBold
+            nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+            nameLabel.PaddingLeft = UDim.new(0, 10)
+            nameLabel.Parent = wrapFrame
+            
+            -- Car-specific label
+            if wrapName:find("/") then
+                local carLabel = Instance.new("TextLabel")
+                carLabel.Text = "🚗 " .. selectedCar.name
+                carLabel.Size = UDim2.new(0.7, 0, 0.4, 0)
+                carLabel.Position = UDim2.new(0, 10, 0.6, 0)
+                carLabel.TextColor3 = Color3.new(1, 1, 0)
+                carLabel.TextSize = 12
+                carLabel.Parent = wrapFrame
+            end
+            
+            -- Equip button
+            local equipBtn = Instance.new("TextButton")
+            equipBtn.Text = "EQUIP"
+            equipBtn.Size = UDim2.new(0.2, 0, 0.6, 0)
+            equipBtn.Position = UDim2.new(0.75, 0, 0.2, 0)
+            equipBtn.BackgroundColor3 = wrapName:find("/") and 
+                Color3.fromRGB(138, 43, 226) or  -- Purple for car-specific
+                Color3.fromRGB(0, 150, 0)        -- Green for universal
+            equipBtn.TextColor3 = Color3.new(1, 1, 1)
+            equipBtn.Font = Enum.Font.SourceSansBold
+            equipBtn.Parent = wrapFrame
+            
+            equipBtn.MouseButton1Click:Connect(function()
+                equipWrapOnCar(wrapName, selectedCar.name)
+            end)
+            
+            wrapFrame.Parent = wrapUI
+            addedCount = addedCount + 1
+        end
     end
     
-    print("✅ Added " .. unlockedCount .. " wraps to UI")
-    print("⚠️ UI only - for client-side display")
+    print("✅ Added " .. addedCount .. " wraps for " .. selectedCar.name)
+    print("⚠️ Wraps are CAR-SPECIFIC for: " .. selectedCar.name)
 end
 
--- Actually equip a wrap on the car (client-side)
-local function equipWrapOnCar(wrapName, carName)
-    print("\n🔧 EQUIPPING WRAP:", wrapName, "on", carName)
-    
-    -- Generate fake item data
-    local fakeWrapItem = {
-        Id = HttpService:GenerateGUID(false),
-        Type = "Customization",
-        Category = "Wrap",
-        Name = wrapName,
-        CarName = carName,
-        ObtainedAt = os.time(),
-        Rarity = "Legendary"
+-- Function to get wraps for specific car (needs implementation)
+local function getWrapsForCar(carName)
+    -- This should be implemented based on game structure
+    -- For now, return some example wraps
+    local wraps = {
+        "BasicWrap",  -- Universal wrap
+        "RacingStripes",  -- Universal wrap
+        carName .. "/PremiumWrap",  -- Car-specific
+        carName .. "/RacingWrap",   -- Car-specific
+        carName .. "/SpecialEdition" -- Car-specific
     }
     
-    -- Try to use the game's customization system
-    pcall(function()
-        local CustomizationItemsRemotes = require(ReplicatedStorage.Remotes.Services.CustomizationItemsRemotes)
-        if CustomizationItemsRemotes and CustomizationItemsRemotes.EquipItem then
-            CustomizationItemsRemotes.EquipItem:InvokeServer("Wrap", wrapName, carName)
-            print("✅ Equipped via game system")
-        end
-    end)
-    
-    -- Also try direct remote events
-    for _, remote in pairs(ReplicatedStorage:GetDescendants()) do
-        if remote:IsA("RemoteEvent") or remote:IsA("RemoteFunction") then
-            if remote.Name:find("Wrap") or remote.Name:find("Customization") then
-                pcall(function()
-                    if remote:IsA("RemoteFunction") then
-                        remote:InvokeServer("Wrap", wrapName, carName)
-                    else
-                        remote:FireServer("Wrap", wrapName, carName)
+    return wraps
+end
+
+-- Function to find wrap UI (needs implementation)
+local function findWrapUI()
+    -- Implement based on your UI structure
+    local wrapUI = LocalPlayer.PlayerGui:FindFirstChild("Customization")
+    if wrapUI then
+        wrapUI = wrapUI:FindFirstChild("Bottom")
+        if wrapUI then
+            wrapUI = wrapUI:FindFirstChild("Customization")
+            if wrapUI then
+                wrapUI = wrapUI:FindFirstChild("Items")
+                if wrapUI then
+                    wrapUI = wrapUI:FindFirstChild("Pages")
+                    if wrapUI then
+                        wrapUI = wrapUI:FindFirstChild("List")
+                        if wrapUI then
+                            wrapUI = wrapUI:FindFirstChild("Wrap")
+                            return wrapUI
+                        end
                     end
-                    print("Sent to remote:", remote.Name)
-                end)
+                end
             end
         end
     end
-    
-    -- Apply visual wrap to current car
-    applyWrapVisual(wrapName, carName)
-    
-    print("✅ Wrap equipped (client-side)")
-    print("Visible to you, may not persist")
+    return nil
 end
 
--- Apply wrap visual to car (client-side only)
-local function applyWrapVisual(wrapName, carName)
-    print("🎨 APPLYING WRAP VISUAL...")
-    
-    -- Find the car in workspace
-    local targetCar = nil
-    
-    -- Check player's current vehicle
-    local character = LocalPlayer.Character
-    if character then
-        for _, part in pairs(character:GetDescendants()) do
-            if part:IsA("Model") and part.Name == carName then
-                targetCar = part
-                break
-            end
-        end
-    end
-    
-    -- If not found, search workspace
-    if not targetCar then
-        targetCar = workspace:FindFirstChild(carName)
-    end
-    
-    if targetCar then
-        print("Found car to apply wrap:", targetCar.Name)
-        
-        -- Remove existing wrap materials
-        for _, part in pairs(targetCar:GetDescendants()) do
-            if part:IsA("BasePart") then
-                -- Try to apply a special material/color
-                part.BrickColor = BrickColor.new("Bright blue") -- Visual indicator
-                part.Material = EnumMaterial.Neon
-                
-                -- Add a decal if possible
-                local decal = Instance.new("Decal")
-                decal.Name = "Wrap_" .. wrapName
-                decal.Texture = "rbxassetid://276934160" -- Some texture
-                decal.Face = Enum.NormalId.Top
-                decal.Parent = part
-            end
-        end
-        
-        print("✅ Applied wrap visual to car")
-    else
-        print("❌ Could not find car to apply wrap")
-    end
+-- Function to equip wrap (needs implementation)
+local function equipWrapOnCar(wrapName, carName)
+    print("Equipping " .. wrapName .. " on " .. carName)
+    -- Implementation would go here
 end
 
--- Preview wrap on car
-local function previewWrapOnCar(wrapName, carName)
-    print("\n👁️ PREVIEWING WRAP:", wrapName)
-    
-    -- Create preview window
-    local previewUI = Instance.new("ScreenGui")
-    previewUI.Name = "WrapPreview"
-    previewUI.DisplayOrder = 999
-    previewUI.Parent = LocalPlayer.PlayerGui
-    
-    local previewFrame = Instance.new("Frame")
-    previewFrame.Size = UDim2.new(0, 400, 0, 300)
-    previewFrame.Position = UDim2.new(0.5, -200, 0.5, -150)
-    previewFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-    previewFrame.BorderSizePixel = 3
-    previewFrame.BorderColor3 = Color3.new(0, 1, 0)
-    previewFrame.Parent = previewUI
-    
-    local title = Instance.new("TextLabel")
-    title.Text = "👁️ WRAP PREVIEW"
-    title.Size = UDim2.new(1, 0, 0, 40)
-    title.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
-    title.TextColor3 = Color3.new(1, 1, 1)
-    title.Font = Enum.Font.SourceSansBold
-    title.Parent = previewFrame
-    
-    local wrapInfo = Instance.new("TextLabel")
-    wrapInfo.Text = "Wrap: " .. wrapName .. "\nCar: " .. carName
-    wrapInfo.Size = UDim2.new(1, 0, 0, 60)
-    wrapInfo.Position = UDim2.new(0, 0, 0.15, 0)
-    wrapInfo.TextColor3 = Color3.new(1, 1, 1)
-    wrapInfo.TextSize = 18
-    wrapInfo.Parent = previewFrame
-    
-    local previewText = Instance.new("TextLabel")
-    previewText.Text = "This wrap would be applied to your " .. carName
-    previewText.Size = UDim2.new(1, 0, 0, 40)
-    previewText.Position = UDim2.new(0, 0, 0.4, 0)
-    previewText.TextColor3 = Color3.new(1, 1, 0)
-    previewText.Parent = previewFrame
-    
-    local equipBtn = Instance.new("TextButton")
-    equipBtn.Text = "EQUIP THIS WRAP"
-    equipBtn.Size = UDim2.new(0.6, 0, 0, 50)
-    equipBtn.Position = UDim2.new(0.2, 0, 0.7, 0)
-    equipBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
-    equipBtn.TextColor3 = Color3.new(1, 1, 1)
-    equipBtn.Font = Enum.Font.SourceSansBold
-    equipBtn.Parent = previewFrame
-    
-    equipBtn.MouseButton1Click:Connect(function()
-        equipWrapOnCar(wrapName, carName)
-        previewUI:Destroy()
-    end)
-    
-    local closeBtn = Instance.new("TextButton")
-    closeBtn.Text = "CLOSE"
-    closeBtn.Size = UDim2.new(0.3, 0, 0, 30)
-    closeBtn.Position = UDim2.new(0.7, 0, 0, 0)
-    closeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-    closeBtn.TextColor3 = Color3.new(1, 1, 1)
-    closeBtn.Parent = previewFrame
-    
-    closeBtn.MouseButton1Click:Connect(function()
-        previewUI:Destroy()
-    end)
-    
-    print("✅ Preview window created")
-end
-
--- CREATE CONTROL UI
+-- CREATE UPDATED CONTROL UI
 local controlUI = Instance.new("ScreenGui")
-controlUI.Name = "WrapUnlockerUI"
+controlUI.Name = "CarSpecificWrapUnlocker"
 controlUI.Parent = LocalPlayer.PlayerGui
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 250, 0, 250)
+mainFrame.Size = UDim2.new(0, 300, 0, 300)
 mainFrame.Position = UDim2.new(0, 20, 0, 100)
 mainFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
 mainFrame.BorderSizePixel = 3
@@ -442,61 +324,73 @@ mainFrame.BorderColor3 = Color3.new(0, 0.7, 1)
 mainFrame.Parent = controlUI
 
 local title = Instance.new("TextLabel")
-title.Text = "🎨 WRAP UNLOCKER"
+title.Text = "🚗 CAR-SPECIFIC WRAPS"
 title.Size = UDim2.new(1, 0, 0, 30)
 title.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
 title.TextColor3 = Color3.new(1, 1, 1)
 title.Font = Enum.Font.SourceSansBold
 title.Parent = mainFrame
 
-local subtitle = Instance.new("TextLabel")
-subtitle.Text = "For selected car only"
-subtitle.Size = UDim2.new(1, 0, 0, 20)
-subtitle.Position = UDim2.new(0, 0, 0.12, 0)
-subtitle.TextColor3 = Color3.new(1, 1, 0)
-subtitle.Parent = mainFrame
-
--- Car display
+-- Current car display
 local carDisplay = Instance.new("TextLabel")
 carDisplay.Name = "CarDisplay"
-carDisplay.Text = "Car: Not selected"
+carDisplay.Text = "Car: Detecting..."
 carDisplay.Size = UDim2.new(1, 0, 0, 25)
-carDisplay.Position = UDim2.new(0, 0, 0.25, 0)
+carDisplay.Position = UDim2.new(0, 0, 0.12, 0)
 carDisplay.TextColor3 = Color3.new(1, 1, 1)
 carDisplay.Parent = mainFrame
 
+-- Car list display
+local carListDisplay = Instance.new("TextLabel")
+carListDisplay.Name = "CarListDisplay"
+carListDisplay.Text = "Owned cars: Loading..."
+carListDisplay.Size = UDim2.new(1, 0, 0, 40)
+carListDisplay.Position = UDim2.new(0, 0, 0.2, 0)
+carListDisplay.TextColor3 = Color3.new(1, 1, 0)
+carListDisplay.TextSize = 12
+carListDisplay.TextWrapped = true
+carListDisplay.Parent = mainFrame
+
 -- Buttons
 local buttons = {
-    {"🔍 Detect Car", function()
-        local car = getSelectedCar()
+    {"🔍 Detect Selected Car", function()
+        local car = getCurrentSelectedCar()
         if car then
-            carDisplay.Text = "Car: " .. car
+            carDisplay.Text = "Car: " .. car.name
             carDisplay.TextColor3 = Color3.new(0, 1, 0)
         end
     end},
-    {"🎨 Unlock All Wraps", unlockWrapsInUI},
-    {"✨ Unlock & Equip Best", function()
-        local car = getSelectedCar()
-        if car then
-            equipWrapOnCar(car .. "/LegendaryWrap", car)
+    {"📋 Show All Cars", function()
+        local cars = getAllOwnedCars()
+        if #cars > 0 then
+            local carNames = ""
+            for i, car in ipairs(cars) do
+                if i <= 5 then  -- Limit display
+                    carNames = carNames .. (i > 1 and ", " or "") .. car.name
+                end
+            end
+            if #cars > 5 then
+                carNames = carNames .. " and " .. (#cars - 5) .. " more"
+            end
+            carListDisplay.Text = "Owned cars: " .. carNames
         end
     end},
-    {"👁️ Preview Wraps", function()
-        local car = getSelectedCar()
-        if car then
-            previewWrapOnCar(car .. "/PreviewWrap", car)
+    {"🎨 Unlock Car-Specific Wraps", unlockWrapsForSpecificCar},
+    {"🔧 Change Selected Car", function()
+        -- Let user pick a different car
+        local cars = getAllOwnedCars()
+        if #cars > 0 then
+            -- Create car selection UI
+            createCarSelectionUI(cars)
         end
-    end},
-    {"🔄 Refresh UI", function()
-        unlockWrapsInUI()
     end}
 }
 
 for i, btnData in ipairs(buttons) do
     local btn = Instance.new("TextButton")
     btn.Text = btnData[1]
-    btn.Size = UDim2.new(0.9, 0, 0, 35)
-    btn.Position = UDim2.new(0.05, 0, 0.35 + (i * 0.13), 0)
+    btn.Size = UDim2.new(0.9, 0, 0, 40)
+    btn.Position = UDim2.new(0.05, 0, 0.35 + (i * 0.15), 0)
     btn.BackgroundColor3 = Color3.fromRGB(0, 100, 50)
     btn.TextColor3 = Color3.new(1, 1, 1)
     btn.Font = Enum.Font.SourceSansBold
@@ -504,32 +398,104 @@ for i, btnData in ipairs(buttons) do
     btn.MouseButton1Click:Connect(btnData[2])
 end
 
+-- Create car selection UI
+local function createCarSelectionUI(cars)
+    local selectionUI = Instance.new("ScreenGui")
+    selectionUI.Name = "CarSelectionUI"
+    selectionUI.Parent = LocalPlayer.PlayerGui
+    
+    local selectionFrame = Instance.new("Frame")
+    selectionFrame.Size = UDim2.new(0, 350, 0, 400)
+    selectionFrame.Position = UDim2.new(0.5, -175, 0.5, -200)
+    selectionFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+    selectionFrame.BorderSizePixel = 3
+    selectionFrame.BorderColor3 = Color3.new(0, 1, 0)
+    selectionFrame.Parent = selectionUI
+    
+    local title = Instance.new("TextLabel")
+    title.Text = "🚗 SELECT A CAR"
+    title.Size = UDim2.new(1, 0, 0, 40)
+    title.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+    title.TextColor3 = Color3.new(1, 1, 1)
+    title.Font = Enum.Font.SourceSansBold
+    title.Parent = selectionFrame
+    
+    local scrollFrame = Instance.new("ScrollingFrame")
+    scrollFrame.Size = UDim2.new(1, -20, 0.8, 0)
+    scrollFrame.Position = UDim2.new(0, 10, 0.1, 0)
+    scrollFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, #cars * 60)
+    scrollFrame.Parent = selectionFrame
+    
+    local uiListLayout = Instance.new("UIListLayout")
+    uiListLayout.Parent = scrollFrame
+    
+    -- Add car buttons
+    for i, carInfo in ipairs(cars) do
+        local carBtn = Instance.new("TextButton")
+        carBtn.Text = carInfo.name .. " (ID: " .. carInfo.id .. ")"
+        carBtn.Size = UDim2.new(1, -10, 0, 50)
+        carBtn.Position = UDim2.new(0, 5, 0, (i-1) * 55)
+        carBtn.BackgroundColor3 = i % 2 == 0 and 
+            Color3.fromRGB(50, 50, 70) or 
+            Color3.fromRGB(60, 60, 80)
+        carBtn.TextColor3 = Color3.new(1, 1, 1)
+        carBtn.Font = Enum.Font.SourceSansBold
+        
+        -- Highlight if selected
+        if carInfo.rawData.IsSelected or carInfo.rawData.Selected then
+            carBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+            carBtn.Text = "✅ " .. carBtn.Text .. " (SELECTED)"
+        end
+        
+        carBtn.MouseButton1Click:Connect(function()
+            -- Update selected car display
+            carDisplay.Text = "Car: " .. carInfo.name
+            carDisplay.TextColor3 = Color3.new(0, 1, 0)
+            
+            -- Close selection UI
+            selectionUI:Destroy()
+            
+            print("Selected car: " .. carInfo.name)
+        end)
+        
+        carBtn.Parent = scrollFrame
+    end
+    
+    -- Close button
+    local closeBtn = Instance.new("TextButton")
+    closeBtn.Text = "CLOSE"
+    closeBtn.Size = UDim2.new(0.3, 0, 0.1, 0)
+    closeBtn.Position = UDim2.new(0.35, 0, 0.92, 0)
+    closeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    closeBtn.TextColor3 = Color3.new(1, 1, 1)
+    closeBtn.Parent = selectionFrame
+    
+    closeBtn.MouseButton1Click:Connect(function()
+        selectionUI:Destroy()
+    end)
+end
+
 print("\n" .. string.rep("=", 60))
-print("🎯 WRAP UNLOCKER FOR SELECTED CAR")
+print("🚗 FIXED CAR-SPECIFIC WRAP UNLOCKER")
 print(string.rep("=", 60))
-print("TARGETING EXACT UI PATH:")
-print("PlayerGui.Customization.Bottom.Customization.Items.Pages.List.Wrap")
-print(string.rep("=", 60))
-print("HOW TO USE:")
-print("1. Select a car in Garage first")
-print("2. Click '🔍 Detect Car' to confirm")
-print("3. Click '🎨 Unlock All Wraps'")
-print("4. All wraps will appear in Wrap category")
-print("5. Click EQUIP on any wrap")
+print("USES REAL CAR DATA FROM:")
+print("CarServiceRemotes.GetOwnedCars:InvokeServer()")
 print(string.rep("=", 60))
 print("FEATURES:")
-print("• Unlocks wraps FOR SELECTED CAR ONLY")
-print("• Shows in exact UI location")
-print("• Preview before equipping")
-print("• Client-side (disappears on relog)")
+print("• Uses actual car data from server")
+print("• Detects IsSelected/Selected field")
+print("• Shows ALL owned cars")
+print("• Car-specific wrap targeting")
+print("• Manual car selection")
 print(string.rep("=", 60))
 
 -- Make global
-_G.detectcar = getSelectedCar
-_G.unlockwraps = unlockWrapsInUI
-_G.equipwrap = equipWrapOnCar
+_G.getcars = getAllOwnedCars
+_G.getselected = getCurrentSelectedCar
+_G.unlockwraps = unlockWrapsForSpecificCar
 
 print("\nConsole commands:")
-print("_G.detectcar() - Detect selected car")
-print("_G.unlockwraps() - Unlock all wraps for current car")
-print("_G.equipwrap('WrapName', 'CarName') - Equip specific wrap")
+print("_G.getcars() - Get all owned cars")
+print("_G.getselected() - Get selected car")
+print("_G.unlockwraps() - Unlock wraps for selected car")
