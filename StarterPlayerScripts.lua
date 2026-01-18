@@ -1,383 +1,402 @@
--- Correct Trade Duplicator - Using RemoteFunction
+-- Fixed Trade Duplicator with Better UI Detection
 local Players = game:GetService("Players")
 local Player = Players.LocalPlayer
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 wait(2)
 
-print("=== CORRECT TRADE DUPLICATOR ===")
-print("Found SessionAddItem as RemoteFunction!")
+print("=== FIXED TRADE DUPLICATOR ===")
 
--- Get the CORRECT remote function path
+-- First, let's verify the exact UI path
+local function DebugUITree()
+    print("\n🔍 DEBUGGING UI TREE...")
+    
+    if not Player.PlayerGui then
+        print("❌ No PlayerGui")
+        return nil
+    end
+    
+    print("✅ PlayerGui exists")
+    
+    -- Check Menu
+    local menu = Player.PlayerGui:FindFirstChild("Menu")
+    if not menu then
+        print("❌ No Menu in PlayerGui")
+        -- List what's actually in PlayerGui
+        print("Contents of PlayerGui:")
+        for _, child in pairs(Player.PlayerGui:GetChildren()) do
+            print("  - " .. child.Name .. " (" .. child.ClassName .. ")")
+        end
+        return nil
+    end
+    
+    print("✅ Found Menu")
+    
+    -- Check Trading
+    local trading = menu:FindFirstChild("Trading")
+    if not trading then
+        print("❌ No Trading in Menu")
+        print("Contents of Menu:")
+        for _, child in pairs(menu:GetChildren()) do
+            print("  - " .. child.Name .. " (" .. child.ClassName .. ")")
+        end
+        return nil
+    end
+    
+    print("✅ Found Trading")
+    
+    -- Check PeerToPeer
+    local peerToPeer = trading:FindFirstChild("PeerToPeer")
+    if not peerToPeer then
+        print("❌ No PeerToPeer in Trading")
+        return nil
+    end
+    
+    print("✅ Found PeerToPeer")
+    
+    -- Check Main
+    local main = peerToPeer:FindFirstChild("Main")
+    if not main then
+        print("❌ No Main in PeerToPeer")
+        return nil
+    end
+    
+    print("✅ Found Main")
+    
+    -- Check LocalPlayer
+    local localPlayer = main:FindFirstChild("LocalPlayer")
+    if not localPlayer then
+        print("❌ No LocalPlayer in Main")
+        print("Contents of Main:")
+        for _, child in pairs(main:GetChildren()) do
+            print("  - " .. child.Name .. " (" .. child.ClassName .. ")")
+        end
+        return nil
+    end
+    
+    print("✅ Found LocalPlayer")
+    
+    -- Check Content
+    local content = localPlayer:FindFirstChild("Content")
+    if not content then
+        print("❌ No Content in LocalPlayer")
+        return nil
+    end
+    
+    print("✅ Found Content")
+    
+    -- Check ScrollingFrame
+    local scrollingFrame = content:FindFirstChild("ScrollingFrame")
+    if not scrollingFrame then
+        print("❌ No ScrollingFrame in Content")
+        print("Contents of Content:")
+        for _, child in pairs(content:GetChildren()) do
+            print("  - " .. child.Name .. " (" .. child.ClassName .. ")")
+        end
+        return nil
+    end
+    
+    print("✅ Found ScrollingFrame")
+    print("🎯 Full path verified!")
+    print("Path: PlayerGui.Menu.Trading.PeerToPeer.Main.LocalPlayer.Content.ScrollingFrame")
+    
+    return scrollingFrame
+end
+
+-- Get trade container with better error handling
+local function GetTradeContainer()
+    local container = DebugUITree()
+    
+    if container then
+        print("✅ Trade container found!")
+        print("Container visible: " .. tostring(container.Visible))
+        print("Container children: " .. #container:GetChildren())
+        return container
+    else
+        print("⚠️ Trade container not found. Are you in a trade?")
+        return nil
+    end
+end
+
+-- Get remotes
 local TradingServiceRemotes = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Services"):WaitForChild("TradingServiceRemotes")
 local SessionAddItem = TradingServiceRemotes:WaitForChild("SessionAddItem")
-local SessionRemoveItem = TradingServiceRemotes:WaitForChild("SessionRemoveItem")
 local SessionSetConfirmation = TradingServiceRemotes:WaitForChild("SessionSetConfirmation")
 local OnSessionItemsUpdated = TradingServiceRemotes:WaitForChild("OnSessionItemsUpdated")
 
 print("✅ Loaded TradingServiceRemotes")
-print("SessionAddItem type: " .. SessionAddItem.ClassName)
-print("SessionAddItem is RemoteFunction: " .. tostring(SessionAddItem:IsA("RemoteFunction")))
 
--- Get current session ID
-local function GetCurrentSessionId()
-    -- Look in the PeerToPeer UI for session ID
-    if Player.PlayerGui then
-        local menu = Player.PlayerGui:FindFirstChild("Menu")
-        if menu then
-            local trading = menu:FindFirstChild("Trading")
-            if trading then
-                local peerToPeer = trading:FindFirstChild("PeerToPeer")
-                if peerToPeer then
-                    -- Check for session ID in UI elements
-                    for _, obj in pairs(peerToPeer:GetDescendants()) do
-                        if obj:IsA("TextLabel") and (obj.Text:find("Session") or obj.Name:find("Session")) then
-                            local sessionId = obj.Text:match("Session:?(%S+)") or obj.Name:match("Session:?(%S+)")
-                            if sessionId then
-                                return sessionId
-                            end
-                        end
-                    end
-                end
-            end
-        end
+-- Get car ID directly from any button in trade
+local function GetCarIdFromTrade()
+    print("\n🔍 GETTING CAR ID FROM TRADE...")
+    
+    local container = GetTradeContainer()
+    if not container then
+        print("❌ Cannot get container. Start a trade first!")
+        return nil
     end
     
-    -- Default session ID (might work)
-    return "current_trade_session"
-end
-
--- Get car ID from trade window
-local function GetCarIdFromTrade()
-    local container = GetTradeContainer()
-    if not container then return nil end
+    -- List ALL items in container
+    print("Items in trade window:")
+    local items = {}
     
     for _, item in pairs(container:GetChildren()) do
-        if item:IsA("TextButton") or item:IsA("ImageButton") then
-            -- Check for car indicators
-            local name = item.Name:lower()
-            local text = item:IsA("TextButton") and item.Text:lower() or ""
+        local itemName = item.Name
+        local itemClass = item.ClassName
+        
+        print("  - " .. itemName .. " (" .. itemClass .. ")")
+        
+        if item:IsA("TextButton") or item:IsA("ImageButton") or item:IsA("Frame") then
+            table.insert(items, item)
             
-            if name:find("car") or text:find("car") or name:find("vehicle") then
-                print("🚗 Found car item: " .. item.Name)
-                
-                -- Look for item ID in children
-                for _, child in pairs(item:GetChildren()) do
-                    if child:IsA("StringValue") then
-                        print("  StringValue: " .. child.Name .. " = " .. child.Value)
-                        return child.Value
-                    elseif child:IsA("IntValue") then
-                        print("  IntValue: " .. child.Name .. " = " .. child.Value)
-                        return tostring(child.Value)
-                    end
+            -- If it's a button, show text
+            if item:IsA("TextButton") then
+                print("    Text: \"" .. item.Text .. "\"")
+            end
+            
+            -- Show children
+            for _, child in pairs(item:GetChildren()) do
+                print("    └─ " .. child.Name .. " (" .. child.ClassName .. ")")
+                if child:IsA("TextLabel") then
+                    print("      Text: \"" .. child.Text .. "\"")
+                elseif child:IsA("StringValue") or child:IsA("IntValue") then
+                    print("      Value: " .. tostring(child.Value))
                 end
-                
-                -- Try to extract from name
-                local id = item.Name:match("%d+")
-                if id then
-                    print("  Extracted ID from name: " .. id)
-                    return id
-                end
-                
-                -- Return button name as ID
-                print("  Using button name as ID: " .. item.Name)
-                return item.Name
             end
         end
     end
     
-    return nil
+    if #items == 0 then
+        print("❌ No items found in trade window")
+        return nil
+    end
+    
+    -- Try to find a car
+    for _, item in pairs(items) do
+        local itemName = item.Name:lower()
+        local itemText = item:IsA("TextButton") and item.Text:lower() or ""
+        
+        if itemName:find("car") or itemText:find("car") or itemName:find("vehicle") then
+            print("🚗 Found potential car item: " .. item.Name)
+            
+            -- Return the first likely car ID
+            return item.Name  -- Use button name as ID
+        end
+    end
+    
+    -- If no car found, use first item
+    print("⚠️ No car identified, using first item: " .. items[1].Name)
+    return items[1].Name
 end
 
--- Get trade container
-local function GetTradeContainer()
-    if not Player.PlayerGui then return nil end
-    local menu = Player.PlayerGui:FindFirstChild("Menu")
-    if not menu then return nil end
-    local trading = menu:FindFirstChild("Trading")
-    if not trading then return nil end
-    local peerToPeer = trading:FindFirstChild("PeerToPeer")
-    if not peerToPeer then return nil end
-    local main = peerToPeer:FindFirstChild("Main")
-    if not main then return nil end
-    local localPlayer = main:FindFirstChild("LocalPlayer")
-    if not localPlayer then return nil end
-    local content = localPlayer:FindFirstChild("Content")
-    if not content then return nil end
-    return content:FindFirstChild("ScrollingFrame")
+-- Get session ID (simplified)
+local function GetSessionId()
+    print("\n🆔 GETTING SESSION ID...")
+    
+    -- Try a few common session ID formats
+    local possibleIds = {
+        "trade_session",
+        "session_1",
+        "current_session",
+        Player.UserId .. "_trade",
+        os.time()  -- Current timestamp
+    }
+    
+    -- Just return the first one for testing
+    local sessionId = possibleIds[1]
+    print("Using session ID: " .. sessionId)
+    return sessionId
 end
 
--- CORRECT: Use InvokeServer on RemoteFunction
-local function AddCarToSession()
-    print("\n🎯 ADDING CAR TO SESSION (CORRECT METHOD)...")
+-- Main duplication function
+local function DuplicateItem()
+    print("\n🔄 ATTEMPTING DUPLICATION...")
     
-    local sessionId = GetCurrentSessionId()
-    local carId = GetCarIdFromTrade()
+    local sessionId = GetSessionId()
+    local itemId = GetCarIdFromTrade()
     
-    if not carId then
-        print("❌ Could not get car ID")
+    if not itemId then
+        print("❌ Cannot get item ID")
         return false
     end
     
     print("Session ID: " .. sessionId)
-    print("Car ID: " .. carId)
+    print("Item ID: " .. itemId)
     
     local successCount = 0
     
-    -- Try multiple times with different approaches
-    for i = 1, 10 do
-        print("\nAttempt " .. i .. "...")
+    -- Try different parameter formats
+    local attempts = {
+        {name = "Just item ID", func = function() return SessionAddItem:InvokeServer(sessionId, itemId) end},
+        {name = "Item ID + quantity", func = function() return SessionAddItem:InvokeServer(sessionId, itemId, 1) end},
+        {name = "Item ID + quantity + extra", func = function() return SessionAddItem:InvokeServer(sessionId, itemId, 1, "duplicate") end},
+        {name = "Table format", func = function() 
+            return SessionAddItem:InvokeServer(sessionId, {
+                id = itemId,
+                name = itemId .. "_duplicate",
+                type = "item"
+            }) 
+        end}
+    }
+    
+    for i, attempt in ipairs(attempts) do
+        print("\nAttempt " .. i .. ": " .. attempt.name)
         
-        -- Method 1: Just car ID
-        local success1, result1 = pcall(function()
-            return SessionAddItem:InvokeServer(sessionId, carId)
-        end)
+        local success, result = pcall(attempt.func)
         
-        if success1 then
-            print("✅ Added with car ID: " .. carId)
-            if result1 then
-                print("   Server returned: " .. tostring(result1))
+        if success then
+            print("✅ Success!")
+            if result then
+                print("   Server returned: " .. tostring(result))
             end
             successCount = successCount + 1
         else
-            print("❌ Failed with car ID")
+            print("❌ Failed")
         end
         
-        wait(0.2)
-        
-        -- Method 2: Car ID with quantity
-        local success2, result2 = pcall(function()
-            return SessionAddItem:InvokeServer(sessionId, carId, 1)  -- Quantity = 1
-        end)
-        
-        if success2 then
-            print("✅ Added with car ID + quantity")
-            successCount = successCount + 1
-        end
-        
-        wait(0.2)
-        
-        -- Method 3: Table format
-        local success3, result3 = pcall(function()
-            local itemData = {
-                id = carId,
-                type = "Car",
-                name = "Car_Duplicate_" .. i
-            }
-            return SessionAddItem:InvokeServer(sessionId, itemData)
-        end)
-        
-        if success3 then
-            print("✅ Added with table data")
-            successCount = successCount + 1
-        end
-        
-        wait(0.2)
+        wait(0.5)  -- Wait between attempts
     end
     
-    print("\n📊 Successful additions: " .. successCount)
+    print("\n📊 Results: " .. successCount .. "/" .. #attempts .. " successful")
+    
+    -- Force update if any succeeded
+    if successCount > 0 then
+        print("\n🔄 Forcing session update...")
+        pcall(function()
+            OnSessionItemsUpdated:FireServer(sessionId, {updated = true})
+        end)
+        
+        wait(1)
+        
+        -- Check if items changed
+        local container = GetTradeContainer()
+        if container then
+            local itemCount = 0
+            for _ in pairs(container:GetChildren()) do
+                itemCount = itemCount + 1
+            end
+            print("Current item count: " .. itemCount)
+        end
+    end
+    
     return successCount > 0
 end
 
--- Force session update
-local function ForceSessionUpdate()
-    print("\n🔄 FORCING SESSION UPDATE...")
-    
-    local sessionId = GetCurrentSessionId()
-    
-    -- Try to trigger the update event
-    for i = 1, 3 do
-        pcall(function()
-            OnSessionItemsUpdated:FireServer(sessionId, {force = true, update = true})
-            print("✅ Triggered update " .. i)
-        end)
-        wait(0.2)
-    end
-end
-
--- Set confirmation to true (accept trade)
-local function AcceptTrade()
-    print("\n🤝 ACCEPTING TRADE...")
-    
-    local sessionId = GetCurrentSessionId()
-    
-    for i = 1, 5 do
-        local success, result = pcall(function()
-            return SessionSetConfirmation:InvokeServer(sessionId, true)  -- true = confirmed
-        end)
-        
-        if success then
-            print("✅ Set confirmation to TRUE (attempt " .. i .. ")")
-            if result then
-                print("   Server response: " .. tostring(result))
-            end
-        else
-            print("❌ Failed to set confirmation")
-        end
-        
-        wait(0.2)
-    end
-end
-
--- Check current session items
-local function CheckSessionItems()
-    print("\n🔍 CHECKING SESSION...")
-    
-    -- Get the container
-    local container = GetTradeContainer()
-    if container then
-        print("Items in trade window:")
-        local count = 0
-        for _, item in pairs(container:GetChildren()) do
-            if item:IsA("TextButton") or item:IsA("ImageButton") then
-                count = count + 1
-                local name = item.Name
-                local text = item:IsA("TextButton") and item.Text or ""
-                print("  " .. count .. ". " .. name .. " - \"" .. text .. "\"")
-            end
-        end
-        print("Total: " .. count .. " items")
-        return count
-    end
-    
-    return 0
-end
-
--- Main execution
-local function ExecuteCorrectDuplication()
-    print("\n🚀 EXECUTING CORRECT DUPLICATION...")
-    
-    -- Step 1: Check current items
-    local beforeCount = CheckSessionItems()
-    
-    -- Step 2: Add duplicate using CORRECT method
-    wait(1)
-    AddCarToSession()
-    
-    -- Step 3: Force update
-    wait(1)
-    ForceSessionUpdate()
-    
-    -- Step 4: Check again
-    wait(1)
-    local afterCount = CheckSessionItems()
-    
-    -- Step 5: If successful, accept trade
-    if afterCount > beforeCount then
-        print("\n🎉 DUPLICATION SUCCESSFUL!")
-        print("Items increased from " .. beforeCount .. " to " .. afterCount)
-        wait(1)
-        AcceptTrade()
-    else
-        print("\n❌ No change in item count")
-    end
-    
-    return afterCount > beforeCount
-end
-
--- Create UI
-local function CreateUI()
+-- Create simple UI
+local function CreateSimpleUI()
     local gui = Instance.new("ScreenGui")
-    gui.Name = "CorrectDuplicator"
+    gui.Name = "TradeDuplicatorFixed"
     gui.Parent = Player:WaitForChild("PlayerGui")
     
     local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(0, 350, 0, 250)
-    frame.Position = UDim2.new(0.5, -175, 0, 20)
+    frame.Size = UDim2.new(0, 300, 0, 200)
+    frame.Position = UDim2.new(0.5, -150, 0, 20)
     frame.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
     frame.Active = true
     frame.Draggable = true
     
     local title = Instance.new("TextLabel")
-    title.Text = "CORRECT DUPLICATOR"
+    title.Text = "TRADE DUPLICATOR FIXED"
     title.Size = UDim2.new(1, 0, 0, 40)
     title.BackgroundColor3 = Color3.fromRGB(60, 60, 90)
-    title.TextColor3 = Color3.fromRGB(100, 255, 100)
-    title.Font = Enum.Font.GothamBold
+    title.TextColor3 = Color3.fromRGB(255, 150, 100)
     
-    local status = Instance.new("TextLabel")
-    status.Text = "Status: Ready\nUsing RemoteFunction"
-    status.Size = UDim2.new(1, -20, 0, 60)
-    status.Position = UDim2.new(0, 10, 0, 50)
-    status.BackgroundTransparency = 1
-    status.TextColor3 = Color3.fromRGB(200, 255, 200)
-    status.TextWrapped = true
+    local output = Instance.new("TextLabel")
+    output.Text = "Ready\nStart a trade first!"
+    output.Size = UDim2.new(1, -20, 0, 110)
+    output.Position = UDim2.new(0, 10, 0, 50)
+    output.BackgroundTransparency = 1
+    output.TextColor3 = Color3.fromRGB(200, 220, 255)
+    output.TextWrapped = true
+    output.TextXAlignment = Enum.TextXAlignment.Left
     
     -- Buttons
-    local buttons = {
-        {text = "🔍 Check", func = CheckSessionItems, pos = UDim2.new(0.025, 0, 0, 120)},
-        {text = "🎯 Add Car", func = AddCarToSession, pos = UDim2.new(0.025, 0, 0, 150)},
-        {text = "🔄 Update", func = ForceSessionUpdate, pos = UDim2.new(0.025, 0, 0, 180)},
-        {text = "🚀 Execute All", func = ExecuteCorrectDuplication, pos = UDim2.new(0.025, 0, 0, 210)},
-        {text = "🤝 Accept", func = AcceptTrade, pos = UDim2.new(0.525, 0, 0, 120)},
-        {text = "📊 Get Car ID", func = GetCarIdFromTrade, pos = UDim2.new(0.525, 0, 0, 150)},
-        {text = "🆔 Get Session", func = GetCurrentSessionId, pos = UDim2.new(0.525, 0, 0, 180)}
-    }
+    local debugBtn = Instance.new("TextButton")
+    debugBtn.Text = "🔍 DEBUG UI"
+    debugBtn.Size = UDim2.new(0.48, 0, 0, 30)
+    debugBtn.Position = UDim2.new(0.01, 0, 0, 170)
+    debugBtn.BackgroundColor3 = Color3.fromRGB(70, 100, 140)
     
-    for _, btnInfo in pairs(buttons) do
-        local btn = Instance.new("TextButton")
-        btn.Text = btnInfo.text
-        btn.Size = UDim2.new(0.45, 0, 0, 25)
-        btn.Position = btnInfo.pos
-        btn.BackgroundColor3 = Color3.fromRGB(70, 100, 120)
-        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        btn.TextSize = 12
-        
-        btn.MouseButton1Click:Connect(function()
-            status.Text = "Running: " .. btnInfo.text
-            spawn(function()
-                btnInfo.func()
-                wait(0.5)
-                status.Text = "Completed: " .. btnInfo.text
-            end)
-        end)
-        
-        btn.Parent = frame
+    local dupBtn = Instance.new("TextButton")
+    dupBtn.Text = "🔄 DUPLICATE"
+    dupBtn.Size = UDim2.new(0.48, 0, 0, 30)
+    dupBtn.Position = UDim2.new(0.51, 0, 0, 170)
+    dupBtn.BackgroundColor3 = Color3.fromRGB(70, 140, 100)
+    
+    -- Update output
+    local function updateOutput(text)
+        output.Text = text
+        print(text)
     end
+    
+    debugBtn.MouseButton1Click:Connect(function()
+        updateOutput("Debugging UI...")
+        spawn(function()
+            DebugUITree()
+            updateOutput("Debug complete!\nCheck output window.")
+        end)
+    end)
+    
+    dupBtn.MouseButton1Click:Connect(function()
+        updateOutput("Attempting duplication...")
+        spawn(function()
+            local success = DuplicateItem()
+            if success then
+                updateOutput("✅ Duplication attempted!\nCheck other player.")
+            else
+                updateOutput("❌ Duplication failed\nStart a trade first!")
+            end
+        end)
+    end)
     
     -- Parent everything
     title.Parent = frame
-    status.Parent = frame
+    output.Parent = frame
+    debugBtn.Parent = frame
+    dupBtn.Parent = frame
     frame.Parent = gui
     
-    return status
+    return updateOutput
 end
 
 -- Initialize
-CreateUI()
+local updateOutput = CreateSimpleUI()
 
--- Auto-start
+-- Auto-debug on start
 wait(3)
-print("\n=== CORRECT TRADE DUPLICATOR LOADED ===")
-print("Using SessionAddItem as RemoteFunction")
-print("Must use :InvokeServer() not :FireServer()")
+print("\n=== TRADE DUPLICATOR FIXED ===")
+print("This version fixes the container error")
 
-print("\n📋 HOW TO USE:")
-print("1. Start trade with another player")
-print("2. Add ONE car to trade normally")
-print("3. Click 'Get Car ID' to identify car")
-print("4. Click 'Add Car' to attempt duplication")
-print("5. Click 'Execute All' for complete process")
-print("6. Check if OTHER player sees duplicates!")
+-- Run initial debug
+spawn(function()
+    wait(2)
+    print("\n🔍 Running initial UI check...")
+    DebugUITree()
+    updateOutput("UI check complete.\nStart a trade to begin.")
+end)
 
 -- Keybinds
 local UIS = game:GetService("UserInputService")
 UIS.InputBegan:Connect(function(input, processed)
     if processed then return end
     
-    if input.KeyCode == Enum.KeyCode.A then
-        print("\n🎮 A KEY - ADDING CAR")
-        AddCarToSession()
-    elseif input.KeyCode == Enum.KeyCode.E then
-        print("\n🎮 E KEY - EXECUTE ALL")
-        ExecuteCorrectDuplication()
-    elseif input.KeyCode == Enum.KeyCode.C then
-        print("\n🎮 C KEY - CHECK ITEMS")
-        CheckSessionItems()
+    if input.KeyCode == Enum.KeyCode.D then
+        print("\n🎮 D KEY - DEBUGGING UI")
+        DebugUITree()
+        updateOutput("Debugging UI...")
+    elseif input.KeyCode == Enum.KeyCode.F then
+        print("\n🎮 F KEY - DUPLICATING")
+        DuplicateItem()
+        updateOutput("Duplicating...")
     end
 end)
 
-print("\n🔑 QUICK KEYS:")
-print("A = Add car to session")
-print("E = Execute all methods")
-print("C = Check current items")
+print("\n🔑 CONTROLS:")
+print("D = Debug UI")
+print("F = Duplicate item")
+print("\n📋 INSTRUCTIONS:")
+print("1. Start a trade with another player")
+print("2. Add an item to the trade")
+print("3. Click DEBUG UI to verify path")
+print("4. Click DUPLICATE to attempt duplication")
+print("5. Check if other player sees the duplicate")
