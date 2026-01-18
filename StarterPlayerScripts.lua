@@ -1,402 +1,432 @@
--- 🚗 TRADE DUPLICATOR - BOTH SIDES
--- Duplicates cars for BOTH traders in the trade
-
+-- Advanced Trade Duplicator - Attempts server-side duplication
 local Players = game:GetService("Players")
 local Player = Players.LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
 
 wait(2)
 
-print("🚗 BOTH-SIDE TRADE DUPLICATOR LOADED")
+print("=== ADVANCED TRADE DUPLICATOR ===")
 
--- ===== GET BOTH TRADE CONTAINERS =====
-local function GetBothTradeContainers()
-    if not Player.PlayerGui then return nil, nil end
+-- Find remote events/functions for trading
+local function FindTradeRemotes()
+    print("\n🔍 SEARCHING FOR TRADE REMOTES...")
     
-    local menu = Player.PlayerGui:FindFirstChild("Menu")
-    if not menu then return nil, nil end
+    local remotes = {}
     
-    local trading = menu:FindFirstChild("Trading")
-    if not trading then return nil, nil end
-    
-    local peerToPeer = trading:FindFirstChild("PeerToPeer")
-    if not peerToPeer then return nil, nil end
-    
-    local main = peerToPeer:FindFirstChild("Main")
-    if not main then return nil, nil end
-    
-    -- Get MY container (LocalPlayer)
-    local myContainer = nil
-    local myPlayerFrame = main:FindFirstChild("LocalPlayer")
-    if myPlayerFrame then
-        local content = myPlayerFrame:FindFirstChild("Content")
-        if content then
-            myContainer = content:FindFirstChild("ScrollingFrame")
-        end
-    end
-    
-    -- Get OTHER PLAYER's container
-    local otherContainer = nil
-    for _, containerFrame in pairs(main:GetChildren()) do
-        if containerFrame.Name ~= "LocalPlayer" and containerFrame:IsA("Frame") then
-            local content = containerFrame:FindFirstChild("Content")
-            if content then
-                otherContainer = content:FindFirstChild("ScrollingFrame")
-                if otherContainer then
-                    print("✅ Found other player container: " .. containerFrame.Name)
-                    break
-                end
+    -- Check ReplicatedStorage
+    local rs = ReplicatedStorage
+    for _, child in pairs(rs:GetChildren()) do
+        if child:IsA("RemoteEvent") or child:IsA("RemoteFunction") then
+            if child.Name:lower():find("trade") 
+               or child.Name:lower():find("offer")
+               or child.Name:lower():find("item") then
+                print("✅ Found remote: " .. child.Name .. " (" .. child.ClassName .. ")")
+                table.insert(remotes, child)
             end
         end
     end
     
-    return myContainer, otherContainer
+    -- Check ReplicatedFirst
+    local rf = game:GetService("ReplicatedFirst")
+    for _, child in pairs(rf:GetChildren()) do
+        if child:IsA("RemoteEvent") or child:IsA("RemoteFunction") then
+            print("✅ Found remote in ReplicatedFirst: " .. child.Name)
+            table.insert(remotes, child)
+        end
+    end
+    
+    return remotes
 end
 
--- ===== FIND AND DUPLICATE CARS =====
-local function FindAndDuplicateCars()
-    print("\n🔍 Looking for cars in BOTH containers...")
+-- Get the trade container (same as before)
+local function GetTradeContainer()
+    if not Player.PlayerGui then return nil end
+    local menu = Player.PlayerGui:FindFirstChild("Menu")
+    if not menu then return nil end
+    local trading = menu:FindFirstChild("Trading")
+    if not trading then return nil end
+    local peerToPeer = trading:FindFirstChild("PeerToPeer")
+    if not peerToPeer then return nil end
+    local main = peerToPeer:FindFirstChild("Main")
+    if not main then return nil end
+    local localPlayer = main:FindFirstChild("LocalPlayer")
+    if not localPlayer then return nil end
+    local content = localPlayer:FindFirstChild("Content")
+    if not content then return nil end
+    return content:FindFirstChild("ScrollingFrame")
+end
+
+-- Find actual car buttons/items in the trade UI
+local function FindTradeItems()
+    print("\n🔍 FINDING TRADE ITEMS...")
     
-    local myContainer, otherContainer = GetBothTradeContainers()
+    local container = GetTradeContainer()
+    if not container then return {} end
     
-    if not myContainer then
-        print("❌ Your trade container not found")
-        return 0
-    end
+    local items = {}
+    local buttonCount = 0
     
-    if not otherContainer then
-        print("⚠️ Other player container not found (they might not have added items)")
-    end
-    
-    local totalDuplicates = 0
-    
-    -- ===== STEP 1: Find cars in MY container =====
-    local foundCars = {}
-    
-    print("\n🎯 Looking in YOUR container:")
-    for _, item in pairs(myContainer:GetChildren()) do
-        -- Skip UI objects
-        if item.ClassName == "UIPadding" or item.ClassName == "UIListLayout" then
-            continue
-        end
-        
-        -- Check if this looks like a car/item
-        local isCar = false
-        
-        if item.Name:find("Car") or item.Name:match("Car%-") then
-            isCar = true
-        elseif item:IsA("Frame") or item:IsA("TextButton") then
-            -- Check children for car indicators
-            for _, child in pairs(item:GetChildren()) do
-                if child:IsA("TextLabel") and child.Text:find("Car") then
-                    isCar = true
-                    break
+    -- Look for clickable items (buttons, imagebuttons)
+    for _, item in pairs(container:GetChildren()) do
+        if item:IsA("TextButton") or item:IsA("ImageButton") then
+            buttonCount = buttonCount + 1
+            
+            -- Check if it looks like a car item
+            local itemName = item.Name
+            local itemText = ""
+            
+            if item:IsA("TextButton") then
+                itemText = item.Text
+            end
+            
+            print("Button " .. buttonCount .. ": " .. itemName .. " - \"" .. itemText .. "\"")
+            
+            -- Check for car indicators
+            if itemName:find("Car") 
+               or itemText:find("Car")
+               or itemName:find("Vehicle")
+               or itemText:find("Vehicle")
+               or (string.len(itemName) <= 5 and itemText ~= "") then
+                
+                print("🚗 Potential car item found!")
+                
+                -- Get item info from children
+                local itemData = {
+                    Button = item,
+                    Name = itemName,
+                    Text = itemText,
+                    Children = {}
+                }
+                
+                -- Collect child data (for price, name, etc.)
+                for _, child in pairs(item:GetChildren()) do
+                    if child:IsA("TextLabel") or child:IsA("TextButton") then
+                        itemData.Children[child.Name] = {
+                            Text = child.Text,
+                            Class = child.ClassName
+                        }
+                    end
                 end
+                
+                table.insert(items, itemData)
             end
         end
-        
-        if isCar then
-            print("🚗 Found car: " .. item.Name .. " (" .. item.ClassName .. ")")
-            table.insert(foundCars, {
-                object = item,
-                container = myContainer,
-                isNested = false
-            })
-        end
     end
     
-    -- Check inside frames
-    for _, frame in pairs(myContainer:GetChildren()) do
-        if frame:IsA("Frame") then
-            for _, item in pairs(frame:GetChildren()) do
-                if item.Name:find("Car") then
-                    print("🚗 Found nested car: " .. item.Name .. " in " .. frame.Name)
-                    table.insert(foundCars, {
-                        object = item,
-                        container = frame,
-                        isNested = true,
-                        parentFrame = frame
-                    })
-                end
+    print("\n📊 Found " .. #items .. " potential car items")
+    return items
+end
+
+-- Try to simulate clicking the car to add it to trade
+local function SimulateAddCar(carButton)
+    print("\n🎯 SIMULATING ADD CAR: " .. carButton.Name)
+    
+    -- Method 1: Fire the button's click
+    local success1, result1 = pcall(function()
+        -- Try to fire the click event
+        carButton:FireServer("AddToTrade")
+        return true
+    end)
+    
+    if success1 then
+        print("✅ Fired AddToTrade to server")
+        return true
+    end
+    
+    -- Method 2: Call remote event directly
+    local remotes = FindTradeRemotes()
+    for _, remote in pairs(remotes) do
+        local success2, result2 = pcall(function()
+            if remote:IsA("RemoteEvent") then
+                remote:FireServer("AddItem", carButton.Name, Player)
+                print("✅ Fired " .. remote.Name .. " with item: " .. carButton.Name)
+                return true
+            elseif remote:IsA("RemoteFunction") then
+                remote:InvokeServer("AddTradeItem", carButton.Name)
+                print("✅ Invoked " .. remote.Name .. " with item: " .. carButton.Name)
+                return true
             end
-        end
-    end
-    
-    if #foundCars == 0 then
-        print("❌ No cars found in your offer")
-        return 0
-    end
-    
-    print("✅ Found " .. #foundCars .. " cars to duplicate")
-    
-    -- ===== STEP 2: Duplicate in MY container =====
-    print("\n📋 Duplicating in YOUR container:")
-    for i, carInfo in ipairs(foundCars) do
-        local car = carInfo.object
-        
-        -- Create duplicate
-        local success, duplicate = pcall(function()
-            return car:Clone()
         end)
         
-        if success and duplicate then
-            -- Give unique name
-            duplicate.Name = car.Name .. "_Copy" .. i
-            
-            -- Position it (to the right of original)
-            if pcall(function() return car.Position end) then
-                local pos = car.Position
-                local size = car.Size
-                duplicate.Position = UDim2.new(
-                    pos.X.Scale,
-                    pos.X.Offset + size.X.Offset + 15,
-                    pos.Y.Scale,
-                    pos.Y.Offset
-                )
-            end
-            
-            -- Add visual indicator
-            local indicator = Instance.new("TextLabel")
-            indicator.Text = "🔄"
-            indicator.Size = UDim2.new(0, 20, 0, 20)
-            indicator.Position = UDim2.new(1, -25, 0, 5)
-            indicator.BackgroundTransparency = 1
-            indicator.TextColor3 = Color3.fromRGB(0, 255, 0)
-            indicator.Font = Enum.Font.GothamBold
-            indicator.TextSize = 14
-            indicator.Parent = duplicate
-            
-            -- Add to same container
-            duplicate.Parent = carInfo.container
-            
-            print("   ✅ Created: " .. duplicate.Name)
-            totalDuplicates = totalDuplicates + 1
-            
-            -- ===== STEP 3: Duplicate in OTHER PLAYER's container =====
-            if otherContainer then
-                print("   🪞 Mirroring to other player...")
-                
-                -- Find corresponding frame in other container
-                local targetParent = otherContainer
-                if carInfo.isNested and carInfo.parentFrame then
-                    -- Look for same frame name in other container
-                    local targetFrame = otherContainer:FindFirstChild(carInfo.parentFrame.Name)
-                    if targetFrame then
-                        targetParent = targetFrame
-                    end
-                end
-                
-                -- Create duplicate for other player
-                local success2, duplicate2 = pcall(function()
-                    return duplicate:Clone()
-                end)
-                
-                if success2 and duplicate2 then
-                    duplicate2.Name = duplicate.Name .. "_Other"
-                    duplicate2.Parent = targetParent
-                    
-                    -- Same position
-                    if pcall(function() return duplicate.Position end) then
-                        duplicate2.Position = duplicate.Position
-                    end
-                    
-                    print("   ✅ Mirrored to other player")
-                else
-                    print("   ❌ Failed to mirror")
-                end
-            end
-        else
-            print("   ❌ Failed to duplicate: " .. car.Name)
+        if success2 and result2 then
+            return true
         end
     end
     
-    -- ===== STEP 4: Also duplicate ANY items in OTHER container =====
-    if otherContainer then
-        print("\n🎯 Looking in OTHER player's container:")
+    -- Method 3: Simulate mouse click
+    local success3, result3 = pcall(function()
+        local clickDetector = carButton:FindFirstChildOfClass("ClickDetector")
+        if clickDetector then
+            clickDetector.MaxActivationDistance = 0
+            fireclickdetector(clickDetector)
+            print("✅ Fired click detector")
+            return true
+        end
+    end)
+    
+    -- Method 4: Fire mouse events
+    local success4 = pcall(function()
+        local mouse = game:GetService("Players").LocalPlayer:GetMouse()
         
-        for _, item in pairs(otherContainer:GetChildren()) do
-            if item.ClassName == "UIPadding" or item.ClassName == "UIListLayout" then
-                continue
-            end
-            
-            if item.Name:find("Car") then
-                print("🚗 Found car in other container: " .. item.Name)
-                
-                -- Create duplicate in other container
-                local success, duplicate = pcall(function()
-                    return item:Clone()
-                end)
-                
-                if success and duplicate then
-                    duplicate.Name = item.Name .. "_CopyOther"
-                    
-                    if pcall(function() return item.Position end) then
-                        local pos = item.Position
-                        local size = item.Size
-                        duplicate.Position = UDim2.new(
-                            pos.X.Scale,
-                            pos.X.Offset + size.X.Offset + 15,
-                            pos.Y.Scale,
-                            pos.Y.Offset
-                        )
-                    end
-                    
-                    duplicate.Parent = otherContainer
-                    totalDuplicates = totalDuplicates + 1
-                    print("   ✅ Duplicated in other container")
-                end
-            end
-        end
+        -- Store original position
+        local originalPos = Vector2.new(mouse.X, mouse.Y)
+        
+        -- Move mouse to button
+        local buttonPos = carButton.AbsolutePosition + carButton.AbsoluteSize/2
+        
+        -- Try to simulate click
+        carButton:Fire("MouseButton1Down")
+        wait(0.1)
+        carButton:Fire("MouseButton1Up")
+        wait(0.1)
+        carButton:Fire("Activated")
+        
+        print("✅ Simulated mouse events")
+        return true
+    end)
+    
+    if not (success1 or success3 or success4) then
+        print("❌ Could not simulate adding car")
+        return false
     end
     
-    print("\n📊 TOTAL DUPLICATES CREATED: " .. totalDuplicates)
-    print("✅ Both traders should now see 2x cars!")
-    
-    return totalDuplicates
+    return true
 end
 
--- ===== CLEAN UP DUPLICATES =====
-local function CleanAllDuplicates()
-    print("\n🗑️ Cleaning all duplicates...")
+-- Try to duplicate items through the trade system
+local function ServerSideDuplication()
+    print("\n🔄 ATTEMPTING SERVER-SIDE DUPLICATION...")
     
-    local myContainer, otherContainer = GetBothTradeContainers()
-    local removed = 0
+    local items = FindTradeItems()
+    if #items == 0 then
+        print("❌ No trade items found")
+        return 0
+    end
     
-    -- Clean my container
-    if myContainer then
-        for _, item in pairs(myContainer:GetChildren()) do
-            if item.Name:find("_Copy") then
-                item:Destroy()
-                removed = removed + 1
+    local duplicates = 0
+    
+    -- Try each potential car item
+    for i, itemData in pairs(items) do
+        print("\n🔧 Processing item " .. i .. ": " .. itemData.Name)
+        
+        -- Try multiple methods to add the item
+        for attempt = 1, 3 do
+            print("Attempt " .. attempt .. " to add: " .. itemData.Name)
+            
+            -- Try to simulate adding the car
+            if SimulateAddCar(itemData.Button) then
+                duplicates = duplicates + 1
+                print("✅ Attempt " .. attempt .. " successful!")
+                
+                -- Wait a bit between duplicates
+                wait(0.5)
+                
+                -- Try to add it multiple times
+                for repeatCount = 1, 2 do
+                    wait(0.3)
+                    SimulateAddCar(itemData.Button)
+                    print("   Repeated addition #" .. repeatCount)
+                end
+                
+                break
+            else
+                print("❌ Attempt " .. attempt .. " failed")
+                wait(1)
             end
         end
-        
-        -- Clean inside frames
-        for _, frame in pairs(myContainer:GetChildren()) do
-            if frame:IsA("Frame") then
-                for _, item in pairs(frame:GetChildren()) do
-                    if item.Name:find("_Copy") then
-                        item:Destroy()
-                        removed = removed + 1
-                    end
+    end
+    
+    print("\n📊 SERVER-SIDE RESULTS:")
+    print("Total items processed: " .. #items)
+    print("Successful duplicates attempted: " .. duplicates)
+    
+    return duplicates
+end
+
+-- Monitor the receiver's trade window
+local function MonitorReceiverTrade()
+    print("\n👀 MONITORING RECEIVER WINDOW...")
+    
+    -- Try to find the other player's trade window
+    local receiverContainer = nil
+    local peerToPeer = Player.PlayerGui.Menu.Trading.PeerToPeer
+    local main = peerToPeer:FindFirstChild("Main")
+    
+    if main then
+        for _, child in pairs(main:GetChildren()) do
+            if child.Name ~= "LocalPlayer" then
+                receiverContainer = child:FindFirstChild("Content")
+                if receiverContainer then
+                    print("✅ Found receiver container: " .. child.Name)
+                    break
                 end
             end
         end
     end
     
-    -- Clean other container
-    if otherContainer then
-        for _, item in pairs(otherContainer:GetChildren()) do
-            if item.Name:find("_Copy") then
-                item:Destroy()
-                removed = removed + 1
+    if receiverContainer then
+        local scrollingFrame = receiverContainer:FindFirstChild("ScrollingFrame")
+        if scrollingFrame then
+            print("Receiver items count: " .. #scrollingFrame:GetChildren())
+            
+            -- List receiver items
+            for _, item in pairs(scrollingFrame:GetChildren()) do
+                if item:IsA("TextButton") or item:IsA("ImageButton") then
+                    local text = item:IsA("TextButton") and item.Text or item.Name
+                    print("   Receiver has: " .. text)
+                end
             end
         end
-    end
-    
-    print("✅ Removed " .. removed .. " duplicates")
-    return removed
-end
-
--- ===== SIMPLE UI =====
-local gui = Instance.new("ScreenGui")
-gui.Parent = Player:WaitForChild("PlayerGui")
-
-local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 300, 0, 200)
-frame.Position = UDim2.new(0.5, -150, 0, 20)
-frame.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
-frame.Active = true
-frame.Draggable = true
-
-local title = Instance.new("TextLabel")
-title.Text = "🚗 BOTH-SIDE DUPLICATOR"
-title.Size = UDim2.new(1, 0, 0, 40)
-title.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
-title.TextColor3 = Color3.fromRGB(255, 255, 255)
-
-local status = Instance.new("TextLabel")
-status.Text = "1. Open trade\n2. Both add cars\n3. Click DUPLICATE"
-status.Size = UDim2.new(1, -20, 0, 60)
-status.Position = UDim2.new(0, 10, 0, 50)
-status.BackgroundTransparency = 1
-status.TextColor3 = Color3.fromRGB(255, 255, 255)
-status.TextWrapped = true
-
-local dupBtn = Instance.new("TextButton")
-dupBtn.Text = "DUPLICATE BOTH SIDES"
-dupBtn.Size = UDim2.new(1, -20, 0, 35)
-dupBtn.Position = UDim2.new(0, 10, 0, 120)
-dupBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
-dupBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-
-local cleanBtn = Instance.new("TextButton")
-cleanBtn.Text = "CLEAN ALL"
-cleanBtn.Size = UDim2.new(1, -20, 0, 35)
-cleanBtn.Position = UDim2.new(0, 10, 0, 165)
-cleanBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-cleanBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-
--- Parent
-title.Parent = frame
-status.Parent = frame
-dupBtn.Parent = frame
-cleanBtn.Parent = frame
-frame.Parent = gui
-
--- Duplicate button
-dupBtn.MouseButton1Click:Connect(function()
-    dupBtn.Text = "WORKING..."
-    status.Text = "Duplicating for BOTH traders..."
-    
-    local count = FindAndDuplicateCars()
-    
-    if count > 0 then
-        status.Text = "✅ " .. count .. " duplicates created\n"
-        status.Text = status.Text .. "BOTH traders see 2x cars\n"
-        status.Text = status.Text .. "Only 1 car actually trades"
-        
-        dupBtn.Text = "✅ SUCCESS"
-        dupBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
     else
-        status.Text = "❌ No cars found\nAdd cars to BOTH sides first"
-        dupBtn.Text = "DUPLICATE BOTH SIDES"
+        print("❌ No receiver container found")
     end
-end)
+end
 
--- Clean button
-cleanBtn.MouseButton1Click:Connect(function()
-    cleanBtn.Text = "CLEANING..."
-    status.Text = "Cleaning duplicates..."
+-- Create enhanced UI
+local function CreateUI()
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "TradeDuplicatorUI"
+    gui.Parent = Player:WaitForChild("PlayerGui")
     
-    local removed = CleanAllDuplicates()
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 400, 0, 350)
+    frame.Position = UDim2.new(0.5, -200, 0, 20)
+    frame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+    frame.Active = true
+    frame.Draggable = true
     
-    status.Text = "🗑️ Removed " .. removed .. " duplicates"
-    cleanBtn.Text = "CLEAN ALL"
+    local title = Instance.new("TextLabel")
+    title.Text = "SERVER-SIDE DUPLICATOR"
+    title.Size = UDim2.new(1, 0, 0, 40)
+    title.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+    title.TextColor3 = Color3.fromRGB(255, 200, 100)
+    title.Font = Enum.Font.GothamBold
     
-    wait(2)
-    status.Text = "1. Open trade\n2. Both add cars\n3. Click DUPLICATE"
-end)
+    local output = Instance.new("ScrollingFrame")
+    output.Name = "Output"
+    output.Size = UDim2.new(1, -20, 0, 200)
+    output.Position = UDim2.new(0, 10, 0, 50)
+    output.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+    output.ScrollBarThickness = 6
+    
+    local outputText = Instance.new("TextLabel")
+    outputText.Name = "Text"
+    outputText.Size = UDim2.new(1, 0, 1, 0)
+    outputText.BackgroundTransparency = 1
+    outputText.TextColor3 = Color3.fromRGB(200, 200, 255)
+    outputText.TextWrapped = true
+    outputText.TextXAlignment = Enum.TextXAlignment.Left
+    outputText.TextYAlignment = Enum.TextYAlignment.Top
+    outputText.Font = Enum.Font.Code
+    outputText.TextSize = 14
+    
+    outputText.Parent = output
+    
+    -- Buttons
+    local buttons = {
+        {Text = "🔍 SCAN ITEMS", Func = function()
+            outputText.Text = "Scanning trade items..."
+            wait(0.5)
+            FindTradeItems()
+            outputText.Text = "Scan complete!\nCheck OUTPUT window"
+        end},
+        
+        {Text = "🚗 SERVER DUPLICATE", Func = function()
+            outputText.Text = "Attempting server-side duplication...\nThis may take a moment."
+            local count = ServerSideDuplication()
+            outputText.Text = "Server-side attempts: " .. count .. "\nCheck if receiver sees the items."
+        end},
+        
+        {Text = "👀 CHECK RECEIVER", Func = function()
+            outputText.Text = "Checking receiver window..."
+            MonitorReceiverTrade()
+            outputText.Text = "Receiver check complete.\nCheck OUTPUT window."
+        end},
+        
+        {Text = "📡 FIND REMOTES", Func = function()
+            outputText.Text = "Searching for remote events..."
+            FindTradeRemotes()
+            outputText.Text = "Remote search complete.\nCheck OUTPUT window."
+        end},
+        
+        {Text = "🔄 AUTO-DUPLICATE", Func = function()
+            outputText.Text = "Starting auto-duplication sequence..."
+            
+            spawn(function()
+                FindTradeItems()
+                wait(1)
+                ServerSideDuplication()
+                wait(2)
+                MonitorReceiverTrade()
+                outputText.Text = "Auto-sequence complete!"
+            end)
+        end}
+    }
+    
+    for i, btnInfo in pairs(buttons) do
+        local btn = Instance.new("TextButton")
+        btn.Text = btnInfo.Text
+        btn.Size = UDim2.new(0.9, 0, 0, 35)
+        btn.Position = UDim2.new(0.05, 0, 0, 260 + (i-1)*40)
+        btn.BackgroundColor3 = Color3.fromRGB(60, 60, 90)
+        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        
+        btn.MouseButton1Click:Connect(function()
+            btn.Text = "PROCESSING..."
+            spawn(function()
+                btnInfo.Func()
+                wait(1)
+                btn.Text = btnInfo.Text
+            end)
+        end)
+        
+        btn.Parent = frame
+    end
+    
+    -- Parent everything
+    title.Parent = frame
+    output.Parent = frame
+    frame.Parent = gui
+    
+    return outputText
+end
 
-print("\n" .. string.rep("=", 50))
-print("🚗 BOTH-SIDE TRADE DUPLICATOR READY")
-print(string.rep("=", 50))
-print("HOW IT WORKS:")
-print("1. You AND other trader add cars")
-print("2. Click DUPLICATE BOTH SIDES")
-print("3. BOTH traders see 2x cars")
-print("4. Only 1 car actually transfers")
-print(string.rep("=", 50))
+-- Update output function
+local outputText = CreateUI()
 
--- Auto-duplicate when trade is active
+-- Function to add text to UI output
+function UpdateUIOutput(text)
+    outputText.Text = text .. "\n" .. outputText.Text
+end
+
+-- Auto-start
+wait(3)
+print("\n🎯 READY FOR SERVER-SIDE DUPLICATION")
+print("INSTRUCTIONS:")
+print("1. Start a trade with another player")
+print("2. Add your car to the trade window")
+print("3. Click 'SCAN ITEMS' to identify cars")
+print("4. Click 'SERVER DUPLICATE' to attempt duplication")
+print("5. Ask the other player if they see duplicated cars")
+
+-- Start scanning
 spawn(function()
-    while wait(3) do
-        -- Check if trade is open
-        local menu = Player.PlayerGui:FindFirstChild("Menu")
-        if menu and menu:FindFirstChild("Trading") then
-            -- Small chance to auto-duplicate
-            if math.random(1, 10) == 1 then  -- 10% chance
-                FindAndDuplicateCars()
-            end
-        end
+    wait(5)
+    print("\n🚀 STARTING AUTO-SCAN...")
+    FindTradeItems()
+    FindTradeRemotes()
+    UpdateUIOutput("Auto-scan complete. Ready for duplication.")
+end)
+
+-- Keybind for quick duplication
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    
+    if input.KeyCode == Enum.KeyCode.P then
+        print("\n🎮 P KEY PRESSED - QUICK DUPLICATION")
+        ServerSideDuplication()
     end
 end)
+
+print("\nPress P for quick duplication")
