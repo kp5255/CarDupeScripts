@@ -1,501 +1,380 @@
--- FIXED CAR DETECTION USING REAL CAR DATA
+-- 🎯 CDT TRADE OFFER DETECTOR - DYNAMIC VERSION
+-- Finds ANY trade UI and shows what's inside
+
 local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Player = Players.LocalPlayer
 
-print("🚗 FIXED CAR DETECTION USING REAL CAR DATA")
+repeat task.wait() until game:IsLoaded()
+task.wait(2)
 
--- Get car service
-local carService = nil
-pcall(function()
-    carService = require(ReplicatedStorage.Remotes.Services.CarServiceRemotes)
-    print("✅ Found CarServiceRemotes")
-end)
+print("🎯 CDT Trade Offer Detector - Dynamic Scan")
 
--- Function to get ALL owned cars with real data
-local function getAllOwnedCars()
-    print("\n📋 GETTING ALL OWNED CARS...")
+-- ===== FIND ANY TRADE UI =====
+local function FindAnyTradeUI()
+    if not Player.PlayerGui then return nil end
     
-    local ownedCars = {}
-    
-    if carService and carService.GetOwnedCars then
-        local success, result = pcall(function()
-            return carService.GetOwnedCars:InvokeServer()
-        end)
+    local function deepSearch(parent, depth)
+        if depth > 15 then return nil end
         
-        if success and type(result) == "table" then
-            print("✅ Got " .. #result .. " cars from server")
+        for _, child in pairs(parent:GetChildren()) do
+            local nameLower = child.Name:lower()
             
-            -- Analyze car structure
-            for i, carData in ipairs(result) do
-                if type(carData) == "table" then
-                    -- Extract key information
-                    local carInfo = {
-                        index = i,
-                        name = carData.Name or carData.CarName or "Unknown",
-                        id = carData.Id or carData.CarId or i,
-                        isSelected = carData.IsSelected or carData.Selected or false,
-                        rawData = carData
-                    }
-                    
-                    table.insert(ownedCars, carInfo)
-                    
-                    -- Show first car's structure for debugging
-                    if i == 1 then
-                        print("\n🔬 FIRST CAR STRUCTURE:")
-                        for key, value in pairs(carData) do
-                            local valueType = type(value)
-                            local displayValue = tostring(value)
-                            
-                            if valueType == "string" and #displayValue > 20 then
-                                displayValue = displayValue:sub(1, 20) .. "..."
-                            end
-                            
-                            print("  " .. key .. " = " .. displayValue .. " (" .. valueType .. ")")
-                        end
+            -- Look for trade UI indicators
+            if child:IsA("ScreenGui") or child:IsA("Frame") then
+                if nameLower:find("trade") or nameLower:find("peer") then
+                    if child.Visible then
+                        print("🎯 Found VISIBLE trade UI: " .. child.Name .. " at " .. child:GetFullName())
+                        return child
                     end
                 end
             end
-        else
-            print("❌ Failed to get cars:", result)
-        end
-    else
-        print("❌ CarService not available")
-    end
-    
-    return ownedCars
-end
-
--- Function to get CURRENTLY SELECTED car
-local function getCurrentSelectedCar()
-    print("\n🎯 GETTING CURRENTLY SELECTED CAR...")
-    
-    local ownedCars = getAllOwnedCars()
-    local selectedCar = nil
-    
-    -- Method 1: Check IsSelected field
-    for _, carInfo in ipairs(ownedCars) do
-        if carInfo.rawData.IsSelected == true or carInfo.rawData.Selected == true then
-            selectedCar = carInfo
-            print("✅ Found selected car via IsSelected field: " .. carInfo.name)
-            break
-        end
-    end
-    
-    -- Method 2: Check garage UI
-    if not selectedCar then
-        local garageUI = LocalPlayer.PlayerGui:FindFirstChild("Menu")
-        if garageUI then
-            -- Look for selected car in UI
-            for _, element in pairs(garageUI:GetDescendants()) do
-                if element:IsA("TextLabel") then
-                    local text = element.Text or ""
-                    if text:find("Selected:") then
-                        local carName = text:gsub("Selected: ", ""):gsub("Vehicle: ", "")
-                        print("✅ Found selected car in UI: " .. carName)
-                        
-                        -- Find this car in owned cars
-                        for _, carInfo in ipairs(ownedCars) do
-                            if carInfo.name == carName then
-                                selectedCar = carInfo
-                                break
-                            end
-                        end
-                        break
-                    end
-                end
+            
+            if #child:GetChildren() > 0 then
+                local found = deepSearch(child, depth + 1)
+                if found then return found end
             end
         end
-    end
-    
-    -- Method 3: Check current character vehicle
-    if not selectedCar then
-        local character = LocalPlayer.Character
-        if character then
-            for _, part in pairs(character:GetDescendants()) do
-                if part:IsA("Model") and (part.Name:find("Car") or part.Name:find("Vehicle")) then
-                    print("✅ Found current vehicle: " .. part.Name)
-                    
-                    -- Find this car in owned cars
-                    for _, carInfo in ipairs(ownedCars) do
-                        if carInfo.name == part.Name then
-                            selectedCar = carInfo
-                            break
-                        end
-                    end
-                    break
-                end
-            end
-        end
-    end
-    
-    -- Method 4: Use first car if none selected
-    if not selectedCar and #ownedCars > 0 then
-        selectedCar = ownedCars[1]
-        print("⚠️ No selected car found, using first car: " .. selectedCar.name)
-    end
-    
-    if selectedCar then
-        print("\n🎯 CURRENT SELECTED CAR:")
-        print("Name: " .. selectedCar.name)
-        print("ID: " .. tostring(selectedCar.id))
-        print("Index: " .. selectedCar.index)
-        return selectedCar
-    else
-        print("❌ No cars found!")
+        
         return nil
     end
+    
+    return deepSearch(Player.PlayerGui, 0)
 end
 
--- Function to unlock wraps for SPECIFIC car using real car data
-local function unlockWrapsForSpecificCar()
-    print("\n🎨 UNLOCKING WRAPS FOR SPECIFIC CAR...")
+-- ===== SCAN ALL VISIBLE FRAMES FOR OFFERED ITEMS =====
+local function ScanAllVisibleItems()
+    local foundItems = {}
     
-    local selectedCar = getCurrentSelectedCar()
-    if not selectedCar then
-        print("❌ No car selected")
-        return
+    if not Player.PlayerGui then return foundItems end
+    
+    -- First, find if there's a visible trade UI
+    local tradeUI = FindAnyTradeUI()
+    
+    if tradeUI then
+        print("🔍 Scanning trade UI for items...")
+        
+        -- Look for ANY frames/buttons that might be items
+        for _, child in pairs(tradeUI:GetDescendants()) do
+            if child:IsA("Frame") or child:IsA("TextButton") or child:IsA("ImageButton") then
+                if child.Visible then
+                    local name = child.Name
+                    
+                    -- Skip common UI elements
+                    if name == "" or name:find("Background") or name:find("Border") 
+                       or name:find("Corner") or name:find("Padding") 
+                       or name:find("Layout") or name:find("Shadow") then
+                        continue
+                    end
+                    
+                    -- Look for car indicators
+                    if name:find("Car") or name:find("car") or name:match("%-") or name:match("%_") then
+                        local itemInfo = {
+                            Name = name,
+                            DisplayName = name,
+                            Object = child,
+                            Path = child:GetFullName(),
+                            Class = child.ClassName,
+                            Visible = child.Visible
+                        }
+                        
+                        -- Try to get text from TextButton
+                        if child:IsA("TextButton") and child.Text ~= "" then
+                            itemInfo.DisplayName = child.Text
+                        end
+                        
+                        -- Look for text labels
+                        for _, sub in pairs(child:GetChildren()) do
+                            if sub:IsA("TextLabel") and sub.Text ~= "" then
+                                if sub.Name:lower():find("name") or sub.Text:len() > 3 then
+                                    itemInfo.DisplayName = sub.Text
+                                end
+                            end
+                        end
+                        
+                        -- Check if this is likely an item (not a container)
+                        local childCount = #child:GetChildren()
+                        if childCount < 10 then  -- Items usually have few children
+                            table.insert(foundItems, itemInfo)
+                            print("📦 Found potential item: " .. itemInfo.DisplayName .. " (" .. child.ClassName .. ")")
+                        end
+                    end
+                end
+            end
+        end
     end
     
-    print("Target car: " .. selectedCar.name)
-    
-    -- Get wraps for this specific car
-    local wraps = getWrapsForCar(selectedCar.name)
-    if #wraps == 0 then
-        print("❌ No wraps found for this car")
-        return
+    -- If no trade UI found, scan entire PlayerGui for visible items
+    if #foundItems == 0 then
+        print("🔍 Scanning entire PlayerGui for visible car items...")
+        
+        for _, child in pairs(Player.PlayerGui:GetDescendants()) do
+            if child:IsA("Frame") or child:IsA("TextButton") or child:IsA("ImageButton") then
+                if child.Visible then
+                    local name = child.Name
+                    
+                    if name:find("Car") or name:find("Nissan") or name:find("Subaru") then
+                        local absPos = child.AbsolutePosition
+                        local screenSize = workspace.CurrentCamera.ViewportSize
+                        
+                        -- Only show items on screen (not offscreen)
+                        if absPos.X > 0 and absPos.X < screenSize.X 
+                           and absPos.Y > 0 and absPos.Y < screenSize.Y then
+                            
+                            local itemInfo = {
+                                Name = name,
+                                DisplayName = name,
+                                Object = child,
+                                Path = child:GetFullName(),
+                                Position = absPos,
+                                ScreenPosition = UDim2.new(0, absPos.X / screenSize.X, 0, absPos.Y / screenSize.Y)
+                            }
+                            
+                            print("📍 Visible on screen: " .. name .. " at " .. tostring(math.floor(absPos.X)) .. "," .. tostring(math.floor(absPos.Y)))
+                            table.insert(foundItems, itemInfo)
+                        end
+                    end
+                end
+            end
+        end
     end
     
-    -- Find wrap UI
-    local wrapUI = findWrapUI()
-    if not wrapUI then
-        print("❌ Wrap UI not found")
-        return
+    return foundItems
+end
+
+-- ===== CREATE VISUAL OVERLAY UI =====
+local function CreateOverlayUI()
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "TradeOverlay"
+    ScreenGui.Parent = Player:WaitForChild("PlayerGui")
+    ScreenGui.ResetOnSpawn = false
+    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    
+    -- Control Panel
+    local ControlPanel = Instance.new("Frame")
+    ControlPanel.Size = UDim2.new(0, 400, 0, 150)
+    ControlPanel.Position = UDim2.new(0.5, -200, 0, 10)
+    ControlPanel.BackgroundColor3 = Color3.fromRGB(30, 30, 50)
+    ControlPanel.BorderSizePixel = 0
+    ControlPanel.Active = true
+    ControlPanel.Draggable = true
+    
+    -- Title
+    local Title = Instance.new("TextLabel")
+    Title.Text = "🔍 LIVE TRADE ITEM SCANNER"
+    Title.Size = UDim2.new(1, 0, 0, 30)
+    Title.BackgroundColor3 = Color3.fromRGB(50, 50, 80)
+    Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Title.Font = Enum.Font.GothamBold
+    Title.TextSize = 16
+    
+    -- Status
+    local Status = Instance.new("TextLabel")
+    Status.Text = "Ready - Start a trade and add items"
+    Status.Size = UDim2.new(1, -20, 0, 40)
+    Status.Position = UDim2.new(0, 10, 0, 40)
+    Status.BackgroundTransparency = 1
+    Status.TextColor3 = Color3.fromRGB(200, 200, 255)
+    Status.Font = Enum.Font.Gotham
+    Status.TextSize = 14
+    Status.TextWrapped = true
+    
+    -- Scan Button
+    local ScanButton = Instance.new("TextButton")
+    ScanButton.Text = "🔍 SCAN NOW"
+    ScanButton.Size = UDim2.new(0.45, 0, 0, 35)
+    ScanButton.Position = UDim2.new(0.025, 0, 1, -45)
+    ScanButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+    ScanButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    ScanButton.Font = Enum.Font.GothamBold
+    
+    -- Debug Button
+    local DebugButton = Instance.new("TextButton")
+    DebugButton.Text = "🐛 DEBUG VIEW"
+    DebugButton.Size = UDim2.new(0.45, 0, 0, 35)
+    DebugButton.Position = UDim2.new(0.525, 0, 1, -45)
+    DebugButton.BackgroundColor3 = Color3.fromRGB(150, 0, 200)
+    DebugButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    DebugButton.Font = Enum.Font.GothamBold
+    
+    -- Add corners
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    
+    corner:Clone().Parent = ControlPanel
+    corner:Clone().Parent = Title
+    corner:Clone().Parent = ScanButton
+    corner:Clone().Parent = DebugButton
+    
+    -- Parent
+    Title.Parent = ControlPanel
+    Status.Parent = ControlPanel
+    ScanButton.Parent = ControlPanel
+    DebugButton.Parent = ControlPanel
+    ControlPanel.Parent = ScreenGui
+    
+    -- Item Highlight Overlays (will be created dynamically)
+    local highlightContainer = Instance.new("Frame")
+    highlightContainer.Size = UDim2.new(1, 0, 1, 0)
+    highlightContainer.BackgroundTransparency = 1
+    highlightContainer.Parent = ScreenGui
+    
+    -- Functions
+    local function updateStatus(text, color)
+        Status.Text = text
+        Status.TextColor3 = color or Color3.fromRGB(200, 200, 255)
     end
     
-    -- Clear existing items
-    for _, child in pairs(wrapUI:GetChildren()) do
-        if child.Name ~= "UIListLayout" then
+    local function clearHighlights()
+        for _, child in pairs(highlightContainer:GetChildren()) do
             child:Destroy()
         end
     end
     
-    -- Add wraps specifically for this car
-    local addedCount = 0
-    
-    for i, wrapName in pairs(wraps) do
-        -- Check if wrap is for this car or universal
-        local isForThisCar = false
-        if wrapName:find("/") then
-            local carSpecific = wrapName:match("^(.-)/")
-            isForThisCar = (carSpecific == selectedCar.name)
-        else
-            isForThisCar = true  -- Universal wrap
+    local function createHighlight(item)
+        local highlight = Instance.new("Frame")
+        highlight.Name = "Highlight_" .. item.Name
+        highlight.BackgroundTransparency = 0.8
+        highlight.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+        highlight.BorderSizePixel = 0
+        highlight.ZIndex = 999
+        
+        -- Position highlight around the item
+        if item.Position then
+            highlight.Size = UDim2.new(0, 100, 0, 100)
+            highlight.Position = UDim2.new(
+                0, item.Position.X - 50,
+                0, item.Position.Y - 50
+            )
+            
+            -- Add label
+            local label = Instance.new("TextLabel")
+            label.Text = item.DisplayName
+            label.Size = UDim2.new(1, 0, 0, 20)
+            label.Position = UDim2.new(0, 0, 1, 0)
+            label.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+            label.TextColor3 = Color3.fromRGB(255, 255, 255)
+            label.Font = Enum.Font.GothamBold
+            label.TextSize = 12
+            label.Parent = highlight
         end
         
-        if isForThisCar then
-            -- Create wrap item
-            local wrapFrame = Instance.new("Frame")
-            wrapFrame.Name = "Wrap_" .. wrapName:gsub("/", "_")
-            wrapFrame.Size = UDim2.new(1, -10, 0, 70)
-            wrapFrame.Position = UDim2.new(0, 5, 0, addedCount * 75)
+        highlight.Parent = highlightContainer
+        return highlight
+    end
+    
+    local function performScan()
+        clearHighlights()
+        updateStatus("🔍 Scanning...", Color3.fromRGB(255, 200, 100))
+        
+        local items = ScanAllVisibleItems()
+        
+        if #items > 0 then
+            updateStatus("✅ Found " .. #items .. " item(s)", Color3.fromRGB(100, 255, 100))
             
-            -- Color coding
-            if wrapName:find("/") then
-                wrapFrame.BackgroundColor3 = Color3.fromRGB(138, 43, 226) -- Purple for car-specific
-            else
-                wrapFrame.BackgroundColor3 = addedCount % 2 == 0 and 
-                    Color3.fromRGB(50, 50, 70) or 
-                    Color3.fromRGB(60, 60, 80)
+            -- Create highlights for found items
+            for _, item in ipairs(items) do
+                if item.Position then
+                    createHighlight(item)
+                end
+                
+                -- Show in output
+                print("📋 Item: " .. item.DisplayName)
+                print("   Path: " .. item.Path)
+                print("   Class: " .. item.Class)
+                if item.Position then
+                    print("   Position: " .. tostring(item.Position.X) .. ", " .. tostring(item.Position.Y))
+                end
+                print(string.rep("-", 40))
             end
-            
-            wrapFrame.BorderSizePixel = 2
-            wrapFrame.BorderColor3 = Color3.new(0.2, 0.6, 1)
-            
-            -- Wrap name with car indicator
-            local displayName = wrapName
-            if wrapName:find("/") then
-                displayName = wrapName:gsub("^.-/", "") .. " (For: " .. selectedCar.name .. ")"
-            end
-            
-            local nameLabel = Instance.new("TextLabel")
-            nameLabel.Text = "✅ " .. displayName
-            nameLabel.Size = UDim2.new(0.7, 0, 0.6, 0)
-            nameLabel.TextColor3 = Color3.new(0, 1, 0)
-            nameLabel.Font = Enum.Font.SourceSansBold
-            nameLabel.TextXAlignment = Enum.TextXAlignment.Left
-            nameLabel.PaddingLeft = UDim.new(0, 10)
-            nameLabel.Parent = wrapFrame
-            
-            -- Car-specific label
-            if wrapName:find("/") then
-                local carLabel = Instance.new("TextLabel")
-                carLabel.Text = "🚗 " .. selectedCar.name
-                carLabel.Size = UDim2.new(0.7, 0, 0.4, 0)
-                carLabel.Position = UDim2.new(0, 10, 0.6, 0)
-                carLabel.TextColor3 = Color3.new(1, 1, 0)
-                carLabel.TextSize = 12
-                carLabel.Parent = wrapFrame
-            end
-            
-            -- Equip button
-            local equipBtn = Instance.new("TextButton")
-            equipBtn.Text = "EQUIP"
-            equipBtn.Size = UDim2.new(0.2, 0, 0.6, 0)
-            equipBtn.Position = UDim2.new(0.75, 0, 0.2, 0)
-            equipBtn.BackgroundColor3 = wrapName:find("/") and 
-                Color3.fromRGB(138, 43, 226) or  -- Purple for car-specific
-                Color3.fromRGB(0, 150, 0)        -- Green for universal
-            equipBtn.TextColor3 = Color3.new(1, 1, 1)
-            equipBtn.Font = Enum.Font.SourceSansBold
-            equipBtn.Parent = wrapFrame
-            
-            equipBtn.MouseButton1Click:Connect(function()
-                equipWrapOnCar(wrapName, selectedCar.name)
-            end)
-            
-            wrapFrame.Parent = wrapUI
-            addedCount = addedCount + 1
+        else
+            updateStatus("❌ No items found", Color3.fromRGB(255, 100, 100))
         end
     end
     
-    print("✅ Added " .. addedCount .. " wraps for " .. selectedCar.name)
-    print("⚠️ Wraps are CAR-SPECIFIC for: " .. selectedCar.name)
-end
-
--- Function to get wraps for specific car (needs implementation)
-local function getWrapsForCar(carName)
-    -- This should be implemented based on game structure
-    -- For now, return some example wraps
-    local wraps = {
-        "BasicWrap",  -- Universal wrap
-        "RacingStripes",  -- Universal wrap
-        carName .. "/PremiumWrap",  -- Car-specific
-        carName .. "/RacingWrap",   -- Car-specific
-        carName .. "/SpecialEdition" -- Car-specific
-    }
-    
-    return wraps
-end
-
--- Function to find wrap UI (needs implementation)
-local function findWrapUI()
-    -- Implement based on your UI structure
-    local wrapUI = LocalPlayer.PlayerGui:FindFirstChild("Customization")
-    if wrapUI then
-        wrapUI = wrapUI:FindFirstChild("Bottom")
-        if wrapUI then
-            wrapUI = wrapUI:FindFirstChild("Customization")
-            if wrapUI then
-                wrapUI = wrapUI:FindFirstChild("Items")
-                if wrapUI then
-                    wrapUI = wrapUI:FindFirstChild("Pages")
-                    if wrapUI then
-                        wrapUI = wrapUI:FindFirstChild("List")
-                        if wrapUI then
-                            wrapUI = wrapUI:FindFirstChild("Wrap")
-                            return wrapUI
-                        end
+    local function showDebugView()
+        clearHighlights()
+        updateStatus("🐛 Debug: Showing ALL visible UI elements...", Color3.fromRGB(255, 150, 200))
+        
+        if not Player.PlayerGui then return end
+        
+        local visibleCount = 0
+        for _, child in pairs(Player.PlayerGui:GetDescendants()) do
+            if child:IsA("GuiObject") and child.Visible then
+                visibleCount = visibleCount + 1
+                
+                -- Only highlight interesting elements
+                if child:IsA("Frame") or child:IsA("TextButton") or child:IsA("ImageButton") then
+                    local absPos = child.AbsolutePosition
+                    local absSize = child.AbsoluteSize
+                    
+                    if absPos.X > 0 and absPos.Y > 0 and absSize.X > 10 and absSize.Y > 10 then
+                        local highlight = Instance.new("Frame")
+                        highlight.Name = "Debug_" .. child.Name
+                        highlight.BackgroundTransparency = 0.9
+                        highlight.BackgroundColor3 = Color3.fromRGB(255, 0, 255)
+                        highlight.BorderSizePixel = 1
+                        highlight.BorderColor3 = Color3.fromRGB(255, 255, 255)
+                        highlight.ZIndex = 998
+                        
+                        highlight.Size = UDim2.new(0, absSize.X, 0, absSize.Y)
+                        highlight.Position = UDim2.new(0, absPos.X, 0, absPos.Y)
+                        
+                        local label = Instance.new("TextLabel")
+                        label.Text = child.Name .. "\n" .. child.ClassName
+                        label.Size = UDim2.new(1, 0, 0, 30)
+                        label.Position = UDim2.new(0, 0, 1, 0)
+                        label.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+                        label.TextColor3 = Color3.fromRGB(255, 255, 255)
+                        label.Font = Enum.Font.Gotham
+                        label.TextSize = 10
+                        label.TextWrapped = true
+                        label.Parent = highlight
+                        
+                        highlight.Parent = highlightContainer
                     end
                 end
             end
         end
-    end
-    return nil
-end
-
--- Function to equip wrap (needs implementation)
-local function equipWrapOnCar(wrapName, carName)
-    print("Equipping " .. wrapName .. " on " .. carName)
-    -- Implementation would go here
-end
-
--- CREATE UPDATED CONTROL UI
-local controlUI = Instance.new("ScreenGui")
-controlUI.Name = "CarSpecificWrapUnlocker"
-controlUI.Parent = LocalPlayer.PlayerGui
-
-local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 300, 0, 300)
-mainFrame.Position = UDim2.new(0, 20, 0, 100)
-mainFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-mainFrame.BorderSizePixel = 3
-mainFrame.BorderColor3 = Color3.new(0, 0.7, 1)
-mainFrame.Parent = controlUI
-
-local title = Instance.new("TextLabel")
-title.Text = "🚗 CAR-SPECIFIC WRAPS"
-title.Size = UDim2.new(1, 0, 0, 30)
-title.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
-title.TextColor3 = Color3.new(1, 1, 1)
-title.Font = Enum.Font.SourceSansBold
-title.Parent = mainFrame
-
--- Current car display
-local carDisplay = Instance.new("TextLabel")
-carDisplay.Name = "CarDisplay"
-carDisplay.Text = "Car: Detecting..."
-carDisplay.Size = UDim2.new(1, 0, 0, 25)
-carDisplay.Position = UDim2.new(0, 0, 0.12, 0)
-carDisplay.TextColor3 = Color3.new(1, 1, 1)
-carDisplay.Parent = mainFrame
-
--- Car list display
-local carListDisplay = Instance.new("TextLabel")
-carListDisplay.Name = "CarListDisplay"
-carListDisplay.Text = "Owned cars: Loading..."
-carListDisplay.Size = UDim2.new(1, 0, 0, 40)
-carListDisplay.Position = UDim2.new(0, 0, 0.2, 0)
-carListDisplay.TextColor3 = Color3.new(1, 1, 0)
-carListDisplay.TextSize = 12
-carListDisplay.TextWrapped = true
-carListDisplay.Parent = mainFrame
-
--- Buttons
-local buttons = {
-    {"🔍 Detect Selected Car", function()
-        local car = getCurrentSelectedCar()
-        if car then
-            carDisplay.Text = "Car: " .. car.name
-            carDisplay.TextColor3 = Color3.new(0, 1, 0)
-        end
-    end},
-    {"📋 Show All Cars", function()
-        local cars = getAllOwnedCars()
-        if #cars > 0 then
-            local carNames = ""
-            for i, car in ipairs(cars) do
-                if i <= 5 then  -- Limit display
-                    carNames = carNames .. (i > 1 and ", " or "") .. car.name
-                end
-            end
-            if #cars > 5 then
-                carNames = carNames .. " and " .. (#cars - 5) .. " more"
-            end
-            carListDisplay.Text = "Owned cars: " .. carNames
-        end
-    end},
-    {"🎨 Unlock Car-Specific Wraps", unlockWrapsForSpecificCar},
-    {"🔧 Change Selected Car", function()
-        -- Let user pick a different car
-        local cars = getAllOwnedCars()
-        if #cars > 0 then
-            -- Create car selection UI
-            createCarSelectionUI(cars)
-        end
-    end}
-}
-
-for i, btnData in ipairs(buttons) do
-    local btn = Instance.new("TextButton")
-    btn.Text = btnData[1]
-    btn.Size = UDim2.new(0.9, 0, 0, 40)
-    btn.Position = UDim2.new(0.05, 0, 0.35 + (i * 0.15), 0)
-    btn.BackgroundColor3 = Color3.fromRGB(0, 100, 50)
-    btn.TextColor3 = Color3.new(1, 1, 1)
-    btn.Font = Enum.Font.SourceSansBold
-    btn.Parent = mainFrame
-    btn.MouseButton1Click:Connect(btnData[2])
-end
-
--- Create car selection UI
-local function createCarSelectionUI(cars)
-    local selectionUI = Instance.new("ScreenGui")
-    selectionUI.Name = "CarSelectionUI"
-    selectionUI.Parent = LocalPlayer.PlayerGui
-    
-    local selectionFrame = Instance.new("Frame")
-    selectionFrame.Size = UDim2.new(0, 350, 0, 400)
-    selectionFrame.Position = UDim2.new(0.5, -175, 0.5, -200)
-    selectionFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-    selectionFrame.BorderSizePixel = 3
-    selectionFrame.BorderColor3 = Color3.new(0, 1, 0)
-    selectionFrame.Parent = selectionUI
-    
-    local title = Instance.new("TextLabel")
-    title.Text = "🚗 SELECT A CAR"
-    title.Size = UDim2.new(1, 0, 0, 40)
-    title.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
-    title.TextColor3 = Color3.new(1, 1, 1)
-    title.Font = Enum.Font.SourceSansBold
-    title.Parent = selectionFrame
-    
-    local scrollFrame = Instance.new("ScrollingFrame")
-    scrollFrame.Size = UDim2.new(1, -20, 0.8, 0)
-    scrollFrame.Position = UDim2.new(0, 10, 0.1, 0)
-    scrollFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, #cars * 60)
-    scrollFrame.Parent = selectionFrame
-    
-    local uiListLayout = Instance.new("UIListLayout")
-    uiListLayout.Parent = scrollFrame
-    
-    -- Add car buttons
-    for i, carInfo in ipairs(cars) do
-        local carBtn = Instance.new("TextButton")
-        carBtn.Text = carInfo.name .. " (ID: " .. carInfo.id .. ")"
-        carBtn.Size = UDim2.new(1, -10, 0, 50)
-        carBtn.Position = UDim2.new(0, 5, 0, (i-1) * 55)
-        carBtn.BackgroundColor3 = i % 2 == 0 and 
-            Color3.fromRGB(50, 50, 70) or 
-            Color3.fromRGB(60, 60, 80)
-        carBtn.TextColor3 = Color3.new(1, 1, 1)
-        carBtn.Font = Enum.Font.SourceSansBold
         
-        -- Highlight if selected
-        if carInfo.rawData.IsSelected or carInfo.rawData.Selected then
-            carBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
-            carBtn.Text = "✅ " .. carBtn.Text .. " (SELECTED)"
-        end
-        
-        carBtn.MouseButton1Click:Connect(function()
-            -- Update selected car display
-            carDisplay.Text = "Car: " .. carInfo.name
-            carDisplay.TextColor3 = Color3.new(0, 1, 0)
-            
-            -- Close selection UI
-            selectionUI:Destroy()
-            
-            print("Selected car: " .. carInfo.name)
-        end)
-        
-        carBtn.Parent = scrollFrame
+        updateStatus("🐛 " .. visibleCount .. " visible elements highlighted", Color3.fromRGB(255, 150, 200))
     end
     
-    -- Close button
-    local closeBtn = Instance.new("TextButton")
-    closeBtn.Text = "CLOSE"
-    closeBtn.Size = UDim2.new(0.3, 0, 0.1, 0)
-    closeBtn.Position = UDim2.new(0.35, 0, 0.92, 0)
-    closeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-    closeBtn.TextColor3 = Color3.new(1, 1, 1)
-    closeBtn.Parent = selectionFrame
+    -- Event handlers
+    ScanButton.MouseButton1Click:Connect(performScan)
+    DebugButton.MouseButton1Click:Connect(showDebugView)
     
-    closeBtn.MouseButton1Click:Connect(function()
-        selectionUI:Destroy()
+    -- Auto-scan every 3 seconds
+    spawn(function()
+        while task.wait(3) do
+            if ScreenGui and ScreenGui.Parent then
+                performScan()
+            end
+        end
     end)
+    
+    -- Initial scan
+    task.wait(1)
+    performScan()
+    
+    return ScreenGui
 end
 
+-- ===== MAIN =====
 print("\n" .. string.rep("=", 60))
-print("🚗 FIXED CAR-SPECIFIC WRAP UNLOCKER")
-print(string.rep("=", 60))
-print("USES REAL CAR DATA FROM:")
-print("CarServiceRemotes.GetOwnedCars:InvokeServer()")
-print(string.rep("=", 60))
-print("FEATURES:")
-print("• Uses actual car data from server")
-print("• Detects IsSelected/Selected field")
-print("• Shows ALL owned cars")
-print("• Car-specific wrap targeting")
-print("• Manual car selection")
+print("🎯 CDT TRADE ITEM DETECTOR")
+print("📍 Will find ANY visible trade items on screen")
+print("🔍 Auto-scans every 3 seconds")
 print(string.rep("=", 60))
 
--- Make global
-_G.getcars = getAllOwnedCars
-_G.getselected = getCurrentSelectedCar
-_G.unlockwraps = unlockWrapsForSpecificCar
+-- Create the overlay UI
+CreateOverlayUI()
 
-print("\nConsole commands:")
-print("_G.getcars() - Get all owned cars")
-print("_G.getselected() - Get selected car")
-print("_G.unlockwraps() - Unlock wraps for selected car")
+print("\n✅ Overlay UI created!")
+print("💡 Controls:")
+print("   • Drag the panel to move it")
+print("   • SCAN NOW: Manual scan")
+print("   • DEBUG VIEW: Show ALL visible UI elements")
+print("   • Green highlights: Found items")
+print("   • Magenta highlights: All UI elements (debug)")
+print("\n🎮 Start a trade, add items, then click SCAN NOW!")
+print("📊 Watch Output for detailed item information")
