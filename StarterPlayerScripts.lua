@@ -1,5 +1,5 @@
--- 🎯 CDT OFFERED CARS ONLY TRACKER
--- Shows ONLY cars in your TRADE OFFER (not owned cars)
+-- 🎯 CDT EXACT OFFER TRACKER
+-- Targets: PlayerGui.Menu.Trading.PeerToPeer.Main.Inventory.LocalPlayer.Content.ScrollingFrame
 
 local Players = game:GetService("Players")
 local Player = Players.LocalPlayer
@@ -8,159 +8,142 @@ local RunService = game:GetService("RunService")
 repeat task.wait() until game:IsLoaded()
 task.wait(2)
 
-print("🎯 CDT OFFERED CARS TRACKER - Looking for OFFER section only")
+print("🎯 CDT EXACT OFFER TRACKER - Targeting LocalPlayer.Content.ScrollingFrame")
 
--- ===== IDENTIFY OFFER SECTION =====
-local function FindOfferSection()
-    if not Player.PlayerGui then return nil end
-    
-    -- First, find the trade UI
-    local function findTradeUI(parent)
-        for _, child in pairs(parent:GetChildren()) do
-            local nameLower = child.Name:lower()
-            
-            if child:IsA("ScreenGui") or child:IsA("Frame") then
-                if nameLower:find("trade") or nameLower:find("peer") then
-                    if child.Visible then
-                        print("🎯 Found trade UI: " .. child.Name)
-                        return child
-                    end
-                end
-            end
-            
-            if #child:GetChildren() > 0 then
-                local found = findTradeUI(child)
-                if found then return found end
-            end
-        end
-        return nil
+-- ===== EXACT PATH TO OFFER CONTAINER =====
+local function GetExactOfferContainer()
+    if not Player.PlayerGui then 
+        print("❌ No PlayerGui")
+        return nil 
     end
     
-    local tradeUI = findTradeUI(Player.PlayerGui)
-    if not tradeUI then return nil end
-    
-    print("🔍 Looking for OFFER section in trade UI...")
-    
-    -- Look for containers that might be the offer section
-    -- Common names: "YourOffer", "MyOffer", "LocalPlayer", "Offer", "YourItems"
-    local offerContainers = {}
-    
-    for _, child in pairs(tradeUI:GetDescendants()) do
-        if child:IsA("Frame") or child:IsA("ScrollingFrame") then
-            local nameLower = child.Name:lower()
-            
-            if nameLower:find("offer") or 
-               nameLower:find("your") or 
-               nameLower:find("local") or
-               nameLower:find("my") or
-               nameLower:find("left") then  -- Left side is usually your offer
-                
-                -- Check if this container has car items
-                local hasCars = false
-                for _, item in pairs(child:GetDescendants()) do
-                    if item.Name:find("Car") or item.Name:find("car") then
-                        hasCars = true
-                        break
-                    end
-                end
-                
-                if hasCars then
-                    table.insert(offerContainers, {
-                        Container = child,
-                        Name = child.Name,
-                        Path = child:GetFullName(),
-                        ItemCount = 0
-                    })
-                    print("📥 Found potential offer container: " .. child.Name .. " at " .. child:GetFullName())
-                end
-            end
-        end
+    local menu = Player.PlayerGui:WaitForChild("Menu", 5)
+    if not menu then 
+        print("❌ No Menu in PlayerGui")
+        return nil 
     end
     
-    -- If multiple containers found, try to identify the actual offer section
-    if #offerContainers > 0 then
-        -- Look for the container with "LocalPlayer" or "Your" in path
-        for _, container in pairs(offerContainers) do
-            if container.Path:lower():find("localplayer") then
-                print("✅ Identified as OFFER section (contains LocalPlayer): " .. container.Name)
-                return container.Container
-            end
-        end
-        
-        -- Check which container has fewer items (offer usually has fewer than owned)
-        for _, container in pairs(offerContainers) do
-            local itemCount = 0
-            for _ in pairs(container.Container:GetDescendants()) do
-                itemCount = itemCount + 1
-            end
-            container.ItemCount = itemCount
-        end
-        
-        -- Sort by item count (ascending - offer usually has fewer items)
-        table.sort(offerContainers, function(a, b)
-            return a.ItemCount < b.ItemCount
-        end)
-        
-        print("✅ Identified as OFFER section (fewer items): " .. offerContainers[1].Name)
-        return offerContainers[1].Container
+    local trading = menu:FindFirstChild("Trading")
+    if not trading then 
+        print("❌ No Trading in Menu")
+        return nil 
     end
     
-    return nil
+    local peerToPeer = trading:FindFirstChild("PeerToPeer")
+    if not peerToPeer then 
+        print("❌ No PeerToPeer in Trading")
+        return nil 
+    end
+    
+    local main = peerToPeer:FindFirstChild("Main")
+    if not main then 
+        print("❌ No Main in PeerToPeer")
+        return nil 
+    end
+    
+    local inventory = main:FindFirstChild("Inventory")
+    if not inventory then 
+        print("❌ No Inventory in Main")
+        return nil 
+    end
+    
+    local localPlayer = inventory:FindFirstChild("LocalPlayer")
+    if not localPlayer then 
+        print("❌ No LocalPlayer in Inventory")
+        return nil 
+    end
+    
+    local content = localPlayer:FindFirstChild("Content")
+    if not content then 
+        print("❌ No Content in LocalPlayer")
+        return nil 
+    end
+    
+    local scrollingFrame = content:FindFirstChild("ScrollingFrame")
+    if not scrollingFrame then 
+        print("❌ No ScrollingFrame in Content")
+        return nil 
+    end
+    
+    print("✅ Found exact offer container: " .. scrollingFrame:GetFullName())
+    print("   Visible: " .. tostring(scrollingFrame.Visible))
+    print("   Child count: " .. #scrollingFrame:GetChildren())
+    
+    return scrollingFrame
 end
 
--- ===== EXTRACT OFFERED CARS ONLY =====
-local function GetOfferedCarsOnly()
-    local offerSection = FindOfferSection()
+-- ===== SCAN ONLY OFFERED CARS =====
+local function ScanOfferedCarsExact()
+    local offerContainer = GetExactOfferContainer()
     local offeredCars = {}
     
-    if not offerSection then
-        print("❌ No offer section found")
+    if not offerContainer then
+        print("⚠️ No offer container found - may not be in trade")
         return offeredCars
     end
     
-    print("🎯 Scanning OFFER section: " .. offerSection.Name)
+    if not offerContainer.Visible then
+        print("⚠️ Offer container not visible - trade may not be active")
+        return offeredCars
+    end
     
-    -- Look for car items in the offer section ONLY
-    for _, child in pairs(offerSection:GetDescendants()) do
-        if child:IsA("Frame") or child:IsA("TextButton") or child:IsA("ImageButton") then
-            local name = child.Name
+    print("🔍 Scanning offer container for cars...")
+    
+    -- Look DIRECTLY in the ScrollingFrame
+    for _, child in pairs(offerContainer:GetChildren()) do
+        local name = child.Name
+        
+        -- Check for car items (Car-Nissan2 format or similar)
+        if name:find("Car") or name:find("car") or name:match("%-") then
+            print("🚗 Found car in offer: " .. name .. " (" .. child.ClassName .. ")")
             
-            -- Look for cars (case insensitive)
-            if name:lower():find("car") or name:match("Car%-") or name:match("%-Car") then
-                local itemInfo = {
-                    Name = name,
-                    DisplayName = name,
-                    Object = child,
-                    Path = child:GetFullName(),
-                    Class = child.ClassName,
-                    IsInOffer = true
-                }
-                
-                -- Get display name
-                if child:IsA("TextButton") and child.Text ~= "" then
-                    itemInfo.DisplayName = child.Text
-                else
-                    -- Look for text labels
-                    for _, sub in pairs(child:GetChildren()) do
-                        if sub:IsA("TextLabel") and sub.Text ~= "" then
-                            itemInfo.DisplayName = sub.Text
-                            break
-                        end
-                    end
-                end
-                
-                -- Check if this is a duplicate
-                local exists = false
-                for _, existing in pairs(offeredCars) do
-                    if existing.Path == itemInfo.Path then
-                        exists = true
+            local carInfo = {
+                RawName = name,
+                DisplayName = name,
+                Object = child,
+                Path = child:GetFullName(),
+                Class = child.ClassName
+            }
+            
+            -- Try to get better display name
+            if child:IsA("TextButton") and child.Text ~= "" then
+                carInfo.DisplayName = child.Text
+            else
+                -- Look for TextLabels in children
+                for _, sub in pairs(child:GetChildren()) do
+                    if sub:IsA("TextLabel") and sub.Text ~= "" then
+                        carInfo.DisplayName = sub.Text
                         break
                     end
                 end
-                
-                if not exists then
-                    table.insert(offeredCars, itemInfo)
-                    print("🚗 Found in OFFER: " .. itemInfo.DisplayName)
+            end
+            
+            -- Clean up display name (remove "Car-" prefix)
+            carInfo.DisplayName = carInfo.DisplayName:gsub("Car%-", "")
+            
+            table.insert(offeredCars, carInfo)
+        end
+    end
+    
+    -- Also check grandchildren (sometimes items are nested)
+    if #offeredCars == 0 then
+        print("🔍 Checking nested items in offer container...")
+        for _, child in pairs(offerContainer:GetDescendants()) do
+            if child:IsA("Frame") or child:IsA("TextButton") or child:IsA("ImageButton") then
+                local name = child.Name
+                if name:find("Car") or name:find("car") then
+                    print("🚗 Found nested car: " .. name)
+                    
+                    local carInfo = {
+                        RawName = name,
+                        DisplayName = name:gsub("Car%-", ""),
+                        Object = child,
+                        Path = child:GetFullName(),
+                        Class = child.ClassName,
+                        IsNested = true
+                    }
+                    
+                    table.insert(offeredCars, carInfo)
                 end
             end
         end
@@ -169,19 +152,19 @@ local function GetOfferedCarsOnly()
     return offeredCars
 end
 
--- ===== CREATE OFFER-ONLY UI =====
-local function CreateOfferOnlyUI()
+-- ===== CREATE EXACT TRACKER UI =====
+local function CreateExactTrackerUI()
     local ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Name = "OfferedCarsOnly"
+    ScreenGui.Name = "ExactOfferTracker"
     ScreenGui.Parent = Player:WaitForChild("PlayerGui")
     ScreenGui.ResetOnSpawn = false
     ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     
     -- Main Window
     local MainFrame = Instance.new("Frame")
-    MainFrame.Size = UDim2.new(0, 350, 0, 350)
-    MainFrame.Position = UDim2.new(0.7, 0, 0.3, 0)
-    MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 50)
+    MainFrame.Size = UDim2.new(0, 320, 0, 320)
+    MainFrame.Position = UDim2.new(0.75, 0, 0.3, 0)
+    MainFrame.BackgroundColor3 = Color3.fromRGB(30, 35, 45)
     MainFrame.BorderSizePixel = 0
     MainFrame.Active = true
     MainFrame.Draggable = true
@@ -189,19 +172,18 @@ local function CreateOfferOnlyUI()
     -- Title Bar
     local TitleBar = Instance.new("Frame")
     TitleBar.Size = UDim2.new(1, 0, 0, 40)
-    TitleBar.BackgroundColor3 = Color3.fromRGB(50, 50, 80)
+    TitleBar.BackgroundColor3 = Color3.fromRGB(45, 55, 75)
     TitleBar.BorderSizePixel = 0
     TitleBar.Active = true
     
     local TitleText = Instance.new("TextLabel")
-    TitleText.Text = "🚗 OFFERED CARS ONLY"
+    TitleText.Text = "🎯 CURRENT OFFER"
     TitleText.Size = UDim2.new(1, -40, 1, 0)
     TitleText.Position = UDim2.new(0, 10, 0, 0)
     TitleText.BackgroundTransparency = 1
     TitleText.TextColor3 = Color3.fromRGB(255, 255, 255)
     TitleText.Font = Enum.Font.GothamBold
     TitleText.TextSize = 16
-    TitleText.TextXAlignment = Enum.TextXAlignment.Left
     
     local CloseButton = Instance.new("TextButton")
     CloseButton.Text = "✕"
@@ -213,12 +195,12 @@ local function CreateOfferOnlyUI()
     
     -- Status
     local StatusFrame = Instance.new("Frame")
-    StatusFrame.Size = UDim2.new(1, -20, 0, 60)
+    StatusFrame.Size = UDim2.new(1, -20, 0, 50)
     StatusFrame.Position = UDim2.new(0, 10, 0, 50)
-    StatusFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+    StatusFrame.BackgroundColor3 = Color3.fromRGB(40, 50, 65)
     
     local StatusText = Instance.new("TextLabel")
-    StatusText.Text = "🔍 Looking for trade offer..."
+    StatusText.Text = "🔍 Checking offer..."
     StatusText.Size = UDim2.new(1, -20, 1, 0)
     StatusText.Position = UDim2.new(0, 10, 0, 0)
     StatusText.BackgroundTransparency = 1
@@ -227,11 +209,11 @@ local function CreateOfferOnlyUI()
     StatusText.TextSize = 14
     StatusText.TextWrapped = true
     
-    -- Offered Cars List
+    -- Cars List
     local CarsFrame = Instance.new("ScrollingFrame")
-    CarsFrame.Size = UDim2.new(1, -20, 0, 200)
-    CarsFrame.Position = UDim2.new(0, 10, 0, 120)
-    CarsFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+    CarsFrame.Size = UDim2.new(1, -20, 0, 170)
+    CarsFrame.Position = UDim2.new(0, 10, 0, 110)
+    CarsFrame.BackgroundColor3 = Color3.fromRGB(25, 30, 40)
     CarsFrame.BorderSizePixel = 0
     CarsFrame.ScrollBarThickness = 6
     CarsFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
@@ -240,14 +222,22 @@ local function CreateOfferOnlyUI()
     CarsLayout.Padding = UDim.new(0, 8)
     CarsLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
     
-    -- Refresh Button
-    local RefreshButton = Instance.new("TextButton")
-    RefreshButton.Text = "🔄 REFRESH OFFER"
-    RefreshButton.Size = UDim2.new(1, -20, 0, 35)
-    RefreshButton.Position = UDim2.new(0, 10, 1, -45)
-    RefreshButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
-    RefreshButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    RefreshButton.Font = Enum.Font.GothamBold
+    -- Path Display
+    local PathFrame = Instance.new("Frame")
+    PathFrame.Size = UDim2.new(1, -20, 0, 40)
+    PathFrame.Position = UDim2.new(0, 10, 1, -50)
+    PathFrame.BackgroundColor3 = Color3.fromRGB(40, 50, 65)
+    
+    local PathText = Instance.new("TextLabel")
+    PathText.Text = "📁 Menu.Trading.PeerToPeer.Main..."
+    PathText.Size = UDim2.new(1, -20, 1, 0)
+    PathText.Position = UDim2.new(0, 10, 0, 0)
+    PathText.BackgroundTransparency = 1
+    PathText.TextColor3 = Color3.fromRGB(180, 200, 255)
+    PathText.Font = Enum.Font.Code
+    PathText.TextSize = 11
+    PathText.TextWrapped = true
+    PathText.TextXAlignment = Enum.TextXAlignment.Left
     
     -- Add corners
     local corner = Instance.new("UICorner")
@@ -257,7 +247,7 @@ local function CreateOfferOnlyUI()
     corner:Clone().Parent = TitleBar
     corner:Clone().Parent = StatusFrame
     corner:Clone().Parent = CarsFrame
-    corner:Clone().Parent = RefreshButton
+    corner:Clone().Parent = PathFrame
     corner:Clone().Parent = CloseButton
     
     -- Parenting
@@ -271,13 +261,19 @@ local function CreateOfferOnlyUI()
     CarsLayout.Parent = CarsFrame
     CarsFrame.Parent = MainFrame
     
-    RefreshButton.Parent = MainFrame
+    PathText.Parent = PathFrame
+    PathFrame.Parent = MainFrame
+    
     MainFrame.Parent = ScreenGui
     
     -- UI Functions
     local function updateStatus(message, color)
         StatusText.Text = message
         StatusText.TextColor3 = color or Color3.fromRGB(255, 255, 150)
+    end
+    
+    local function updatePath(path)
+        PathText.Text = "📁 " .. path
     end
     
     local function clearCarsList()
@@ -290,55 +286,55 @@ local function CreateOfferOnlyUI()
     
     local function createCarDisplay(carInfo, index)
         local carFrame = Instance.new("Frame")
-        carFrame.Size = UDim2.new(0.95, 0, 0, 60)
-        carFrame.BackgroundColor3 = Color3.fromRGB(60, 60, 90)
-        carFrame.Name = "Car_" .. index
+        carFrame.Size = UDim2.new(0.95, 0, 0, 55)
+        carFrame.BackgroundColor3 = Color3.fromRGB(60, 70, 95)
+        carFrame.Name = "OfferCar_" .. index
         
         local carCorner = Instance.new("UICorner")
         carCorner.CornerRadius = UDim.new(0, 6)
         carCorner.Parent = carFrame
         
-        -- Car icon
+        -- Car icon with color based on type
         local icon = Instance.new("TextLabel")
         icon.Text = "🚗"
-        icon.Size = UDim2.new(0, 40, 0, 40)
-        icon.Position = UDim2.new(0, 10, 0.5, -20)
+        icon.Size = UDim2.new(0, 45, 0, 45)
+        icon.Position = UDim2.new(0, 5, 0.5, -22.5)
         icon.BackgroundTransparency = 1
         icon.TextColor3 = Color3.fromRGB(255, 255, 255)
         icon.Font = Enum.Font.GothamBold
-        icon.TextSize = 22
+        icon.TextSize = 24
         
         -- Car name
         local nameLabel = Instance.new("TextLabel")
         nameLabel.Text = carInfo.DisplayName
         nameLabel.Size = UDim2.new(0.6, -50, 0, 40)
-        nameLabel.Position = UDim2.new(0, 60, 0.5, -20)
+        nameLabel.Position = UDim2.new(0, 55, 0.5, -20)
         nameLabel.BackgroundTransparency = 1
         nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
         nameLabel.Font = Enum.Font.Gotham
         nameLabel.TextSize = 14
         nameLabel.TextXAlignment = Enum.TextXAlignment.Left
         
-        -- Offer badge
-        local badge = Instance.new("Frame")
-        badge.Size = UDim2.new(0, 60, 0, 20)
-        badge.Position = UDim2.new(0.6, 10, 0.5, -10)
-        badge.BackgroundColor3 = Color3.fromRGB(0, 180, 80)
+        -- Index badge
+        local indexBadge = Instance.new("Frame")
+        indexBadge.Size = UDim2.new(0, 25, 0, 25)
+        indexBadge.Position = UDim2.new(1, -30, 0.5, -12.5)
+        indexBadge.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
         
         local badgeCorner = Instance.new("UICorner")
-        badgeCorner.CornerRadius = UDim.new(0, 4)
-        badgeCorner.Parent = badge
+        badgeCorner.CornerRadius = UDim.new(0, 12.5)
+        badgeCorner.Parent = indexBadge
         
-        local badgeText = Instance.new("TextLabel")
-        badgeText.Text = "OFFER"
-        badgeText.Size = UDim2.new(1, 0, 1, 0)
-        badgeText.BackgroundTransparency = 1
-        badgeText.TextColor3 = Color3.fromRGB(255, 255, 255)
-        badgeText.Font = Enum.Font.GothamBold
-        badgeText.TextSize = 10
+        local indexText = Instance.new("TextLabel")
+        indexText.Text = tostring(index)
+        indexText.Size = UDim2.new(1, 0, 1, 0)
+        indexText.BackgroundTransparency = 1
+        indexText.TextColor3 = Color3.fromRGB(255, 255, 255)
+        indexText.Font = Enum.Font.GothamBold
+        indexText.TextSize = 12
         
-        badgeText.Parent = badge
-        badge.Parent = carFrame
+        indexText.Parent = indexBadge
+        indexBadge.Parent = carFrame
         
         -- Parenting
         icon.Parent = carFrame
@@ -348,54 +344,65 @@ local function CreateOfferOnlyUI()
         return carFrame
     end
     
-    local function refreshOfferDisplay()
+    local function refreshDisplay()
+        local offeredCars = ScanOfferedCarsExact()
+        
         clearCarsList()
         
-        local offeredCars = GetOfferedCarsOnly()
-        
         if #offeredCars > 0 then
-            updateStatus("✅ " .. #offeredCars .. " car(s) in your offer", Color3.fromRGB(100, 255, 100))
+            updateStatus("✅ " .. #offeredCars .. " car(s) in offer", Color3.fromRGB(100, 255, 100))
             
             for i, car in ipairs(offeredCars) do
                 createCarDisplay(car, i)
             end
             
-            -- Print to console
-            print("\n📋 OFFERED CARS SUMMARY:")
-            for _, car in ipairs(offeredCars) do
-                print("   🚗 " .. car.DisplayName)
+            -- Update path display
+            local container = GetExactOfferContainer()
+            if container then
+                updatePath(container:GetFullName())
             end
-            print("📊 Total: " .. #offeredCars .. " car(s) in offer")
+            
+            -- Print to console
+            print("\n📊 OFFERED CARS FOUND:")
+            for _, car in ipairs(offeredCars) do
+                print("   🚗 " .. car.DisplayName .. " (from " .. car.RawName .. ")")
+            end
+            print(string.rep("=", 50))
             
         else
-            -- Check if trade is active
-            local offerSection = FindOfferSection()
+            local container = GetExactOfferContainer()
             
-            if offerSection then
-                updateStatus("📭 No cars in your offer", Color3.fromRGB(255, 200, 100))
-                
-                -- Show empty message
-                local emptyFrame = Instance.new("Frame")
-                emptyFrame.Size = UDim2.new(0.9, 0, 0, 80)
-                emptyFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
-                
-                local emptyCorner = Instance.new("UICorner")
-                emptyCorner.CornerRadius = UDim.new(0, 6)
-                emptyCorner.Parent = emptyFrame
-                
-                local emptyText = Instance.new("TextLabel")
-                emptyText.Text = "Drag cars from your inventory\nto add them to your offer"
-                emptyText.Size = UDim2.new(1, 0, 1, 0)
-                emptyText.BackgroundTransparency = 1
-                emptyText.TextColor3 = Color3.fromRGB(150, 150, 150)
-                emptyText.Font = Enum.Font.Gotham
-                emptyText.TextSize = 13
-                emptyText.TextWrapped = true
-                
-                emptyText.Parent = emptyFrame
-                emptyFrame.Parent = CarsFrame
+            if container then
+                if container.Visible then
+                    updateStatus("📭 No cars in offer", Color3.fromRGB(255, 200, 100))
+                    
+                    -- Show empty state
+                    local emptyFrame = Instance.new("Frame")
+                    emptyFrame.Size = UDim2.new(0.9, 0, 0, 80)
+                    emptyFrame.BackgroundColor3 = Color3.fromRGB(40, 50, 65)
+                    
+                    local emptyCorner = Instance.new("UICorner")
+                    emptyCorner.CornerRadius = UDim.new(0, 6)
+                    emptyCorner.Parent = emptyFrame
+                    
+                    local emptyText = Instance.new("TextLabel")
+                    emptyText.Text = "Add cars to\nyour offer"
+                    emptyText.Size = UDim2.new(1, 0, 1, 0)
+                    emptyText.BackgroundTransparency = 1
+                    emptyText.TextColor3 = Color3.fromRGB(150, 150, 150)
+                    emptyText.Font = Enum.Font.Gotham
+                    emptyText.TextSize = 13
+                    emptyText.TextWrapped = true
+                    
+                    emptyText.Parent = emptyFrame
+                    emptyFrame.Parent = CarsFrame
+                else
+                    updateStatus("🔍 Trade not active", Color3.fromRGB(255, 150, 100))
+                end
+                updatePath(container:GetFullName())
             else
-                updateStatus("🔍 No active trade found", Color3.fromRGB(255, 150, 100))
+                updateStatus("❌ No trade UI found", Color3.fromRGB(255, 100, 100))
+                updatePath("Menu.Trading.PeerToPeer.Main.Inventory.LocalPlayer.Content.ScrollingFrame")
             end
         end
     end
@@ -403,15 +410,6 @@ local function CreateOfferOnlyUI()
     -- UI Events
     CloseButton.MouseButton1Click:Connect(function()
         ScreenGui:Destroy()
-    end)
-    
-    RefreshButton.MouseButton1Click:Connect(function()
-        RefreshButton.Text = "SCANNING..."
-        RefreshButton.BackgroundColor3 = Color3.fromRGB(200, 150, 0)
-        refreshOfferDisplay()
-        task.wait(0.5)
-        RefreshButton.Text = "🔄 REFRESH OFFER"
-        RefreshButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
     end)
     
     -- Drag functionality
@@ -446,74 +444,62 @@ local function CreateOfferOnlyUI()
         end
     end)
     
-    -- Auto-refresh loop
+    -- Auto-refresh loop (FAST - 0.5 seconds)
     spawn(function()
-        while task.wait(1) do
+        while task.wait(0.5) do
             if not ScreenGui or not ScreenGui.Parent then break end
-            refreshOfferDisplay()
+            refreshDisplay()
         end
     end)
     
     -- Initial display
     task.wait(1)
-    refreshOfferDisplay()
+    refreshDisplay()
     
     return ScreenGui
 end
 
--- ===== DEBUG: COMPARE OFFER VS OWNED =====
-local function DebugCompareSections()
+-- ===== DEBUG: MONITOR OFFER CONTAINER =====
+local function DebugMonitorOffer()
     spawn(function()
-        while task.wait(3) do
-            print("\n" .. string.rep("=", 60))
-            print("🔍 DEBUG: Comparing sections...")
+        local lastChildCount = 0
+        
+        while task.wait(1) do
+            local container = GetExactOfferContainer()
             
-            if not Player.PlayerGui then
-                print("❌ No PlayerGui")
-                return
-            end
-            
-            -- Find all sections with cars
-            local sections = {}
-            
-            for _, child in pairs(Player.PlayerGui:GetDescendants()) do
-                if child:IsA("Frame") or child:IsA("ScrollingFrame") then
-                    local carCount = 0
+            if container then
+                local childCount = #container:GetChildren()
+                local isVisible = container.Visible
+                
+                if childCount ~= lastChildCount or isVisible then
+                    print("\n🔍 OFFER CONTAINER STATUS:")
+                    print("   Path: " .. container:GetFullName())
+                    print("   Visible: " .. tostring(isVisible))
+                    print("   Children: " .. childCount)
                     
-                    for _, item in pairs(child:GetDescendants()) do
-                        if item.Name:find("Car") or item.Name:lower():find("car") then
-                            carCount = carCount + 1
+                    if childCount > 0 then
+                        print("   Contents:")
+                        for _, child in pairs(container:GetChildren()) do
+                            print("     • " .. child.Name .. " (" .. child.ClassName .. ")")
+                            
+                            -- Show child properties
+                            if child:IsA("TextButton") and child.Text ~= "" then
+                                print("       Text: " .. child.Text)
+                            end
+                            
+                            -- Show grandchildren
+                            for _, grandchild in pairs(child:GetChildren()) do
+                                if grandchild:IsA("TextLabel") and grandchild.Text ~= "" then
+                                    print("       Label: " .. grandchild.Name .. " = " .. grandchild.Text)
+                                end
+                            end
                         end
                     end
                     
-                    if carCount > 0 then
-                        table.insert(sections, {
-                            Name = child.Name,
-                            Path = child:GetFullName(),
-                            CarCount = carCount,
-                            IsVisible = child.Visible
-                        })
-                    end
+                    lastChildCount = childCount
                 end
-            end
-            
-            -- Sort by car count
-            table.sort(sections, function(a, b)
-                return a.CarCount < b.CarCount
-            end)
-            
-            print("📊 Found " .. #sections .. " sections with cars:")
-            for i, section in ipairs(sections) do
-                local status = section.IsVisible and "🟢 VISIBLE" or "🔴 HIDDEN"
-                print("   " .. i .. ". " .. section.Name .. " - " .. section.CarCount .. " cars - " .. status)
-                print("      Path: " .. section.Path)
-            end
-            
-            -- Offer section is usually the one with fewer cars
-            if #sections >= 2 then
-                print("\n🎯 OFFER SECTION DETECTED:")
-                print("   Likely: " .. sections[1].Name .. " (" .. sections[1].CarCount .. " cars)")
-                print("   Reason: Fewest cars (offer has fewer than owned)")
+            else
+                print("❌ No offer container - not in trade")
             end
         end
     end)
@@ -521,23 +507,18 @@ end
 
 -- ===== MAIN =====
 print("\n" .. string.rep("=", 60))
-print("🎯 CDT OFFERED CARS ONLY TRACKER")
-print("📍 Shows ONLY cars in your TRADE OFFER (not owned cars)")
-print("🔍 Auto-refreshes every second")
+print("🎯 CDT EXACT OFFER TRACKER")
+print("📍 Targeting: LocalPlayer.Content.ScrollingFrame")
+print("⚡ Updates every 0.5 seconds")
 print(string.rep("=", 60))
 
 -- Create UI
-CreateOfferOnlyUI()
+CreateExactTrackerUI()
 
--- Start debug comparison
-DebugCompareSections()
+-- Start debug monitor
+DebugMonitorOffer()
 
-print("\n✅ Tracker UI created!")
-print("💡 Features:")
-print("   • Drag title bar to move")
-print("   • Shows ONLY cars in your OFFER")
-print("   • Green 'OFFER' badge on each car")
-print("   • Auto-refresh every second")
-print("   • Manual refresh button")
-print("\n🎮 Start a trade, add cars to your offer!")
-print("📊 Watch Output for section comparison debug info")
+print("\n✅ Tracker created!")
+print("💡 Will show ONLY cars in your offer")
+print("📊 Check Output for detailed container information")
+print("\n🎮 Start a trade and add cars to see them appear!")
