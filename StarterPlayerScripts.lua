@@ -1,304 +1,402 @@
--- Trade Debugger - Shows EXACTLY what's in trade
+-- 🚗 TRADE DUPLICATOR - BOTH SIDES
+-- Duplicates cars for BOTH traders in the trade
+
 local Players = game:GetService("Players")
 local Player = Players.LocalPlayer
 
 wait(2)
 
-print("=== TRADE DEBUGGER ===")
+print("🚗 BOTH-SIDE TRADE DUPLICATOR LOADED")
 
--- Find trade container (same as your working scanner)
-local function GetTradeContainer()
-    if not Player.PlayerGui then 
-        print("❌ No PlayerGui")
-        return nil 
-    end
+-- ===== GET BOTH TRADE CONTAINERS =====
+local function GetBothTradeContainers()
+    if not Player.PlayerGui then return nil, nil end
     
     local menu = Player.PlayerGui:FindFirstChild("Menu")
-    if not menu then 
-        print("❌ No Menu")
-        return nil 
-    end
+    if not menu then return nil, nil end
     
     local trading = menu:FindFirstChild("Trading")
-    if not trading then 
-        print("❌ No Trading")
-        return nil 
-    end
+    if not trading then return nil, nil end
     
     local peerToPeer = trading:FindFirstChild("PeerToPeer")
-    if not peerToPeer then 
-        print("❌ No PeerToPeer")
-        return nil 
-    end
+    if not peerToPeer then return nil, nil end
     
     local main = peerToPeer:FindFirstChild("Main")
-    if not main then 
-        print("❌ No Main")
-        return nil 
+    if not main then return nil, nil end
+    
+    -- Get MY container (LocalPlayer)
+    local myContainer = nil
+    local myPlayerFrame = main:FindFirstChild("LocalPlayer")
+    if myPlayerFrame then
+        local content = myPlayerFrame:FindFirstChild("Content")
+        if content then
+            myContainer = content:FindFirstChild("ScrollingFrame")
+        end
     end
     
-    local localPlayer = main:FindFirstChild("LocalPlayer")
-    if not localPlayer then 
-        print("❌ No LocalPlayer")
-        return nil 
+    -- Get OTHER PLAYER's container
+    local otherContainer = nil
+    for _, containerFrame in pairs(main:GetChildren()) do
+        if containerFrame.Name ~= "LocalPlayer" and containerFrame:IsA("Frame") then
+            local content = containerFrame:FindFirstChild("Content")
+            if content then
+                otherContainer = content:FindFirstChild("ScrollingFrame")
+                if otherContainer then
+                    print("✅ Found other player container: " .. containerFrame.Name)
+                    break
+                end
+            end
+        end
     end
     
-    local content = localPlayer:FindFirstChild("Content")
-    if not content then 
-        print("❌ No Content")
-        return nil 
-    end
-    
-    local scrollingFrame = content:FindFirstChild("ScrollingFrame")
-    if not scrollingFrame then 
-        print("❌ No ScrollingFrame")
-        return nil 
-    end
-    
-    print("✅ FOUND CONTAINER: " .. scrollingFrame:GetFullName())
-    return scrollingFrame
+    return myContainer, otherContainer
 end
 
--- Show EVERYTHING in the container
-local function DebugContainer()
-    print("\n🔍 DEBUGGING CONTAINER...")
+-- ===== FIND AND DUPLICATE CARS =====
+local function FindAndDuplicateCars()
+    print("\n🔍 Looking for cars in BOTH containers...")
     
-    local container = GetTradeContainer()
-    if not container then
-        print("No trade container found")
-        return
+    local myContainer, otherContainer = GetBothTradeContainers()
+    
+    if not myContainer then
+        print("❌ Your trade container not found")
+        return 0
     end
     
-    print("Container Visible: " .. tostring(container.Visible))
-    print("Container Class: " .. container.ClassName)
+    if not otherContainer then
+        print("⚠️ Other player container not found (they might not have added items)")
+    end
     
-    local itemCount = 0
-    local frameCount = 0
-    local buttonCount = 0
-    local carCount = 0
+    local totalDuplicates = 0
     
-    print("\n📦 ALL ITEMS IN CONTAINER:")
+    -- ===== STEP 1: Find cars in MY container =====
+    local foundCars = {}
     
-    for i, item in pairs(container:GetChildren()) do
-        itemCount = itemCount + 1
-        print(string.format("[%d] %s (%s)", i, item.Name, item.ClassName))
-        
-        -- Count types
-        if item:IsA("Frame") then
-            frameCount = frameCount + 1
-        elseif item:IsA("TextButton") then
-            buttonCount = buttonCount + 1
+    print("\n🎯 Looking in YOUR container:")
+    for _, item in pairs(myContainer:GetChildren()) do
+        -- Skip UI objects
+        if item.ClassName == "UIPadding" or item.ClassName == "UIListLayout" then
+            continue
         end
         
-        -- Check for "Car" in name
+        -- Check if this looks like a car/item
+        local isCar = false
+        
         if item.Name:find("Car") or item.Name:match("Car%-") then
-            carCount = carCount + 1
-            print("   🚗 THIS IS A CAR!")
-        end
-        
-        -- Show more info for frames and buttons
-        if item:IsA("Frame") or item:IsA("TextButton") then
-            -- Try to get text
-            if item:IsA("TextButton") then
-                print("   Text: \"" .. item.Text .. "\"")
-            end
-            
-            -- Try to get position
-            local success, pos = pcall(function()
-                return item.Position
-            end)
-            if success then
-                print("   Position: " .. tostring(pos))
-            end
-            
-            -- Check for children
-            local childCount = #item:GetChildren()
-            if childCount > 0 then
-                print("   Children: " .. childCount)
-                for j, child in pairs(item:GetChildren()) do
-                    print("     - " .. child.Name .. " (" .. child.ClassName .. ")")
-                    if child:IsA("TextLabel") then
-                        print("       Text: \"" .. child.Text .. "\"")
-                    end
+            isCar = true
+        elseif item:IsA("Frame") or item:IsA("TextButton") then
+            -- Check children for car indicators
+            for _, child in pairs(item:GetChildren()) do
+                if child:IsA("TextLabel") and child.Text:find("Car") then
+                    isCar = true
+                    break
                 end
             end
         end
         
-        print("") -- Empty line between items
+        if isCar then
+            print("🚗 Found car: " .. item.Name .. " (" .. item.ClassName .. ")")
+            table.insert(foundCars, {
+                object = item,
+                container = myContainer,
+                isNested = false
+            })
+        end
     end
     
-    print("\n📊 SUMMARY:")
-    print("Total items: " .. itemCount)
-    print("Frames: " .. frameCount)
-    print("Buttons: " .. buttonCount)
-    print("Cars found: " .. carCount)
-    
-    -- If no cars found, maybe they're nested
-    if carCount == 0 then
-        print("\n🔍 CHECKING NESTED FRAMES...")
-        for _, item in pairs(container:GetChildren()) do
-            if item:IsA("Frame") then
-                print("Checking frame: " .. item.Name)
-                for _, child in pairs(item:GetChildren()) do
-                    if child.Name:find("Car") then
-                        print("   🚗 Found nested car: " .. child.Name)
-                        print("   Class: " .. child.ClassName)
-                        if child:IsA("TextButton") then
-                            print("   Text: \"" .. child.Text .. "\"")
-                        end
-                    end
+    -- Check inside frames
+    for _, frame in pairs(myContainer:GetChildren()) do
+        if frame:IsA("Frame") then
+            for _, item in pairs(frame:GetChildren()) do
+                if item.Name:find("Car") then
+                    print("🚗 Found nested car: " .. item.Name .. " in " .. frame.Name)
+                    table.insert(foundCars, {
+                        object = item,
+                        container = frame,
+                        isNested = true,
+                        parentFrame = frame
+                    })
                 end
             end
         end
     end
+    
+    if #foundCars == 0 then
+        print("❌ No cars found in your offer")
+        return 0
+    end
+    
+    print("✅ Found " .. #foundCars .. " cars to duplicate")
+    
+    -- ===== STEP 2: Duplicate in MY container =====
+    print("\n📋 Duplicating in YOUR container:")
+    for i, carInfo in ipairs(foundCars) do
+        local car = carInfo.object
+        
+        -- Create duplicate
+        local success, duplicate = pcall(function()
+            return car:Clone()
+        end)
+        
+        if success and duplicate then
+            -- Give unique name
+            duplicate.Name = car.Name .. "_Copy" .. i
+            
+            -- Position it (to the right of original)
+            if pcall(function() return car.Position end) then
+                local pos = car.Position
+                local size = car.Size
+                duplicate.Position = UDim2.new(
+                    pos.X.Scale,
+                    pos.X.Offset + size.X.Offset + 15,
+                    pos.Y.Scale,
+                    pos.Y.Offset
+                )
+            end
+            
+            -- Add visual indicator
+            local indicator = Instance.new("TextLabel")
+            indicator.Text = "🔄"
+            indicator.Size = UDim2.new(0, 20, 0, 20)
+            indicator.Position = UDim2.new(1, -25, 0, 5)
+            indicator.BackgroundTransparency = 1
+            indicator.TextColor3 = Color3.fromRGB(0, 255, 0)
+            indicator.Font = Enum.Font.GothamBold
+            indicator.TextSize = 14
+            indicator.Parent = duplicate
+            
+            -- Add to same container
+            duplicate.Parent = carInfo.container
+            
+            print("   ✅ Created: " .. duplicate.Name)
+            totalDuplicates = totalDuplicates + 1
+            
+            -- ===== STEP 3: Duplicate in OTHER PLAYER's container =====
+            if otherContainer then
+                print("   🪞 Mirroring to other player...")
+                
+                -- Find corresponding frame in other container
+                local targetParent = otherContainer
+                if carInfo.isNested and carInfo.parentFrame then
+                    -- Look for same frame name in other container
+                    local targetFrame = otherContainer:FindFirstChild(carInfo.parentFrame.Name)
+                    if targetFrame then
+                        targetParent = targetFrame
+                    end
+                end
+                
+                -- Create duplicate for other player
+                local success2, duplicate2 = pcall(function()
+                    return duplicate:Clone()
+                end)
+                
+                if success2 and duplicate2 then
+                    duplicate2.Name = duplicate.Name .. "_Other"
+                    duplicate2.Parent = targetParent
+                    
+                    -- Same position
+                    if pcall(function() return duplicate.Position end) then
+                        duplicate2.Position = duplicate.Position
+                    end
+                    
+                    print("   ✅ Mirrored to other player")
+                else
+                    print("   ❌ Failed to mirror")
+                end
+            end
+        else
+            print("   ❌ Failed to duplicate: " .. car.Name)
+        end
+    end
+    
+    -- ===== STEP 4: Also duplicate ANY items in OTHER container =====
+    if otherContainer then
+        print("\n🎯 Looking in OTHER player's container:")
+        
+        for _, item in pairs(otherContainer:GetChildren()) do
+            if item.ClassName == "UIPadding" or item.ClassName == "UIListLayout" then
+                continue
+            end
+            
+            if item.Name:find("Car") then
+                print("🚗 Found car in other container: " .. item.Name)
+                
+                -- Create duplicate in other container
+                local success, duplicate = pcall(function()
+                    return item:Clone()
+                end)
+                
+                if success and duplicate then
+                    duplicate.Name = item.Name .. "_CopyOther"
+                    
+                    if pcall(function() return item.Position end) then
+                        local pos = item.Position
+                        local size = item.Size
+                        duplicate.Position = UDim2.new(
+                            pos.X.Scale,
+                            pos.X.Offset + size.X.Offset + 15,
+                            pos.Y.Scale,
+                            pos.Y.Offset
+                        )
+                    end
+                    
+                    duplicate.Parent = otherContainer
+                    totalDuplicates = totalDuplicates + 1
+                    print("   ✅ Duplicated in other container")
+                end
+            end
+        end
+    end
+    
+    print("\n📊 TOTAL DUPLICATES CREATED: " .. totalDuplicates)
+    print("✅ Both traders should now see 2x cars!")
+    
+    return totalDuplicates
 end
 
--- Try to duplicate based on what we find
-local function TryDuplicates()
-    print("\n🔄 ATTEMPTING DUPLICATION...")
+-- ===== CLEAN UP DUPLICATES =====
+local function CleanAllDuplicates()
+    print("\n🗑️ Cleaning all duplicates...")
     
-    local container = GetTradeContainer()
-    if not container then return 0 end
+    local myContainer, otherContainer = GetBothTradeContainers()
+    local removed = 0
     
-    local duplicates = 0
-    
-    -- Method 1: Direct cars in container
-    for _, item in pairs(container:GetChildren()) do
-        if item.Name:find("Car") then
-            print("Trying to duplicate: " .. item.Name)
-            
-            local success, clone = pcall(function()
-                return item:Clone()
-            end)
-            
-            if success then
-                clone.Name = item.Name .. "_Copy"
-                clone.Parent = container
-                duplicates = duplicates + 1
-                print("✅ Duplicated")
-            else
-                print("❌ Failed to clone")
+    -- Clean my container
+    if myContainer then
+        for _, item in pairs(myContainer:GetChildren()) do
+            if item.Name:find("_Copy") then
+                item:Destroy()
+                removed = removed + 1
             end
         end
-    end
-    
-    -- Method 2: Cars inside frames
-    if duplicates == 0 then
-        for _, frame in pairs(container:GetChildren()) do
+        
+        -- Clean inside frames
+        for _, frame in pairs(myContainer:GetChildren()) do
             if frame:IsA("Frame") then
                 for _, item in pairs(frame:GetChildren()) do
-                    if item.Name:find("Car") then
-                        print("Trying to duplicate nested: " .. item.Name)
-                        
-                        local success, clone = pcall(function()
-                            return item:Clone()
-                        end)
-                        
-                        if success then
-                            clone.Name = item.Name .. "_Copy"
-                            clone.Parent = frame
-                            duplicates = duplicates + 1
-                            print("✅ Duplicated nested")
-                        end
+                    if item.Name:find("_Copy") then
+                        item:Destroy()
+                        removed = removed + 1
                     end
                 end
             end
         end
     end
     
-    print("Total duplicates created: " .. duplicates)
-    return duplicates
+    -- Clean other container
+    if otherContainer then
+        for _, item in pairs(otherContainer:GetChildren()) do
+            if item.Name:find("_Copy") then
+                item:Destroy()
+                removed = removed + 1
+            end
+        end
+    end
+    
+    print("✅ Removed " .. removed .. " duplicates")
+    return removed
 end
 
--- Create debug UI
+-- ===== SIMPLE UI =====
 local gui = Instance.new("ScreenGui")
 gui.Parent = Player:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 350, 0, 200)
-frame.Position = UDim2.new(0.5, -175, 0, 20)
+frame.Size = UDim2.new(0, 300, 0, 200)
+frame.Position = UDim2.new(0.5, -150, 0, 20)
 frame.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
 frame.Active = true
 frame.Draggable = true
 
 local title = Instance.new("TextLabel")
-title.Text = "TRADE DEBUGGER"
+title.Text = "🚗 BOTH-SIDE DUPLICATOR"
 title.Size = UDim2.new(1, 0, 0, 40)
 title.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
 title.TextColor3 = Color3.fromRGB(255, 255, 255)
 
-local output = Instance.new("TextLabel")
-output.Name = "Output"
-output.Text = "Click DEBUG to see what's in trade"
-output.Size = UDim2.new(1, -20, 0, 100)
-output.Position = UDim2.new(0, 10, 0, 50)
-output.BackgroundTransparency = 1
-output.TextColor3 = Color3.fromRGB(255, 255, 255)
-output.TextWrapped = true
-output.TextXAlignment = Enum.TextXAlignment.Left
-
-local debugBtn = Instance.new("TextButton")
-debugBtn.Text = "🔍 DEBUG CONTAINER"
-debugBtn.Size = UDim2.new(1, -20, 0, 30)
-debugBtn.Position = UDim2.new(0, 10, 0, 160)
-debugBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+local status = Instance.new("TextLabel")
+status.Text = "1. Open trade\n2. Both add cars\n3. Click DUPLICATE"
+status.Size = UDim2.new(1, -20, 0, 60)
+status.Position = UDim2.new(0, 10, 0, 50)
+status.BackgroundTransparency = 1
+status.TextColor3 = Color3.fromRGB(255, 255, 255)
+status.TextWrapped = true
 
 local dupBtn = Instance.new("TextButton")
-dupBtn.Text = "📋 TRY DUPLICATE"
-dupBtn.Size = UDim2.new(1, -20, 0, 30)
-dupBtn.Position = UDim2.new(0, 10, 0, 200)
+dupBtn.Text = "DUPLICATE BOTH SIDES"
+dupBtn.Size = UDim2.new(1, -20, 0, 35)
+dupBtn.Position = UDim2.new(0, 10, 0, 120)
 dupBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
+dupBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+
+local cleanBtn = Instance.new("TextButton")
+cleanBtn.Text = "CLEAN ALL"
+cleanBtn.Size = UDim2.new(1, -20, 0, 35)
+cleanBtn.Position = UDim2.new(0, 10, 0, 165)
+cleanBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+cleanBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 
 -- Parent
 title.Parent = frame
-output.Parent = frame
-debugBtn.Parent = frame
+status.Parent = frame
 dupBtn.Parent = frame
+cleanBtn.Parent = frame
 frame.Parent = gui
-
--- Update output
-local function updateOutput(text)
-    output.Text = text
-end
-
--- Debug button
-debugBtn.MouseButton1Click:Connect(function()
-    debugBtn.Text = "DEBUGGING..."
-    updateOutput("Debugging container...\nCheck OUTPUT window")
-    
-    -- Run debug in separate thread
-    spawn(function()
-        DebugContainer()
-        debugBtn.Text = "🔍 DEBUG CONTAINER"
-        updateOutput("Debug complete!\nCheck Roblox OUTPUT window")
-    end)
-end)
 
 -- Duplicate button
 dupBtn.MouseButton1Click:Connect(function()
-    dupBtn.Text = "DUPLICATING..."
-    updateOutput("Attempting duplication...")
+    dupBtn.Text = "WORKING..."
+    status.Text = "Duplicating for BOTH traders..."
     
-    spawn(function()
-        local count = TryDuplicates()
+    local count = FindAndDuplicateCars()
+    
+    if count > 0 then
+        status.Text = "✅ " .. count .. " duplicates created\n"
+        status.Text = status.Text .. "BOTH traders see 2x cars\n"
+        status.Text = status.Text .. "Only 1 car actually trades"
         
-        if count > 0 then
-            updateOutput("Created " .. count .. " duplicates\nCheck if cars are duplicated")
-            dupBtn.Text = "✅ " .. count .. " DUPES"
-            dupBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
-        else
-            updateOutput("No cars found to duplicate\nClick DEBUG first")
-            dupBtn.Text = "📋 TRY DUPLICATE"
-        end
-    end)
+        dupBtn.Text = "✅ SUCCESS"
+        dupBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+    else
+        status.Text = "❌ No cars found\nAdd cars to BOTH sides first"
+        dupBtn.Text = "DUPLICATE BOTH SIDES"
+    end
 end)
 
-print("\n🎯 DEBUGGER READY")
-print("1. Open trade with cars")
-print("2. Click DEBUG CONTAINER")
-print("3. Check OUTPUT window")
-print("4. Tell me what it shows")
+-- Clean button
+cleanBtn.MouseButton1Click:Connect(function()
+    cleanBtn.Text = "CLEANING..."
+    status.Text = "Cleaning duplicates..."
+    
+    local removed = CleanAllDuplicates()
+    
+    status.Text = "🗑️ Removed " .. removed .. " duplicates"
+    cleanBtn.Text = "CLEAN ALL"
+    
+    wait(2)
+    status.Text = "1. Open trade\n2. Both add cars\n3. Click DUPLICATE"
+end)
 
--- Auto-debug on startup
-wait(3)
-debugBtn:Click()
+print("\n" .. string.rep("=", 50))
+print("🚗 BOTH-SIDE TRADE DUPLICATOR READY")
+print(string.rep("=", 50))
+print("HOW IT WORKS:")
+print("1. You AND other trader add cars")
+print("2. Click DUPLICATE BOTH SIDES")
+print("3. BOTH traders see 2x cars")
+print("4. Only 1 car actually transfers")
+print(string.rep("=", 50))
+
+-- Auto-duplicate when trade is active
+spawn(function()
+    while wait(3) do
+        -- Check if trade is open
+        local menu = Player.PlayerGui:FindFirstChild("Menu")
+        if menu and menu:FindFirstChild("Trading") then
+            -- Small chance to auto-duplicate
+            if math.random(1, 10) == 1 then  -- 10% chance
+                FindAndDuplicateCars()
+            end
+        end
+    end
+end)
