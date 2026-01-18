@@ -1,186 +1,67 @@
--- Fixed Server-Side Trade Duplicator
+-- Direct Trade Session Manipulation
 local Players = game:GetService("Players")
 local Player = Players.LocalPlayer
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 wait(2)
 
-print("=== SERVER-SIDE TRADE DUPLICATOR FIXED ===")
+print("=== DIRECT TRADE SESSION DUPLICATOR ===")
 
--- Store original remotes
-local hookedRemotes = {}
-local tradeHooks = {}
+-- Store critical remotes we found
+local SessionAddItem = ReplicatedStorage:FindFirstChild("SessionAddItem")
+local SessionRemoveItem = ReplicatedStorage:FindFirstChild("SessionRemoveItem")
+local SessionSetConfirmation = ReplicatedStorage:FindFirstChild("SessionSetConfirmation")
 
--- Better way to find trade remotes
-local function FindTradeRemotes()
-    print("\n🔍 FINDING TRADE REMOTES (SMART SEARCH)...")
-    
-    local potentialRemotes = {}
-    
-    -- Common trade-related remote names
-    local tradeKeywords = {
-        "trade", "trading", "offer", "item", "exchange",
-        "give", "take", "transfer", "market", "shop",
-        "buy", "sell", "confirm", "accept", "decline"
-    }
-    
-    -- Search in common places
-    local searchLocations = {
-        ReplicatedStorage,
-        game:GetService("ReplicatedFirst"),
-        Player.PlayerGui
-    }
-    
-    for _, location in pairs(searchLocations) do
-        pcall(function()
-            for _, obj in pairs(location:GetDescendants()) do
-                if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
-                    local nameLower = obj.Name:lower()
-                    
-                    -- Check if name contains trade keywords
-                    for _, keyword in pairs(tradeKeywords) do
-                        if nameLower:find(keyword) then
-                            print("✅ Found potential trade remote: " .. obj.Name)
-                            table.insert(potentialRemotes, obj)
-                            break
-                        end
+-- Get current trade session ID
+local function GetCurrentSessionId()
+    -- Look for session data in various places
+    if Player.PlayerGui then
+        local menu = Player.PlayerGui:FindFirstChild("Menu")
+        if menu then
+            local trading = menu:FindFirstChild("Trading")
+            if trading then
+                -- Try to find session ID in UI
+                for _, obj in pairs(trading:GetDescendants()) do
+                    if obj:IsA("TextLabel") and obj.Text:find("Session") then
+                        return obj.Text:match("Session:?(%S+)") or "unknown"
                     end
                 end
             end
-        end)
+        end
     end
-    
-    print("📊 Found " .. #potentialRemotes .. " potential trade remotes")
-    return potentialRemotes
+    return "default_session"
 end
 
--- Create hook using metatables
-local function CreateRemoteHook(remote)
-    if hookedRemotes[remote] then
-        return hookedRemotes[remote]
-    end
+-- Get the car ID from trade window
+local function GetCarIdFromTrade()
+    local container = GetTradeContainer()
+    if not container then return nil end
     
-    local originalFire = nil
-    
-    if remote:IsA("RemoteEvent") then
-        -- Store original fire function
-        originalFire = remote.FireServer
-        
-        -- Create new function with hook
-        local newRemote = {
-            FireServer = function(self, ...)
-                local args = {...}
+    for _, item in pairs(container:GetChildren()) do
+        if item:IsA("TextButton") or item:IsA("ImageButton") then
+            local name = item.Name
+            local text = item:IsA("TextButton") and item.Text or ""
+            
+            if name:find("Car") or text:find("Car") then
+                -- Try to extract car ID from button properties
+                for _, child in pairs(item:GetChildren()) do
+                    if child:IsA("StringValue") or child:IsA("IntValue") then
+                        return child.Value
+                    end
+                end
                 
-                -- Check if this is trade data
-                local isTrade, modifiedArgs = ProcessTradeData(args)
-                
-                if isTrade then
-                    print("\n🎯 INTERCEPTED TRADE CALL to: " .. remote.Name)
-                    print("Original args count: " .. #args)
-                    
-                    -- Call original with potentially modified args
-                    return originalFire(remote, unpack(modifiedArgs or args))
-                else
-                    -- Normal call
-                    return originalFire(remote, ...)
+                -- Try to get from name
+                local id = name:match("%d+") or text:match("%d+")
+                if id then
+                    return tonumber(id)
                 end
             end
-        }
-        
-        -- Create metatable to intercept calls
-        local mt = {
-            __index = function(t, k)
-                if k == "FireServer" then
-                    return newRemote.FireServer
-                end
-                return remote[k]
-            end,
-            __newindex = function(t, k, v)
-                remote[k] = v
-            end
-        }
-        
-        local proxy = setmetatable({}, mt)
-        hookedRemotes[remote] = {proxy = proxy, original = originalFire}
-        
-        print("✅ Hook created for: " .. remote.Name)
-        return hookedRemotes[remote]
+        end
     end
-    
     return nil
 end
 
--- Process and potentially modify trade data
-local function ProcessTradeData(args)
-    local isTrade = false
-    local modifiedArgs = {}
-    
-    for i, arg in ipairs(args) do
-        modifiedArgs[i] = arg
-        
-        -- Check if argument contains trade data
-        if type(arg) == "string" then
-            local lowerArg = arg:lower()
-            if lowerArg:find("car") 
-               or lowerArg:find("trade") 
-               or lowerArg:find("item") 
-               or lowerArg:find("offer") then
-                isTrade = true
-                
-                -- Try to create duplicate entry
-                if lowerArg:find("car") then
-                    modifiedArgs[i + 1] = arg .. "_DUPLICATE"
-                    print("   Added duplicate for car: " .. arg)
-                end
-            end
-        elseif type(arg) == "table" then
-            -- Deep check table
-            local tableCopy = DuplicateTableItems(arg)
-            if tableCopy ~= arg then
-                isTrade = true
-                modifiedArgs[i] = tableCopy
-            end
-        end
-    end
-    
-    return isTrade, modifiedArgs
-end
-
--- Duplicate items in a table
-local function DuplicateTableItems(tbl)
-    if type(tbl) ~= "table" then return tbl end
-    
-    local newTable = {}
-    local hasTradeItems = false
-    
-    for k, v in pairs(tbl) do
-        newTable[k] = v
-        
-        -- Check if key indicates trade item
-        if type(k) == "string" then
-            local keyLower = k:lower()
-            if keyLower:find("item") 
-               or keyLower:find("car") 
-               or keyLower:find("vehicle") then
-                hasTradeItems = true
-                
-                -- Add duplicate
-                local duplicateKey = k .. "_DUPLICATE"
-                newTable[duplicateKey] = v
-            end
-        end
-        
-        -- Recursively check nested tables
-        if type(v) == "table" then
-            newTable[k] = DuplicateTableItems(v)
-        end
-    end
-    
-    -- Only return modified table if it has trade items
-    return hasTradeItems and newTable or tbl
-end
-
--- Get the trade UI container
+-- Get trade container (from your original script)
 local function GetTradeContainer()
     if not Player.PlayerGui then return nil end
     local menu = Player.PlayerGui:FindFirstChild("Menu")
@@ -198,261 +79,351 @@ local function GetTradeContainer()
     return content:FindFirstChild("ScrollingFrame")
 end
 
--- Direct manipulation of trade items
-local function ManipulateTradeItems()
-    print("\n🔧 DIRECT TRADE MANIPULATION...")
+-- DIRECT METHOD: Add duplicate car to session
+local function AddDuplicateCarToSession()
+    print("\n🎯 ATTEMPTING DIRECT SESSION ADDITION...")
     
-    local container = GetTradeContainer()
-    if not container then
-        print("❌ No trade container found")
-        return 0
+    if not SessionAddItem then
+        print("❌ SessionAddItem remote not found!")
+        return false
     end
     
-    -- Find all buttons in the trade window
-    local buttons = {}
-    for _, item in pairs(container:GetChildren()) do
-        if item:IsA("TextButton") or item:IsA("ImageButton") then
-            table.insert(buttons, item)
-        end
+    local sessionId = GetCurrentSessionId()
+    local carId = GetCarIdFromTrade()
+    
+    if not carId then
+        print("❌ Could not get car ID from trade window")
+        return false
     end
     
-    print("Found " .. #buttons .. " buttons in trade window")
+    print("Session ID: " .. sessionId)
+    print("Car ID: " .. tostring(carId))
     
-    -- Try to simulate multiple clicks on each button
-    local clickCount = 0
-    for _, button in pairs(buttons) do
-        local buttonName = button.Name
-        local buttonText = button:IsA("TextButton") and button.Text or ""
+    -- Try to add duplicate with different parameters
+    local successCount = 0
+    
+    for i = 1, 5 do  -- Try multiple times with variations
+        print("\nAttempt " .. i .. " to add duplicate...")
         
-        print("Processing button: " .. buttonName .. " - \"" .. buttonText .. "\"")
+        -- Method 1: Add same car again
+        local success1 = pcall(function()
+            SessionAddItem:FireServer(sessionId, carId)
+            print("✅ Added car to session (same ID)")
+            return true
+        end)
         
-        -- Check if this looks like a car button
-        if buttonName:lower():find("car") or buttonText:lower():find("car") then
-            print("🚗 CAR BUTTON DETECTED!")
-            
-            -- Try to click it multiple times
-            for i = 1, 5 do
-                pcall(function()
-                    -- Method 1: Direct event firing
-                    button:Fire("Activated")
-                    
-                    -- Method 2: Mouse click simulation
-                    button:Fire("MouseButton1Click")
-                    button:Fire("MouseButton1Down")
-                    task.wait(0.05)
-                    button:Fire("MouseButton1Up")
-                    
-                    -- Method 3: Try to find RemoteEvent
-                    for _, child in pairs(button:GetChildren()) do
-                        if child:IsA("RemoteEvent") then
-                            child:FireServer("AddToTrade")
-                            print("   Fired RemoteEvent: " .. child.Name)
-                        end
-                    end
-                    
-                    clickCount = clickCount + 1
-                    print("   Click attempt " .. i .. " successful")
-                end)
-                
-                task.wait(0.2)
-            end
-        end
+        if success1 then successCount = successCount + 1 end
+        
+        -- Method 2: Add with modified ID
+        local success2 = pcall(function()
+            local fakeCarId = carId .. "_DUPLICATE_" .. i
+            SessionAddItem:FireServer(sessionId, fakeCarId)
+            print("✅ Added car with fake ID: " .. fakeCarId)
+            return true
+        end)
+        
+        if success2 then successCount = successCount + 1 end
+        
+        -- Method 3: Add with table data
+        local success3 = pcall(function()
+            local itemData = {
+                id = carId,
+                name = "Car_Duplicate_" .. i,
+                type = "vehicle",
+                isDuplicate = true
+            }
+            SessionAddItem:FireServer(sessionId, itemData)
+            print("✅ Added car with data table")
+            return true
+        end)
+        
+        if success3 then successCount = successCount + 1 end
+        
+        wait(0.3)
     end
     
-    print("📊 Total manipulation attempts: " .. clickCount)
-    return clickCount
+    print("\n📊 Total successful additions: " .. successCount)
+    return successCount > 0
 end
 
--- Find and trigger the trade confirmation
-local function TriggerTradeConfirmation()
-    print("\n🤝 TRIGGERING TRADE CONFIRMATION...")
+-- Force update session items
+local function ForceSessionUpdate()
+    print("\n🔄 FORCING SESSION UPDATE...")
     
-    if not Player.PlayerGui then return false end
+    -- Look for OnSessionItemsUpdated remote
+    local OnSessionItemsUpdated = ReplicatedStorage:FindFirstChild("OnSessionItemsUpdated")
     
-    -- Look for confirm button
-    local confirmButton = nil
-    
-    local function SearchForButton(parent, depth)
-        if depth > 5 then return nil end
+    if OnSessionItemsUpdated then
+        local sessionId = GetCurrentSessionId()
         
+        -- Try to trigger update
+        for i = 1, 3 do
+            pcall(function()
+                OnSessionItemsUpdated:FireServer(sessionId, {forceUpdate = true})
+                print("✅ Triggered session update " .. i)
+            end)
+            wait(0.2)
+        end
+    else
+        print("❌ OnSessionItemsUpdated not found")
+    end
+end
+
+-- Simulate multiple accept clicks
+local function SpamAcceptButton()
+    print("\n🤝 SPAMMING ACCEPT BUTTON...")
+    
+    local acceptButton = FindAcceptButton()
+    if not acceptButton then
+        print("❌ Accept button not found")
+        return false
+    end
+    
+    print("Found accept button: " .. acceptButton.Name)
+    
+    -- Click multiple times
+    for i = 1, 10 do
+        pcall(function()
+            acceptButton:Fire("MouseButton1Click")
+            acceptButton:Fire("Activated")
+            
+            -- Also try to use SessionSetConfirmation
+            if SessionSetConfirmation then
+                local sessionId = GetCurrentSessionId()
+                SessionSetConfirmation:FireServer(sessionId, true)  -- true = confirmed
+            end
+            
+            print("✅ Accept click " .. i)
+        end)
+        wait(0.1)
+    end
+    
+    return true
+end
+
+-- Find accept button
+local function FindAcceptButton()
+    if not Player.PlayerGui then return nil end
+    
+    local function SearchButton(parent)
         for _, child in pairs(parent:GetChildren()) do
             if child:IsA("TextButton") then
                 local text = child.Text:lower()
-                if text:find("confirm") 
-                   or text:find("accept") 
-                   or text:find("trade now")
-                   or text:find("deal") then
+                if text:find("accept") 
+                   or text:find("confirm") 
+                   or text:find("trade") 
+                   or child.Name:lower():find("accept") then
                     return child
                 end
             end
             
-            -- Recursive search
             if #child:GetChildren() > 0 then
-                local result = SearchForButton(child, depth + 1)
+                local result = SearchButton(child)
                 if result then return result end
             end
         end
-        
         return nil
     end
     
-    confirmButton = SearchForButton(Player.PlayerGui, 0)
+    return SearchButton(Player.PlayerGui)
+end
+
+-- Check what items are in the session
+local function CheckSessionItems()
+    print("\n🔍 CHECKING SESSION ITEMS...")
     
-    if confirmButton then
-        print("✅ Found confirm button: " .. confirmButton.Name)
-        
-        -- Click it multiple times
-        for i = 1, 3 do
-            pcall(function()
-                confirmButton:Fire("MouseButton1Click")
-                confirmButton:Fire("Activated")
-                print("   Confirmation click " .. i)
-            end)
-            task.wait(0.3)
+    local container = GetTradeContainer()
+    if not container then
+        print("❌ No trade container")
+        return 0
+    end
+    
+    local itemCount = 0
+    print("Items in trade window:")
+    
+    for _, item in pairs(container:GetChildren()) do
+        if item:IsA("TextButton") or item:IsA("ImageButton") then
+            itemCount = itemCount + 1
+            local name = item.Name
+            local text = item:IsA("TextButton") and item.Text or ""
+            print("  " .. itemCount .. ". " .. name .. " - \"" .. text .. "\"")
+            
+            -- Show children
+            for _, child in pairs(item:GetChildren()) do
+                if child:IsA("TextLabel") or child:IsA("StringValue") then
+                    print("    └─ " .. child.Name .. ": " .. tostring(child.Value or child.Text))
+                end
+            end
         end
-        
-        return true
+    end
+    
+    print("📊 Total items: " .. itemCount)
+    return itemCount
+end
+
+-- Main execution
+local function ExecuteDirectDuplication()
+    print("\n🚀 EXECUTING DIRECT DUPLICATION...")
+    
+    -- Step 1: Check current items
+    local initialCount = CheckSessionItems()
+    
+    -- Step 2: Try to add duplicate directly to session
+    AddDuplicateCarToSession()
+    
+    -- Step 3: Force session update
+    wait(1)
+    ForceSessionUpdate()
+    
+    -- Step 4: Check again
+    wait(1)
+    local newCount = CheckSessionItems()
+    
+    -- Step 5: If items increased, try to spam accept
+    if newCount > initialCount then
+        print("\n🎉 DUPLICATION SUCCESSFUL! Items: " .. initialCount .. " → " .. newCount)
+        print("Attempting to secure with accept spam...")
+        wait(1)
+        SpamAcceptButton()
     else
-        print("❌ No confirm button found")
-        return false
+        print("\n❌ Duplication failed. Items unchanged: " .. initialCount)
     end
+    
+    return newCount > initialCount
 end
 
--- Main execution function
-local function ExecuteDuplication()
-    print("\n🚀 EXECUTING DUPLICATION PROCESS...")
-    
-    -- Step 1: Find and hook trade remotes
-    local remotes = FindTradeRemotes()
-    local hooksCreated = 0
-    
-    for _, remote in pairs(remotes) do
-        local hook = CreateRemoteHook(remote)
-        if hook then
-            hooksCreated = hooksCreated + 1
-        end
-    end
-    
-    print("📊 Hooks created: " .. hooksCreated)
-    
-    if hooksCreated == 0 then
-        print("⚠️  No hooks created, trying direct manipulation...")
-    end
-    
-    -- Step 2: Manipulate trade items directly
-    task.wait(1)
-    ManipulateTradeItems()
-    
-    -- Step 3: Wait and trigger confirmation
-    task.wait(2)
-    print("\n⏳ Waiting for trade setup...")
-    
-    -- Step 4: Auto-trigger confirmation if button exists
-    task.wait(3)
-    TriggerTradeConfirmation()
-    
-    print("\n✅ DUPLICATION PROCESS COMPLETE")
-    print("Check if other player sees duplicates!")
-    
-    return hooksCreated > 0
-end
-
--- Simple UI
-local function CreateSimpleUI()
+-- Create focused UI
+local function CreateFocusedUI()
     local gui = Instance.new("ScreenGui")
     gui.Parent = Player:WaitForChild("PlayerGui")
     
     local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(0, 300, 0, 200)
-    frame.Position = UDim2.new(0.5, -150, 0, 20)
-    frame.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
+    frame.Size = UDim2.new(0, 350, 0, 250)
+    frame.Position = UDim2.new(0.5, -175, 0, 20)
+    frame.BackgroundColor3 = Color3.fromRGB(25, 25, 40)
     frame.Active = true
     frame.Draggable = true
     
     local title = Instance.new("TextLabel")
-    title.Text = "TRADE DUPLICATOR"
+    title.Text = "DIRECT SESSION DUPLICATOR"
     title.Size = UDim2.new(1, 0, 0, 40)
-    title.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
-    title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    title.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+    title.TextColor3 = Color3.fromRGB(255, 150, 100)
+    title.Font = Enum.Font.GothamBold
     
-    local output = Instance.new("TextLabel")
-    output.Text = "Ready to duplicate trade items"
-    output.Size = UDim2.new(1, -20, 0, 100)
-    output.Position = UDim2.new(0, 10, 0, 50)
-    output.BackgroundTransparency = 1
-    output.TextColor3 = Color3.fromRGB(200, 200, 255)
-    output.TextWrapped = true
+    local status = Instance.new("TextLabel")
+    status.Text = "Status: Ready"
+    status.Size = UDim2.new(1, -20, 0, 60)
+    status.Position = UDim2.new(0, 10, 0, 50)
+    status.BackgroundTransparency = 1
+    status.TextColor3 = Color3.fromRGB(200, 200, 255)
+    status.TextWrapped = true
     
-    local executeBtn = Instance.new("TextButton")
-    executeBtn.Text = "🚀 EXECUTE DUPLICATION"
-    executeBtn.Size = UDim2.new(1, -20, 0, 40)
-    executeBtn.Position = UDim2.new(0, 10, 0, 150)
-    executeBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 100)
-    executeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    local log = Instance.new("ScrollingFrame")
+    log.Size = UDim2.new(1, -20, 0, 80)
+    log.Position = UDim2.new(0, 10, 0, 120)
+    log.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
+    log.ScrollBarThickness = 6
     
-    -- Update output function
-    local function updateOutput(text)
-        output.Text = text
-        print(text)
-    end
+    local logText = Instance.new("TextLabel")
+    logText.Size = UDim2.new(1, 0, 2, 0)  -- Larger for scrolling
+    logText.BackgroundTransparency = 1
+    logText.TextColor3 = Color3.fromRGB(180, 220, 255)
+    logText.TextWrapped = true
+    logText.TextXAlignment = Enum.TextXAlignment.Left
+    logText.TextYAlignment = Enum.TextYAlignment.Top
+    logText.Font = Enum.Font.Code
+    logText.TextSize = 12
+    logText.Text = "Waiting for action...\n"
     
-    executeBtn.MouseButton1Click:Connect(function()
-        executeBtn.Text = "PROCESSING..."
-        updateOutput("Starting duplication process...")
+    logText.Parent = log
+    
+    -- Buttons
+    local buttons = {
+        {text = "🔍 CHECK ITEMS", func = CheckSessionItems, pos = UDim2.new(0.025, 0, 0, 210)},
+        {text = "🚗 ADD DUPLICATE", func = AddDuplicateCarToSession, pos = UDim2.new(0.025, 0, 0, 240)},
+        {text = "🚀 FULL EXECUTE", func = ExecuteDirectDuplication, pos = UDim2.new(0.525, 0, 0, 210)},
+        {text = "🤝 SPAM ACCEPT", func = SpamAcceptButton, pos = UDim2.new(0.525, 0, 0, 240)}
+    }
+    
+    for _, btnInfo in pairs(buttons) do
+        local btn = Instance.new("TextButton")
+        btn.Text = btnInfo.text
+        btn.Size = UDim2.new(0.45, 0, 0, 25)
+        btn.Position = btnInfo.pos
+        btn.BackgroundColor3 = Color3.fromRGB(50, 70, 100)
+        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
         
-        spawn(function()
-            local success = ExecuteDuplication()
+        btn.MouseButton1Click:Connect(function()
+            btn.Text = "RUNNING..."
+            status.Text = "Executing: " .. btnInfo.text
             
-            if success then
-                updateOutput("✅ Duplication attempted!\nCheck other player's screen.")
-                executeBtn.Text = "✅ SUCCESS"
-                executeBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
-            else
-                updateOutput("⚠️  Partial success\nDirect manipulation only")
-                executeBtn.Text = "🚀 EXECUTE DUPLICATION"
-            end
+            spawn(function()
+                btnInfo.func()
+                wait(1)
+                btn.Text = btnInfo.text
+                status.Text = "Status: Completed"
+            end)
         end)
-    end)
+        
+        btn.Parent = frame
+    end
     
     -- Parent everything
     title.Parent = frame
-    output.Parent = frame
-    executeBtn.Parent = frame
+    status.Parent = frame
+    log.Parent = frame
     frame.Parent = gui
     
-    return updateOutput
+    -- Hook print to log
+    local originalPrint = print
+    print = function(...)
+        local args = {...}
+        local message = table.concat(args, " ")
+        originalPrint(message)
+        logText.Text = "> " .. message .. "\n" .. logText.Text
+    end
+    
+    return status
 end
 
 -- Initialize
-local updateOutput = CreateSimpleUI()
+CreateFocusedUI()
 
--- Auto-start instructions
-task.wait(3)
-print("\n=== INSTRUCTIONS ===")
-print("1. Start a trade with another player")
-print("2. Add a car to the trade window")
-print("3. Click 'EXECUTE DUPLICATION' button")
-print("4. Check if OTHER player sees duplicates")
-print("5. Complete the trade normally")
+-- Auto-start
+wait(3)
+print("\n=== DIRECT SESSION DUPLICATOR LOADED ===")
+print("Found critical remotes:")
+print("  • SessionAddItem: " .. tostring(SessionAddItem ~= nil))
+print("  • SessionRemoveItem: " .. tostring(SessionRemoveItem ~= nil))
+print("  • SessionSetConfirmation: " .. tostring(SessionSetConfirmation ~= nil))
 
--- Auto-scan after delay
-spawn(function()
-    task.wait(5)
-    print("\n🔍 Auto-scanning for trade remotes...")
-    FindTradeRemotes()
-    updateOutput("Scan complete. Ready to execute.")
-end)
+print("\n📋 INSTRUCTIONS:")
+print("1. Start trade with other player")
+print("2. Add a car to trade normally")
+print("3. Click 'CHECK ITEMS' to see current count")
+print("4. Click 'ADD DUPLICATE' to try duplication")
+print("5. Click 'FULL EXECUTE' for complete process")
+print("6. Check if OTHER player sees the duplicate")
 
--- Keybind for quick execution
+-- Keybinds
 local UIS = game:GetService("UserInputService")
 UIS.InputBegan:Connect(function(input, processed)
     if processed then return end
     
-    if input.KeyCode == Enum.KeyCode.D then
-        print("\n🎮 D KEY PRESSED - EXECUTING")
-        ExecuteDuplication()
-        updateOutput("Quick execution via D key")
+    if input.KeyCode == Enum.KeyCode.A then
+        print("\n🎮 A KEY - ADD DUPLICATE")
+        AddDuplicateCarToSession()
+    elseif input.KeyCode == Enum.KeyCode.S then
+        print("\n🎮 S KEY - CHECK ITEMS")
+        CheckSessionItems()
+    elseif input.KeyCode == Enum.KeyCode.F then
+        print("\n🎮 F KEY - FULL EXECUTE")
+        ExecuteDirectDuplication()
     end
 end)
 
-print("\nPress D for quick duplication")
+print("\n🔑 CONTROLS:")
+print("A = Add duplicate to session")
+print("S = Check current items")
+print("F = Full execution")
