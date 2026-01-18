@@ -1,13 +1,8 @@
--- Item ID Finder & Trade Duplicator
+-- Deep Car Button Inspector
 local Players = game:GetService("Players")
 local Player = Players.LocalPlayer
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-print("=== ITEM ID FINDER ===")
-
--- Get remotes
-local TradingServiceRemotes = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Services"):WaitForChild("TradingServiceRemotes")
-local SessionAddItem = TradingServiceRemotes:WaitForChild("SessionAddItem")
+print("=== DEEP CAR BUTTON INSPECTOR ===")
 
 -- Get trade container
 local function GetTradeContainer()
@@ -15,9 +10,9 @@ local function GetTradeContainer()
     return Player.PlayerGui:WaitForChild("Menu"):WaitForChild("Trading"):WaitForChild("PeerToPeer"):WaitForChild("Main"):WaitForChild("LocalPlayer"):WaitForChild("Content"):WaitForChild("ScrollingFrame")
 end
 
--- Find ALL data in car button
-local function GetCarItemData()
-    print("\n🔍 EXTRACTING CAR ITEM DATA...")
+-- Deep inspect the car button
+local function DeepInspectCarButton()
+    print("\n🔍 DEEP INSPECTION OF CAR BUTTON...")
     
     local container = GetTradeContainer()
     if not container then
@@ -39,209 +34,257 @@ local function GetCarItemData()
         return nil
     end
     
-    print("Found car button: " .. carButton.Name)
+    print("🎯 CAR BUTTON FOUND: " .. carButton.Name)
+    print("Class: " .. carButton.ClassName)
+    print("Visible: " .. tostring(carButton.Visible))
     
-    -- Extract ALL data from the button and its children
-    local itemData = {
-        buttonName = carButton.Name,
-        children = {}
-    }
+    -- Get ALL properties of the button
+    print("\n📋 BUTTON PROPERTIES:")
+    pcall(function() print("  Position: " .. tostring(carButton.Position)) end)
+    pcall(function() print("  Size: " .. tostring(carButton.Size)) end)
+    pcall(function() print("  Image: " .. tostring(carButton.Image)) end)
+    pcall(function() print("  ImageColor3: " .. tostring(carButton.ImageColor3)) end)
     
-    -- Get all children values
-    for _, child in pairs(carButton:GetDescendants()) do
-        if child:IsA("StringValue") then
-            itemData.children[child.Name] = child.Value
-            print("StringValue: " .. child.Name .. " = \"" .. child.Value .. "\"")
-        elseif child:IsA("IntValue") then
-            itemData.children[child.Name] = child.Value
-            print("IntValue: " .. child.Name .. " = " .. child.Value)
-        elseif child:IsA("NumberValue") then
-            itemData.children[child.Name] = child.Value
-            print("NumberValue: " .. child.Name .. " = " .. child.Value)
-        elseif child:IsA("BoolValue") then
-            itemData.children[child.Name] = child.Value
-            print("BoolValue: " .. child.Name .. " = " .. tostring(child.Value))
-        elseif child:IsA("ObjectValue") then
-            if child.Value then
-                itemData.children[child.Name] = child.Value:GetFullName()
-                print("ObjectValue: " .. child.Name .. " = " .. child.Value:GetFullName())
+    -- Count ALL descendants
+    local allDescendants = carButton:GetDescendants()
+    print("\n📊 TOTAL DESCENDANTS: " .. #allDescendants)
+    
+    -- Group descendants by type
+    local byType = {}
+    for _, descendant in pairs(allDescendants) do
+        local className = descendant.ClassName
+        byType[className] = (byType[className] or 0) + 1
+    end
+    
+    print("Descendants by type:")
+    for className, count in pairs(byType) do
+        print("  " .. className .. ": " .. count)
+    end
+    
+    -- Show EVERY StringValue and IntValue
+    print("\n🔑 ALL VALUE OBJECTS:")
+    local foundValues = {}
+    
+    for _, descendant in pairs(allDescendants) do
+        if descendant:IsA("StringValue") then
+            print("📝 StringValue: " .. descendant.Name .. " = \"" .. descendant.Value .. "\"")
+            table.insert(foundValues, {
+                type = "string",
+                name = descendant.Name,
+                value = descendant.Value
+            })
+        elseif descendant:IsA("IntValue") then
+            print("🔢 IntValue: " .. descendant.Name .. " = " .. descendant.Value)
+            table.insert(foundValues, {
+                type = "int",
+                name = descendant.Name,
+                value = descendant.Value
+            })
+        elseif descendant:IsA("NumberValue") then
+            print("🔢 NumberValue: " .. descendant.Name .. " = " .. descendant.Value)
+            table.insert(foundValues, {
+                type = "number",
+                name = descendant.Name,
+                value = descendant.Value
+            })
+        elseif descendant:IsA("BoolValue") then
+            print("✅ BoolValue: " .. descendant.Name .. " = " .. tostring(descendant.Value))
+            table.insert(foundValues, {
+                type = "bool",
+                name = descendant.Name,
+                value = descendant.Value
+            })
+        elseif descendant:IsA("ObjectValue") then
+            if descendant.Value then
+                print("🎯 ObjectValue: " .. descendant.Name .. " -> " .. descendant.Value:GetFullName())
+                table.insert(foundValues, {
+                    type = "object",
+                    name = descendant.Name,
+                    value = descendant.Value
+                })
             end
         end
     end
     
-    -- Also check for TextLabels with important info
-    for _, child in pairs(carButton:GetChildren()) do
-        if child:IsA("TextLabel") then
-            print("TextLabel: " .. child.Name .. " = \"" .. child.Text .. "\"")
+    -- Show ALL TextLabels and their text
+    print("\n📝 ALL TEXTLABELS:")
+    for _, descendant in pairs(allDescendants) do
+        if descendant:IsA("TextLabel") or descendant:IsA("TextButton") then
+            local text = descendant.Text
+            if text and text ~= "" then
+                print("  " .. descendant.Name .. ": \"" .. text .. "\"")
+            end
         end
     end
     
-    return itemData
-end
-
--- Try to find what item ID the server expects
-local function FindCorrectItemId()
-    print("\n🔑 FINDING CORRECT ITEM ID...")
-    
-    local itemData = GetCarItemData()
-    if not itemData then return nil end
-    
-    -- Common item ID patterns to check for
-    local possibleIds = {}
-    
-    -- Check children for likely IDs
-    for name, value in pairs(itemData.children) do
-        local nameLower = name:lower()
+    -- Show ALL Frame children structure
+    print("\n🏗️ BUTTON STRUCTURE (first 2 levels):")
+    local function PrintStructure(obj, depth, maxDepth)
+        if depth > maxDepth then return end
         
-        -- Look for ID-related names
-        if nameLower:find("id") or 
-           nameLower:find("item") or 
-           nameLower:find("asset") or
-           nameLower:find("product") then
-            
-            table.insert(possibleIds, {
-                source = name,
-                value = value,
-                type = type(value)
-            })
+        local indent = string.rep("  ", depth)
+        print(indent .. obj.Name .. " (" .. obj.ClassName .. ")")
+        
+        if depth < maxDepth then
+            for _, child in pairs(obj:GetChildren()) do
+                PrintStructure(child, depth + 1, maxDepth)
+            end
         end
     end
     
-    -- Also check the button name for numeric ID
-    local numericId = itemData.buttonName:match("%d+")
-    if numericId then
-        table.insert(possibleIds, {
-            source = "button name",
-            value = tonumber(numericId),
-            type = "number"
-        })
-    end
+    PrintStructure(carButton, 0, 2)
     
-    print("\n📋 Possible item IDs found:")
-    for i, idInfo in ipairs(possibleIds) do
-        print(i .. ". " .. idInfo.source .. " = " .. tostring(idInfo.value) .. " (" .. idInfo.type .. ")")
-    end
-    
-    return possibleIds
+    return foundValues
 end
 
--- Test different item IDs
-local function TestItemIds()
-    print("\n🧪 TESTING ITEM IDs...")
+-- Try to click the button and see what happens
+local function TestButtonClick()
+    print("\n🖱️ TESTING BUTTON CLICK...")
     
-    local possibleIds = FindCorrectItemId()
-    if not possibleIds or #possibleIds == 0 then
-        print("❌ No possible IDs found")
+    local container = GetTradeContainer()
+    if not container then return nil end
+    
+    -- Find car button
+    local carButton = nil
+    for _, item in pairs(container:GetChildren()) do
+        if item:IsA("ImageButton") and item.Name:sub(1, 4) == "Car-" then
+            carButton = item
+            break
+        end
+    end
+    
+    if not carButton then
+        print("❌ No car button")
         return false
     end
     
-    local successCount = 0
+    print("Testing clicks on: " .. carButton.Name)
     
-    for i, idInfo in ipairs(possibleIds) do
-        print("\n--- Test " .. i .. " ---")
-        print("Using ID: " .. tostring(idInfo.value) .. " (from " .. idInfo.source .. ")")
+    -- Try different click methods
+    local methods = {
+        {"MouseButton1Click", function() carButton:Fire("MouseButton1Click") end},
+        {"Activated", function() carButton:Fire("Activated") end},
+        {"MouseButton1Down/Up", function() 
+            carButton:Fire("MouseButton1Down")
+            wait(0.05)
+            carButton:Fire("MouseButton1Up")
+        end}
+    }
+    
+    for i = 1, 5 do
+        print("\nClick attempt " .. i .. ":")
         
-        -- Try different formats with this ID
-        local testFormats = {
-            {name = "Number ID", value = tonumber(idInfo.value) or idInfo.value},
-            {name = "String ID", value = tostring(idInfo.value)},
-            {name = "ID with prefix", value = "Car_" .. tostring(idInfo.value)},
-            {name = "ID as table", value = {id = idInfo.value}},
-            {name = "ID with type", value = {id = idInfo.value, type = "car"}},
+        for _, method in ipairs(methods) do
+            local methodName = method[1]
+            local methodFunc = method[2]
+            
+            local success, result = pcall(methodFunc)
+            if success then
+                print("  ✅ " .. methodName .. " worked")
+            else
+                print("  ❌ " .. methodName .. " failed: " .. tostring(result))
+            end
+            
+            wait(0.1)
+        end
+    end
+    
+    return true
+end
+
+-- Look for RemoteEvents on the button
+local function FindButtonRemotes()
+    print("\n📡 LOOKING FOR REMOTES ON BUTTON...")
+    
+    local container = GetTradeContainer()
+    if not container then return nil end
+    
+    -- Find car button
+    local carButton = nil
+    for _, item in pairs(container:GetChildren()) do
+        if item:IsA("ImageButton") and item.Name:sub(1, 4) == "Car-" then
+            carButton = item
+            break
+        end
+    end
+    
+    if not carButton then
+        print("❌ No car button")
+        return {}
+    end
+    
+    local foundRemotes = {}
+    
+    -- Check button and all descendants for RemoteEvents
+    for _, descendant in pairs(carButton:GetDescendants()) do
+        if descendant:IsA("RemoteEvent") then
+            print("🎯 Found RemoteEvent: " .. descendant.Name)
+            print("  Path: " .. descendant:GetFullName())
+            table.insert(foundRemotes, descendant)
+        elseif descendant:IsA("RemoteFunction") then
+            print("🎯 Found RemoteFunction: " .. descendant.Name)
+            print("  Path: " .. descendant:GetFullName())
+            table.insert(foundRemotes, descendant)
+        end
+    end
+    
+    if #foundRemotes == 0 then
+        print("❌ No remotes found on button")
+    else
+        print("📊 Found " .. #foundRemotes .. " remote(s)")
+    end
+    
+    return foundRemotes
+end
+
+-- Try to fire remotes if found
+local function TestButtonRemotes()
+    print("\n🧪 TESTING BUTTON REMOTES...")
+    
+    local remotes = FindButtonRemotes()
+    
+    for _, remote in pairs(remotes) do
+        print("\nTesting remote: " .. remote.Name)
+        
+        -- Try different data to send
+        local testData = {
+            "add",
+            "select",
+            "click",
+            carButton.Name,
+            1,
+            {action = "add", item = carButton.Name}
         }
         
-        for _, format in ipairs(testFormats) do
-            print("  Format: " .. format.name)
+        for _, data in ipairs(testData) do
+            print("  Sending: " .. tostring(data))
             
-            -- Try to add item
             local success, result = pcall(function()
-                return SessionAddItem:InvokeServer("trade_session", format.value)
+                if remote:IsA("RemoteEvent") then
+                    return remote:FireServer(data)
+                else
+                    return remote:InvokeServer(data)
+                end
             end)
             
             if success then
-                print("    ✅ SUCCESS!")
+                print("    ✅ Success!")
                 if result then
                     print("    Result: " .. tostring(result))
                 end
-                successCount = successCount + 1
-                
-                -- Try a few more times
-                for j = 1, 3 do
-                    wait(0.2)
-                    pcall(function()
-                        SessionAddItem:InvokeServer("trade_session", format.value)
-                        print("    Repeated " .. j)
-                    end)
-                end
-                
-                break  -- Stop if this format works
             else
                 print("    ❌ Failed: " .. tostring(result))
             end
             
-            wait(0.3)
+            wait(0.2)
         end
     end
-    
-    print("\n📊 Results: " .. successCount .. " successful ID tests")
-    return successCount > 0
-end
-
--- Alternative: Look for item data in other places
-local function SearchForItemDatabase()
-    print("\n🗄️ SEARCHING FOR ITEM DATABASE...")
-    
-    -- Look in ReplicatedStorage for item data
-    local foundItems = {}
-    
-    local function SearchFolder(folder, path)
-        for _, item in pairs(folder:GetChildren()) do
-            if item:IsA("Folder") and (item.Name:lower():find("car") or item.Name:lower():find("item") or item.Name:lower():find("vehicle")) then
-                print("Found item folder: " .. path .. item.Name)
-                
-                -- Check for item data in folder
-                for _, data in pairs(item:GetChildren()) do
-                    if data:IsA("StringValue") or data:IsA("IntValue") then
-                        print("  " .. data.Name .. " = " .. tostring(data.Value))
-                        table.insert(foundItems, {
-                            name = item.Name,
-                            dataName = data.Name,
-                            value = data.Value,
-                            path = path .. item.Name
-                        })
-                    end
-                end
-            end
-            
-            -- Recursive search
-            if item:IsA("Folder") then
-                SearchFolder(item, path .. item.Name .. "/")
-            end
-        end
-    end
-    
-    -- Search common locations
-    local locations = {
-        {name = "ReplicatedStorage", folder = ReplicatedStorage},
-        {name = "ServerStorage", folder = game:GetService("ServerStorage")},
-        {name = "ServerScriptService", folder = game:GetService("ServerScriptService")},
-    }
-    
-    for _, location in pairs(locations) do
-        print("\nSearching " .. location.name .. "...")
-        pcall(function()
-            SearchFolder(location.folder, location.name .. "/")
-        end)
-    end
-    
-    print("\n📋 Found " .. #foundItems .. " potential item data entries")
-    return foundItems
 end
 
 -- Create UI
 local function CreateUI()
     local gui = Instance.new("ScreenGui")
-    gui.Name = "ItemIdFinder"
+    gui.Name = "DeepInspector"
     gui.Parent = Player:WaitForChild("PlayerGui")
     
     local frame = Instance.new("Frame")
@@ -252,13 +295,13 @@ local function CreateUI()
     frame.Draggable = true
     
     local title = Instance.new("TextLabel")
-    title.Text = "ITEM ID FINDER"
+    title.Text = "DEEP INSPECTOR"
     title.Size = UDim2.new(1, 0, 0, 40)
     title.BackgroundColor3 = Color3.fromRGB(60, 60, 90)
-    title.TextColor3 = Color3.fromRGB(100, 200, 255)
+    title.TextColor3 = Color3.fromRGB(255, 150, 100)
     
     local status = Instance.new("TextLabel")
-    status.Text = "Find the REAL item ID\nnot just display name"
+    status.Text = "Deep inspection of car button\nLooking for hidden values"
     status.Size = UDim2.new(1, -20, 0, 80)
     status.Position = UDim2.new(0, 10, 0, 50)
     status.BackgroundTransparency = 1
@@ -267,32 +310,19 @@ local function CreateUI()
     
     -- Buttons
     local buttons = {
-        {text = "🔍 GET CAR DATA", func = GetCarItemData, pos = UDim2.new(0.025, 0, 0, 140)},
-        {text = "🔑 FIND ITEM ID", func = FindCorrectItemId, pos = UDim2.new(0.525, 0, 0, 140)},
-        {text = "🧪 TEST IDs", func = TestItemIds, pos = UDim2.new(0.025, 0, 0, 175)},
-        {text = "🗄️ SEARCH DB", func = SearchForItemDatabase, pos = UDim2.new(0.525, 0, 0, 175)},
-        {text = "🚀 QUICK TEST", func = function()
-            print("\n⚡ QUICK TEST...")
-            local itemData = GetCarItemData()
-            if itemData then
-                -- Try the most likely ID formats
-                local tests = {
-                    {name = "First child value", value = next(itemData.children)},
-                    {name = "Numeric from name", value = itemData.buttonName:match("%d+")},
-                    {name = "AssetId if exists", value = itemData.children["AssetId"]}
-                }
-                
-                for _, test in ipairs(tests) do
-                    if test.value then
-                        print("Testing: " .. test.name .. " = " .. test.value)
-                        pcall(function()
-                            SessionAddItem:InvokeServer("trade_session", test.value)
-                            print("✅ Sent!")
-                        end)
-                        wait(0.3)
-                    end
-                end
-            end
+        {text = "🔍 DEEP INSPECT", func = DeepInspectCarButton, pos = UDim2.new(0.025, 0, 0, 140)},
+        {text = "🖱️ TEST CLICKS", func = TestButtonClick, pos = UDim2.new(0.525, 0, 0, 140)},
+        {text = "📡 FIND REMOTES", func = FindButtonRemotes, pos = UDim2.new(0.025, 0, 0, 175)},
+        {text = "🧪 TEST REMOTES", func = TestButtonRemotes, pos = UDim2.new(0.525, 0, 0, 175)},
+        {text = "🚀 RUN ALL", func = function()
+            print("\n=== RUNNING ALL TESTS ===")
+            DeepInspectCarButton()
+            wait(1)
+            TestButtonClick()
+            wait(1)
+            FindButtonRemotes()
+            wait(1)
+            TestButtonRemotes()
         end, pos = UDim2.new(0.025, 0, 0, 210)}
     }
     
@@ -327,19 +357,18 @@ end
 -- Initialize
 CreateUI()
 
--- Instructions
+-- Auto-run deep inspection
 wait(2)
-print("\n=== ITEM ID FINDER ===")
-print("The error 'Invalid item type' means we're sending the wrong ID")
-print("\n📋 WHAT TO DO:")
-print("1. Click 'GET CAR DATA' - shows all data in car button")
-print("2. Look for ID values (StringValue, IntValue)")
-print("3. Click 'TEST IDs' - tries different ID formats")
-print("4. Share the OUTPUT with me!")
+print("\n=== DEEP CAR BUTTON INSPECTOR ===")
+print("We need to find the ACTUAL item ID values")
+print("\n📋 CRITICAL QUESTIONS:")
+print("1. Are there StringValue/IntValue objects INSIDE the car button?")
+print("2. What are their names and values?")
+print("3. Are there RemoteEvents on the button?")
+print("\n🔍 Click 'DEEP INSPECT' to find answers!")
 
--- Auto-run first scan
 spawn(function()
     wait(3)
-    print("\n🔍 Auto-scanning car data...")
-    GetCarItemData()
+    print("\n🔍 Starting deep inspection...")
+    DeepInspectCarButton()
 end)
