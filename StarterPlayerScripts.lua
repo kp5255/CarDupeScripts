@@ -1,380 +1,543 @@
--- 🎯 CDT TRADE OFFER DETECTOR - DYNAMIC VERSION
--- Finds ANY trade UI and shows what's inside
+-- 🎯 CDT OFFERED CARS ONLY TRACKER
+-- Shows ONLY cars in your TRADE OFFER (not owned cars)
 
 local Players = game:GetService("Players")
 local Player = Players.LocalPlayer
+local RunService = game:GetService("RunService")
 
 repeat task.wait() until game:IsLoaded()
 task.wait(2)
 
-print("🎯 CDT Trade Offer Detector - Dynamic Scan")
+print("🎯 CDT OFFERED CARS TRACKER - Looking for OFFER section only")
 
--- ===== FIND ANY TRADE UI =====
-local function FindAnyTradeUI()
+-- ===== IDENTIFY OFFER SECTION =====
+local function FindOfferSection()
     if not Player.PlayerGui then return nil end
     
-    local function deepSearch(parent, depth)
-        if depth > 15 then return nil end
-        
+    -- First, find the trade UI
+    local function findTradeUI(parent)
         for _, child in pairs(parent:GetChildren()) do
             local nameLower = child.Name:lower()
             
-            -- Look for trade UI indicators
             if child:IsA("ScreenGui") or child:IsA("Frame") then
                 if nameLower:find("trade") or nameLower:find("peer") then
                     if child.Visible then
-                        print("🎯 Found VISIBLE trade UI: " .. child.Name .. " at " .. child:GetFullName())
+                        print("🎯 Found trade UI: " .. child.Name)
                         return child
                     end
                 end
             end
             
             if #child:GetChildren() > 0 then
-                local found = deepSearch(child, depth + 1)
+                local found = findTradeUI(child)
                 if found then return found end
             end
         end
-        
         return nil
     end
     
-    return deepSearch(Player.PlayerGui, 0)
-end
-
--- ===== SCAN ALL VISIBLE FRAMES FOR OFFERED ITEMS =====
-local function ScanAllVisibleItems()
-    local foundItems = {}
+    local tradeUI = findTradeUI(Player.PlayerGui)
+    if not tradeUI then return nil end
     
-    if not Player.PlayerGui then return foundItems end
+    print("🔍 Looking for OFFER section in trade UI...")
     
-    -- First, find if there's a visible trade UI
-    local tradeUI = FindAnyTradeUI()
+    -- Look for containers that might be the offer section
+    -- Common names: "YourOffer", "MyOffer", "LocalPlayer", "Offer", "YourItems"
+    local offerContainers = {}
     
-    if tradeUI then
-        print("🔍 Scanning trade UI for items...")
-        
-        -- Look for ANY frames/buttons that might be items
-        for _, child in pairs(tradeUI:GetDescendants()) do
-            if child:IsA("Frame") or child:IsA("TextButton") or child:IsA("ImageButton") then
-                if child.Visible then
-                    local name = child.Name
-                    
-                    -- Skip common UI elements
-                    if name == "" or name:find("Background") or name:find("Border") 
-                       or name:find("Corner") or name:find("Padding") 
-                       or name:find("Layout") or name:find("Shadow") then
-                        continue
+    for _, child in pairs(tradeUI:GetDescendants()) do
+        if child:IsA("Frame") or child:IsA("ScrollingFrame") then
+            local nameLower = child.Name:lower()
+            
+            if nameLower:find("offer") or 
+               nameLower:find("your") or 
+               nameLower:find("local") or
+               nameLower:find("my") or
+               nameLower:find("left") then  -- Left side is usually your offer
+                
+                -- Check if this container has car items
+                local hasCars = false
+                for _, item in pairs(child:GetDescendants()) do
+                    if item.Name:find("Car") or item.Name:find("car") then
+                        hasCars = true
+                        break
                     end
-                    
-                    -- Look for car indicators
-                    if name:find("Car") or name:find("car") or name:match("%-") or name:match("%_") then
-                        local itemInfo = {
-                            Name = name,
-                            DisplayName = name,
-                            Object = child,
-                            Path = child:GetFullName(),
-                            Class = child.ClassName,
-                            Visible = child.Visible
-                        }
-                        
-                        -- Try to get text from TextButton
-                        if child:IsA("TextButton") and child.Text ~= "" then
-                            itemInfo.DisplayName = child.Text
-                        end
-                        
-                        -- Look for text labels
-                        for _, sub in pairs(child:GetChildren()) do
-                            if sub:IsA("TextLabel") and sub.Text ~= "" then
-                                if sub.Name:lower():find("name") or sub.Text:len() > 3 then
-                                    itemInfo.DisplayName = sub.Text
-                                end
-                            end
-                        end
-                        
-                        -- Check if this is likely an item (not a container)
-                        local childCount = #child:GetChildren()
-                        if childCount < 10 then  -- Items usually have few children
-                            table.insert(foundItems, itemInfo)
-                            print("📦 Found potential item: " .. itemInfo.DisplayName .. " (" .. child.ClassName .. ")")
-                        end
-                    end
+                end
+                
+                if hasCars then
+                    table.insert(offerContainers, {
+                        Container = child,
+                        Name = child.Name,
+                        Path = child:GetFullName(),
+                        ItemCount = 0
+                    })
+                    print("📥 Found potential offer container: " .. child.Name .. " at " .. child:GetFullName())
                 end
             end
         end
     end
     
-    -- If no trade UI found, scan entire PlayerGui for visible items
-    if #foundItems == 0 then
-        print("🔍 Scanning entire PlayerGui for visible car items...")
+    -- If multiple containers found, try to identify the actual offer section
+    if #offerContainers > 0 then
+        -- Look for the container with "LocalPlayer" or "Your" in path
+        for _, container in pairs(offerContainers) do
+            if container.Path:lower():find("localplayer") then
+                print("✅ Identified as OFFER section (contains LocalPlayer): " .. container.Name)
+                return container.Container
+            end
+        end
         
-        for _, child in pairs(Player.PlayerGui:GetDescendants()) do
-            if child:IsA("Frame") or child:IsA("TextButton") or child:IsA("ImageButton") then
-                if child.Visible then
-                    local name = child.Name
-                    
-                    if name:find("Car") or name:find("Nissan") or name:find("Subaru") then
-                        local absPos = child.AbsolutePosition
-                        local screenSize = workspace.CurrentCamera.ViewportSize
-                        
-                        -- Only show items on screen (not offscreen)
-                        if absPos.X > 0 and absPos.X < screenSize.X 
-                           and absPos.Y > 0 and absPos.Y < screenSize.Y then
-                            
-                            local itemInfo = {
-                                Name = name,
-                                DisplayName = name,
-                                Object = child,
-                                Path = child:GetFullName(),
-                                Position = absPos,
-                                ScreenPosition = UDim2.new(0, absPos.X / screenSize.X, 0, absPos.Y / screenSize.Y)
-                            }
-                            
-                            print("📍 Visible on screen: " .. name .. " at " .. tostring(math.floor(absPos.X)) .. "," .. tostring(math.floor(absPos.Y)))
-                            table.insert(foundItems, itemInfo)
+        -- Check which container has fewer items (offer usually has fewer than owned)
+        for _, container in pairs(offerContainers) do
+            local itemCount = 0
+            for _ in pairs(container.Container:GetDescendants()) do
+                itemCount = itemCount + 1
+            end
+            container.ItemCount = itemCount
+        end
+        
+        -- Sort by item count (ascending - offer usually has fewer items)
+        table.sort(offerContainers, function(a, b)
+            return a.ItemCount < b.ItemCount
+        end)
+        
+        print("✅ Identified as OFFER section (fewer items): " .. offerContainers[1].Name)
+        return offerContainers[1].Container
+    end
+    
+    return nil
+end
+
+-- ===== EXTRACT OFFERED CARS ONLY =====
+local function GetOfferedCarsOnly()
+    local offerSection = FindOfferSection()
+    local offeredCars = {}
+    
+    if not offerSection then
+        print("❌ No offer section found")
+        return offeredCars
+    end
+    
+    print("🎯 Scanning OFFER section: " .. offerSection.Name)
+    
+    -- Look for car items in the offer section ONLY
+    for _, child in pairs(offerSection:GetDescendants()) do
+        if child:IsA("Frame") or child:IsA("TextButton") or child:IsA("ImageButton") then
+            local name = child.Name
+            
+            -- Look for cars (case insensitive)
+            if name:lower():find("car") or name:match("Car%-") or name:match("%-Car") then
+                local itemInfo = {
+                    Name = name,
+                    DisplayName = name,
+                    Object = child,
+                    Path = child:GetFullName(),
+                    Class = child.ClassName,
+                    IsInOffer = true
+                }
+                
+                -- Get display name
+                if child:IsA("TextButton") and child.Text ~= "" then
+                    itemInfo.DisplayName = child.Text
+                else
+                    -- Look for text labels
+                    for _, sub in pairs(child:GetChildren()) do
+                        if sub:IsA("TextLabel") and sub.Text ~= "" then
+                            itemInfo.DisplayName = sub.Text
+                            break
                         end
                     end
+                end
+                
+                -- Check if this is a duplicate
+                local exists = false
+                for _, existing in pairs(offeredCars) do
+                    if existing.Path == itemInfo.Path then
+                        exists = true
+                        break
+                    end
+                end
+                
+                if not exists then
+                    table.insert(offeredCars, itemInfo)
+                    print("🚗 Found in OFFER: " .. itemInfo.DisplayName)
                 end
             end
         end
     end
     
-    return foundItems
+    return offeredCars
 end
 
--- ===== CREATE VISUAL OVERLAY UI =====
-local function CreateOverlayUI()
+-- ===== CREATE OFFER-ONLY UI =====
+local function CreateOfferOnlyUI()
     local ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Name = "TradeOverlay"
+    ScreenGui.Name = "OfferedCarsOnly"
     ScreenGui.Parent = Player:WaitForChild("PlayerGui")
     ScreenGui.ResetOnSpawn = false
     ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     
-    -- Control Panel
-    local ControlPanel = Instance.new("Frame")
-    ControlPanel.Size = UDim2.new(0, 400, 0, 150)
-    ControlPanel.Position = UDim2.new(0.5, -200, 0, 10)
-    ControlPanel.BackgroundColor3 = Color3.fromRGB(30, 30, 50)
-    ControlPanel.BorderSizePixel = 0
-    ControlPanel.Active = true
-    ControlPanel.Draggable = true
+    -- Main Window
+    local MainFrame = Instance.new("Frame")
+    MainFrame.Size = UDim2.new(0, 350, 0, 350)
+    MainFrame.Position = UDim2.new(0.7, 0, 0.3, 0)
+    MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 50)
+    MainFrame.BorderSizePixel = 0
+    MainFrame.Active = true
+    MainFrame.Draggable = true
     
-    -- Title
-    local Title = Instance.new("TextLabel")
-    Title.Text = "🔍 LIVE TRADE ITEM SCANNER"
-    Title.Size = UDim2.new(1, 0, 0, 30)
-    Title.BackgroundColor3 = Color3.fromRGB(50, 50, 80)
-    Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-    Title.Font = Enum.Font.GothamBold
-    Title.TextSize = 16
+    -- Title Bar
+    local TitleBar = Instance.new("Frame")
+    TitleBar.Size = UDim2.new(1, 0, 0, 40)
+    TitleBar.BackgroundColor3 = Color3.fromRGB(50, 50, 80)
+    TitleBar.BorderSizePixel = 0
+    TitleBar.Active = true
+    
+    local TitleText = Instance.new("TextLabel")
+    TitleText.Text = "🚗 OFFERED CARS ONLY"
+    TitleText.Size = UDim2.new(1, -40, 1, 0)
+    TitleText.Position = UDim2.new(0, 10, 0, 0)
+    TitleText.BackgroundTransparency = 1
+    TitleText.TextColor3 = Color3.fromRGB(255, 255, 255)
+    TitleText.Font = Enum.Font.GothamBold
+    TitleText.TextSize = 16
+    TitleText.TextXAlignment = Enum.TextXAlignment.Left
+    
+    local CloseButton = Instance.new("TextButton")
+    CloseButton.Text = "✕"
+    CloseButton.Size = UDim2.new(0, 30, 0, 30)
+    CloseButton.Position = UDim2.new(1, -35, 0.5, -15)
+    CloseButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    CloseButton.Font = Enum.Font.GothamBold
     
     -- Status
-    local Status = Instance.new("TextLabel")
-    Status.Text = "Ready - Start a trade and add items"
-    Status.Size = UDim2.new(1, -20, 0, 40)
-    Status.Position = UDim2.new(0, 10, 0, 40)
-    Status.BackgroundTransparency = 1
-    Status.TextColor3 = Color3.fromRGB(200, 200, 255)
-    Status.Font = Enum.Font.Gotham
-    Status.TextSize = 14
-    Status.TextWrapped = true
+    local StatusFrame = Instance.new("Frame")
+    StatusFrame.Size = UDim2.new(1, -20, 0, 60)
+    StatusFrame.Position = UDim2.new(0, 10, 0, 50)
+    StatusFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
     
-    -- Scan Button
-    local ScanButton = Instance.new("TextButton")
-    ScanButton.Text = "🔍 SCAN NOW"
-    ScanButton.Size = UDim2.new(0.45, 0, 0, 35)
-    ScanButton.Position = UDim2.new(0.025, 0, 1, -45)
-    ScanButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
-    ScanButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    ScanButton.Font = Enum.Font.GothamBold
+    local StatusText = Instance.new("TextLabel")
+    StatusText.Text = "🔍 Looking for trade offer..."
+    StatusText.Size = UDim2.new(1, -20, 1, 0)
+    StatusText.Position = UDim2.new(0, 10, 0, 0)
+    StatusText.BackgroundTransparency = 1
+    StatusText.TextColor3 = Color3.fromRGB(255, 255, 150)
+    StatusText.Font = Enum.Font.Gotham
+    StatusText.TextSize = 14
+    StatusText.TextWrapped = true
     
-    -- Debug Button
-    local DebugButton = Instance.new("TextButton")
-    DebugButton.Text = "🐛 DEBUG VIEW"
-    DebugButton.Size = UDim2.new(0.45, 0, 0, 35)
-    DebugButton.Position = UDim2.new(0.525, 0, 1, -45)
-    DebugButton.BackgroundColor3 = Color3.fromRGB(150, 0, 200)
-    DebugButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    DebugButton.Font = Enum.Font.GothamBold
+    -- Offered Cars List
+    local CarsFrame = Instance.new("ScrollingFrame")
+    CarsFrame.Size = UDim2.new(1, -20, 0, 200)
+    CarsFrame.Position = UDim2.new(0, 10, 0, 120)
+    CarsFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+    CarsFrame.BorderSizePixel = 0
+    CarsFrame.ScrollBarThickness = 6
+    CarsFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    
+    local CarsLayout = Instance.new("UIListLayout")
+    CarsLayout.Padding = UDim.new(0, 8)
+    CarsLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    
+    -- Refresh Button
+    local RefreshButton = Instance.new("TextButton")
+    RefreshButton.Text = "🔄 REFRESH OFFER"
+    RefreshButton.Size = UDim2.new(1, -20, 0, 35)
+    RefreshButton.Position = UDim2.new(0, 10, 1, -45)
+    RefreshButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+    RefreshButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    RefreshButton.Font = Enum.Font.GothamBold
     
     -- Add corners
     local corner = Instance.new("UICorner")
     corner.CornerRadius = UDim.new(0, 8)
     
-    corner:Clone().Parent = ControlPanel
-    corner:Clone().Parent = Title
-    corner:Clone().Parent = ScanButton
-    corner:Clone().Parent = DebugButton
+    corner:Clone().Parent = MainFrame
+    corner:Clone().Parent = TitleBar
+    corner:Clone().Parent = StatusFrame
+    corner:Clone().Parent = CarsFrame
+    corner:Clone().Parent = RefreshButton
+    corner:Clone().Parent = CloseButton
     
-    -- Parent
-    Title.Parent = ControlPanel
-    Status.Parent = ControlPanel
-    ScanButton.Parent = ControlPanel
-    DebugButton.Parent = ControlPanel
-    ControlPanel.Parent = ScreenGui
+    -- Parenting
+    TitleText.Parent = TitleBar
+    CloseButton.Parent = TitleBar
+    TitleBar.Parent = MainFrame
     
-    -- Item Highlight Overlays (will be created dynamically)
-    local highlightContainer = Instance.new("Frame")
-    highlightContainer.Size = UDim2.new(1, 0, 1, 0)
-    highlightContainer.BackgroundTransparency = 1
-    highlightContainer.Parent = ScreenGui
+    StatusText.Parent = StatusFrame
+    StatusFrame.Parent = MainFrame
     
-    -- Functions
-    local function updateStatus(text, color)
-        Status.Text = text
-        Status.TextColor3 = color or Color3.fromRGB(200, 200, 255)
+    CarsLayout.Parent = CarsFrame
+    CarsFrame.Parent = MainFrame
+    
+    RefreshButton.Parent = MainFrame
+    MainFrame.Parent = ScreenGui
+    
+    -- UI Functions
+    local function updateStatus(message, color)
+        StatusText.Text = message
+        StatusText.TextColor3 = color or Color3.fromRGB(255, 255, 150)
     end
     
-    local function clearHighlights()
-        for _, child in pairs(highlightContainer:GetChildren()) do
-            child:Destroy()
-        end
-    end
-    
-    local function createHighlight(item)
-        local highlight = Instance.new("Frame")
-        highlight.Name = "Highlight_" .. item.Name
-        highlight.BackgroundTransparency = 0.8
-        highlight.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
-        highlight.BorderSizePixel = 0
-        highlight.ZIndex = 999
-        
-        -- Position highlight around the item
-        if item.Position then
-            highlight.Size = UDim2.new(0, 100, 0, 100)
-            highlight.Position = UDim2.new(
-                0, item.Position.X - 50,
-                0, item.Position.Y - 50
-            )
-            
-            -- Add label
-            local label = Instance.new("TextLabel")
-            label.Text = item.DisplayName
-            label.Size = UDim2.new(1, 0, 0, 20)
-            label.Position = UDim2.new(0, 0, 1, 0)
-            label.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-            label.TextColor3 = Color3.fromRGB(255, 255, 255)
-            label.Font = Enum.Font.GothamBold
-            label.TextSize = 12
-            label.Parent = highlight
-        end
-        
-        highlight.Parent = highlightContainer
-        return highlight
-    end
-    
-    local function performScan()
-        clearHighlights()
-        updateStatus("🔍 Scanning...", Color3.fromRGB(255, 200, 100))
-        
-        local items = ScanAllVisibleItems()
-        
-        if #items > 0 then
-            updateStatus("✅ Found " .. #items .. " item(s)", Color3.fromRGB(100, 255, 100))
-            
-            -- Create highlights for found items
-            for _, item in ipairs(items) do
-                if item.Position then
-                    createHighlight(item)
-                end
-                
-                -- Show in output
-                print("📋 Item: " .. item.DisplayName)
-                print("   Path: " .. item.Path)
-                print("   Class: " .. item.Class)
-                if item.Position then
-                    print("   Position: " .. tostring(item.Position.X) .. ", " .. tostring(item.Position.Y))
-                end
-                print(string.rep("-", 40))
+    local function clearCarsList()
+        for _, child in pairs(CarsFrame:GetChildren()) do
+            if child:IsA("Frame") then
+                child:Destroy()
             end
+        end
+    end
+    
+    local function createCarDisplay(carInfo, index)
+        local carFrame = Instance.new("Frame")
+        carFrame.Size = UDim2.new(0.95, 0, 0, 60)
+        carFrame.BackgroundColor3 = Color3.fromRGB(60, 60, 90)
+        carFrame.Name = "Car_" .. index
+        
+        local carCorner = Instance.new("UICorner")
+        carCorner.CornerRadius = UDim.new(0, 6)
+        carCorner.Parent = carFrame
+        
+        -- Car icon
+        local icon = Instance.new("TextLabel")
+        icon.Text = "🚗"
+        icon.Size = UDim2.new(0, 40, 0, 40)
+        icon.Position = UDim2.new(0, 10, 0.5, -20)
+        icon.BackgroundTransparency = 1
+        icon.TextColor3 = Color3.fromRGB(255, 255, 255)
+        icon.Font = Enum.Font.GothamBold
+        icon.TextSize = 22
+        
+        -- Car name
+        local nameLabel = Instance.new("TextLabel")
+        nameLabel.Text = carInfo.DisplayName
+        nameLabel.Size = UDim2.new(0.6, -50, 0, 40)
+        nameLabel.Position = UDim2.new(0, 60, 0.5, -20)
+        nameLabel.BackgroundTransparency = 1
+        nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+        nameLabel.Font = Enum.Font.Gotham
+        nameLabel.TextSize = 14
+        nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+        
+        -- Offer badge
+        local badge = Instance.new("Frame")
+        badge.Size = UDim2.new(0, 60, 0, 20)
+        badge.Position = UDim2.new(0.6, 10, 0.5, -10)
+        badge.BackgroundColor3 = Color3.fromRGB(0, 180, 80)
+        
+        local badgeCorner = Instance.new("UICorner")
+        badgeCorner.CornerRadius = UDim.new(0, 4)
+        badgeCorner.Parent = badge
+        
+        local badgeText = Instance.new("TextLabel")
+        badgeText.Text = "OFFER"
+        badgeText.Size = UDim2.new(1, 0, 1, 0)
+        badgeText.BackgroundTransparency = 1
+        badgeText.TextColor3 = Color3.fromRGB(255, 255, 255)
+        badgeText.Font = Enum.Font.GothamBold
+        badgeText.TextSize = 10
+        
+        badgeText.Parent = badge
+        badge.Parent = carFrame
+        
+        -- Parenting
+        icon.Parent = carFrame
+        nameLabel.Parent = carFrame
+        carFrame.Parent = CarsFrame
+        
+        return carFrame
+    end
+    
+    local function refreshOfferDisplay()
+        clearCarsList()
+        
+        local offeredCars = GetOfferedCarsOnly()
+        
+        if #offeredCars > 0 then
+            updateStatus("✅ " .. #offeredCars .. " car(s) in your offer", Color3.fromRGB(100, 255, 100))
+            
+            for i, car in ipairs(offeredCars) do
+                createCarDisplay(car, i)
+            end
+            
+            -- Print to console
+            print("\n📋 OFFERED CARS SUMMARY:")
+            for _, car in ipairs(offeredCars) do
+                print("   🚗 " .. car.DisplayName)
+            end
+            print("📊 Total: " .. #offeredCars .. " car(s) in offer")
+            
         else
-            updateStatus("❌ No items found", Color3.fromRGB(255, 100, 100))
-        end
-    end
-    
-    local function showDebugView()
-        clearHighlights()
-        updateStatus("🐛 Debug: Showing ALL visible UI elements...", Color3.fromRGB(255, 150, 200))
-        
-        if not Player.PlayerGui then return end
-        
-        local visibleCount = 0
-        for _, child in pairs(Player.PlayerGui:GetDescendants()) do
-            if child:IsA("GuiObject") and child.Visible then
-                visibleCount = visibleCount + 1
+            -- Check if trade is active
+            local offerSection = FindOfferSection()
+            
+            if offerSection then
+                updateStatus("📭 No cars in your offer", Color3.fromRGB(255, 200, 100))
                 
-                -- Only highlight interesting elements
-                if child:IsA("Frame") or child:IsA("TextButton") or child:IsA("ImageButton") then
-                    local absPos = child.AbsolutePosition
-                    local absSize = child.AbsoluteSize
-                    
-                    if absPos.X > 0 and absPos.Y > 0 and absSize.X > 10 and absSize.Y > 10 then
-                        local highlight = Instance.new("Frame")
-                        highlight.Name = "Debug_" .. child.Name
-                        highlight.BackgroundTransparency = 0.9
-                        highlight.BackgroundColor3 = Color3.fromRGB(255, 0, 255)
-                        highlight.BorderSizePixel = 1
-                        highlight.BorderColor3 = Color3.fromRGB(255, 255, 255)
-                        highlight.ZIndex = 998
-                        
-                        highlight.Size = UDim2.new(0, absSize.X, 0, absSize.Y)
-                        highlight.Position = UDim2.new(0, absPos.X, 0, absPos.Y)
-                        
-                        local label = Instance.new("TextLabel")
-                        label.Text = child.Name .. "\n" .. child.ClassName
-                        label.Size = UDim2.new(1, 0, 0, 30)
-                        label.Position = UDim2.new(0, 0, 1, 0)
-                        label.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-                        label.TextColor3 = Color3.fromRGB(255, 255, 255)
-                        label.Font = Enum.Font.Gotham
-                        label.TextSize = 10
-                        label.TextWrapped = true
-                        label.Parent = highlight
-                        
-                        highlight.Parent = highlightContainer
-                    end
-                end
+                -- Show empty message
+                local emptyFrame = Instance.new("Frame")
+                emptyFrame.Size = UDim2.new(0.9, 0, 0, 80)
+                emptyFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+                
+                local emptyCorner = Instance.new("UICorner")
+                emptyCorner.CornerRadius = UDim.new(0, 6)
+                emptyCorner.Parent = emptyFrame
+                
+                local emptyText = Instance.new("TextLabel")
+                emptyText.Text = "Drag cars from your inventory\nto add them to your offer"
+                emptyText.Size = UDim2.new(1, 0, 1, 0)
+                emptyText.BackgroundTransparency = 1
+                emptyText.TextColor3 = Color3.fromRGB(150, 150, 150)
+                emptyText.Font = Enum.Font.Gotham
+                emptyText.TextSize = 13
+                emptyText.TextWrapped = true
+                
+                emptyText.Parent = emptyFrame
+                emptyFrame.Parent = CarsFrame
+            else
+                updateStatus("🔍 No active trade found", Color3.fromRGB(255, 150, 100))
             end
         end
-        
-        updateStatus("🐛 " .. visibleCount .. " visible elements highlighted", Color3.fromRGB(255, 150, 200))
     end
     
-    -- Event handlers
-    ScanButton.MouseButton1Click:Connect(performScan)
-    DebugButton.MouseButton1Click:Connect(showDebugView)
+    -- UI Events
+    CloseButton.MouseButton1Click:Connect(function()
+        ScreenGui:Destroy()
+    end)
     
-    -- Auto-scan every 3 seconds
-    spawn(function()
-        while task.wait(3) do
-            if ScreenGui and ScreenGui.Parent then
-                performScan()
+    RefreshButton.MouseButton1Click:Connect(function()
+        RefreshButton.Text = "SCANNING..."
+        RefreshButton.BackgroundColor3 = Color3.fromRGB(200, 150, 0)
+        refreshOfferDisplay()
+        task.wait(0.5)
+        RefreshButton.Text = "🔄 REFRESH OFFER"
+        RefreshButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+    end)
+    
+    -- Drag functionality
+    local dragging = false
+    local dragStart, startPos
+    
+    TitleBar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = MainFrame.Position
+        end
+    end)
+    
+    TitleBar.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement then
+            if dragging then
+                local delta = input.Position - dragStart
+                MainFrame.Position = UDim2.new(
+                    startPos.X.Scale,
+                    startPos.X.Offset + delta.X,
+                    startPos.Y.Scale,
+                    startPos.Y.Offset + delta.Y
+                )
             end
         end
     end)
     
-    -- Initial scan
+    TitleBar.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+    
+    -- Auto-refresh loop
+    spawn(function()
+        while task.wait(1) do
+            if not ScreenGui or not ScreenGui.Parent then break end
+            refreshOfferDisplay()
+        end
+    end)
+    
+    -- Initial display
     task.wait(1)
-    performScan()
+    refreshOfferDisplay()
     
     return ScreenGui
 end
 
+-- ===== DEBUG: COMPARE OFFER VS OWNED =====
+local function DebugCompareSections()
+    spawn(function()
+        while task.wait(3) do
+            print("\n" .. string.rep("=", 60))
+            print("🔍 DEBUG: Comparing sections...")
+            
+            if not Player.PlayerGui then
+                print("❌ No PlayerGui")
+                return
+            end
+            
+            -- Find all sections with cars
+            local sections = {}
+            
+            for _, child in pairs(Player.PlayerGui:GetDescendants()) do
+                if child:IsA("Frame") or child:IsA("ScrollingFrame") then
+                    local carCount = 0
+                    
+                    for _, item in pairs(child:GetDescendants()) do
+                        if item.Name:find("Car") or item.Name:lower():find("car") then
+                            carCount = carCount + 1
+                        end
+                    end
+                    
+                    if carCount > 0 then
+                        table.insert(sections, {
+                            Name = child.Name,
+                            Path = child:GetFullName(),
+                            CarCount = carCount,
+                            IsVisible = child.Visible
+                        })
+                    end
+                end
+            end
+            
+            -- Sort by car count
+            table.sort(sections, function(a, b)
+                return a.CarCount < b.CarCount
+            end)
+            
+            print("📊 Found " .. #sections .. " sections with cars:")
+            for i, section in ipairs(sections) do
+                local status = section.IsVisible and "🟢 VISIBLE" or "🔴 HIDDEN"
+                print("   " .. i .. ". " .. section.Name .. " - " .. section.CarCount .. " cars - " .. status)
+                print("      Path: " .. section.Path)
+            end
+            
+            -- Offer section is usually the one with fewer cars
+            if #sections >= 2 then
+                print("\n🎯 OFFER SECTION DETECTED:")
+                print("   Likely: " .. sections[1].Name .. " (" .. sections[1].CarCount .. " cars)")
+                print("   Reason: Fewest cars (offer has fewer than owned)")
+            end
+        end
+    end)
+end
+
 -- ===== MAIN =====
 print("\n" .. string.rep("=", 60))
-print("🎯 CDT TRADE ITEM DETECTOR")
-print("📍 Will find ANY visible trade items on screen")
-print("🔍 Auto-scans every 3 seconds")
+print("🎯 CDT OFFERED CARS ONLY TRACKER")
+print("📍 Shows ONLY cars in your TRADE OFFER (not owned cars)")
+print("🔍 Auto-refreshes every second")
 print(string.rep("=", 60))
 
--- Create the overlay UI
-CreateOverlayUI()
+-- Create UI
+CreateOfferOnlyUI()
 
-print("\n✅ Overlay UI created!")
-print("💡 Controls:")
-print("   • Drag the panel to move it")
-print("   • SCAN NOW: Manual scan")
-print("   • DEBUG VIEW: Show ALL visible UI elements")
-print("   • Green highlights: Found items")
-print("   • Magenta highlights: All UI elements (debug)")
-print("\n🎮 Start a trade, add items, then click SCAN NOW!")
-print("📊 Watch Output for detailed item information")
+-- Start debug comparison
+DebugCompareSections()
+
+print("\n✅ Tracker UI created!")
+print("💡 Features:")
+print("   • Drag title bar to move")
+print("   • Shows ONLY cars in your OFFER")
+print("   • Green 'OFFER' badge on each car")
+print("   • Auto-refresh every second")
+print("   • Manual refresh button")
+print("\n🎮 Start a trade, add cars to your offer!")
+print("📊 Watch Output for section comparison debug info")
