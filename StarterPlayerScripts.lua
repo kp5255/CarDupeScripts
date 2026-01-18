@@ -1,435 +1,366 @@
--- Trade Duplicator - Car Only
+-- Trade Parameter Capturer & Duplicator
 local Players = game:GetService("Players")
 local Player = Players.LocalPlayer
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 wait(2)
 
-print("=== CAR-ONLY TRADE DUPLICATOR ===")
+print("=== TRADE PARAMETER CAPTURER ===")
 
 -- Get remotes
 local TradingServiceRemotes = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Services"):WaitForChild("TradingServiceRemotes")
 local SessionAddItem = TradingServiceRemotes:WaitForChild("SessionAddItem")
 
-print("✅ Loaded TradingServiceRemotes")
+-- Store original function to capture calls
+local originalInvoke = SessionAddItem.InvokeServer
+local capturedCalls = {}
 
--- Get the ScrollingFrame
-local function GetScrollingFrame()
-    if not Player.PlayerGui then return nil end
-    local menu = Player.PlayerGui:FindFirstChild("Menu")
-    if not menu then return nil end
-    local trading = menu:FindFirstChild("Trading")
-    if not trading then return nil end
-    local peerToPeer = trading:FindFirstChild("PeerToPeer")
-    if not peerToPeer then return nil end
-    local main = peerToPeer:FindFirstChild("Main")
-    if not main then return nil end
-    local localPlayer = main:FindFirstChild("LocalPlayer")
-    if not localPlayer then return nil end
-    local content = localPlayer:FindFirstChild("Content")
-    if not content then return nil end
-    return content:FindFirstChild("ScrollingFrame")
-end
-
--- Find ONLY actual cars (not customization items)
-local function FindRealCarsInTrade()
-    print("\n🔍 FINDING REAL CARS ONLY...")
+-- Hook the InvokeServer to capture successful calls
+SessionAddItem.InvokeServer = function(self, ...)
+    local args = {...}
     
-    local scrollingFrame = GetScrollingFrame()
-    if not scrollingFrame then
-        print("❌ No trade window found")
-        return {}
-    end
+    print("\n🎯 CAPTURED SessionAddItem CALL!")
+    print("Number of arguments: " .. #args)
     
-    print("ScrollingFrame items: " .. #scrollingFrame:GetChildren())
+    -- Record the call
+    table.insert(capturedCalls, {
+        timestamp = os.time(),
+        args = args,
+        argCount = #args
+    })
     
-    local realCars = {}
-    
-    -- Check each item
-    for _, item in pairs(scrollingFrame:GetChildren()) do
-        if item:IsA("ImageButton") or item:IsA("TextButton") then
-            local itemName = item.Name
-            
-            -- IMPORTANT: Only get items that start with "Car-"
-            if itemName:sub(1, 4) == "Car-" then
-                print("🚗 REAL CAR FOUND: " .. itemName)
-                
-                -- Look for ID in children
-                local carId = nil
-                for _, child in pairs(item:GetChildren()) do
-                    if child:IsA("StringValue") then
-                        if child.Name:lower():find("id") then
-                            carId = child.Value
-                            print("  Found ID: " .. carId)
-                        end
-                    end
-                end
-                
-                -- If no ID found, use the item name
-                if not carId then
-                    carId = itemName
-                    print("  Using name as ID: " .. carId)
-                end
-                
-                table.insert(realCars, {
-                    button = item,
-                    name = itemName,
-                    id = carId,
-                    isCar = true
-                })
+    -- Show details of each argument
+    for i, arg in ipairs(args) do
+        local argType = type(arg)
+        print("  Arg " .. i .. ": Type = " .. argType)
+        
+        if argType == "string" then
+            print("       Value = \"" .. arg .. "\"")
+        elseif argType == "number" then
+            print("       Value = " .. arg)
+        elseif argType == "boolean" then
+            print("       Value = " .. tostring(arg))
+        elseif argType == "table" then
+            print("       Table contents:")
+            for k, v in pairs(arg) do
+                print("         " .. tostring(k) .. " = " .. tostring(v))
+            end
+        elseif argType == "userdata" then
+            if typeof(arg) == "Instance" then
+                print("       Instance: " .. arg:GetFullName())
             else
-                -- This is a customization item, ignore it
-                if itemName:lower():find("car") then
-                    print("⚠️ Ignoring customization: " .. itemName)
-                end
+                print("       Userdata: " .. typeof(arg))
             end
+        else
+            print("       Value = " .. tostring(arg))
         end
     end
     
-    print("\n📊 Found " .. #realCars .. " real car(s)")
-    return realCars
-end
-
--- Get session ID (try smarter approach)
-local function GetSessionId()
-    print("\n🆔 GETTING SESSION ID...")
-    
-    -- Method 1: Try to find in trade UI
-    if Player.PlayerGui then
-        local menu = Player.PlayerGui:FindFirstChild("Menu")
-        if menu then
-            local trading = menu:FindFirstChild("Trading")
-            if trading then
-                -- Look for any text that might contain session info
-                for _, obj in pairs(trading:GetDescendants()) do
-                    if obj:IsA("TextLabel") then
-                        local text = obj.Text
-                        if text:find("Session") or text:find("Trade") then
-                            -- Try to extract ID
-                            local id = text:match("ID:%s*(%S+)") or 
-                                       text:match("Session:%s*(%S+)") or
-                                       text:match("Trade:%s*(%S+)")
-                            if id then
-                                print("✅ Found session ID in UI: " .. id)
-                                return id
-                            end
-                        end
-                    end
-                end
-            end
-        end
-    end
-    
-    -- Method 2: Try common session ID patterns
-    local possibleSessions = {
-        Player.UserId .. "_trade",
-        "trade_" .. tostring(os.time()),
-        "session_1",
-        "current_trade"
-    }
-    
-    -- Try each one
-    for _, sessionId in pairs(possibleSessions) do
-        print("Trying session ID: " .. sessionId)
-        
-        local success = pcall(function()
-            -- Just test if the remote accepts this session ID
-            SessionAddItem:InvokeServer(sessionId, "test")
-            return true
-        end)
-        
-        if success then
-            print("✅ Session ID works: " .. sessionId)
-            return sessionId
-        end
-    end
-    
-    -- Method 3: Ask the remote what session we're in
-    print("⚠️ Trying to get session from remote...")
+    -- Try to call original
     local success, result = pcall(function()
-        return SessionAddItem:InvokeServer("get_session", Player)
+        return originalInvoke(self, ...)
     end)
     
-    if success and result then
-        print("✅ Remote returned session: " .. tostring(result))
-        return tostring(result)
-    end
-    
-    print("❌ Could not find session ID")
-    return nil
-end
-
--- Try to add car with different session ID strategies
-local function AddCarToSession(carId, carName)
-    print("\n🎯 ADDING CAR TO SESSION: " .. carName)
-    
-    -- Try multiple session ID strategies
-    local sessionStrategies = {
-        function() return GetSessionId() end,  -- Try to find it
-        function() return "trade_session" end,  -- Simple
-        function() return Player.UserId .. "_session" end,  -- User-based
-        function() return "session_" .. tostring(math.random(1000, 9999)) end,  -- Random
-        function() return nil end  -- Try without session ID
-    }
-    
-    local successCount = 0
-    
-    for strategyIndex, getSessionFunc in pairs(sessionStrategies) do
-        local sessionId = getSessionFunc()
-        
-        if not sessionId then
-            print("\nTrying without session ID...")
-            -- Try without session ID
-            local attempts = {
-                {desc = "Just car ID", params = {carId}},
-                {desc = "Car ID + quantity", params = {carId, 1}},
-                {desc = "Car name", params = {carName}},
-            }
-            
-            for _, attempt in pairs(attempts) do
-                print("Attempt: " .. attempt.desc)
-                local success = pcall(function()
-                    return SessionAddItem:InvokeServer(unpack(attempt.params))
-                end)
-                
-                if success then
-                    print("✅ Success without session ID!")
-                    successCount = successCount + 1
-                    break
-                end
-            end
-            
-        else
-            print("\nUsing session ID: " .. sessionId)
-            
-            -- Try different parameter formats WITH session ID
-            local attempts = {
-                {desc = "Session + Car ID", params = {sessionId, carId}},
-                {desc = "Session + Car ID + Qty", params = {sessionId, carId, 1}},
-                {desc = "Session + Car Name", params = {sessionId, carName}},
-                {desc = "Session + Car Name + Qty", params = {sessionId, carName, 1}},
-                {desc = "Session + Table", params = {sessionId, {id = carId, name = carName}}},
-            }
-            
-            for _, attempt in pairs(attempts) do
-                print("Attempt: " .. attempt.desc)
-                local success, result = pcall(function()
-                    return SessionAddItem:InvokeServer(unpack(attempt.params))
-                end)
-                
-                if success then
-                    print("✅ Success!")
-                    if result then
-                        print("   Result: " .. tostring(result))
-                    end
-                    successCount = successCount + 1
-                    break  -- Stop if one works
-                end
-            end
+    if success then
+        print("✅ Original call successful!")
+        if result then
+            print("   Result: " .. tostring(result))
         end
-        
-        if successCount > 0 then
-            break  -- Stop if we found a working method
-        end
-        
-        wait(0.5)
-    end
-    
-    return successCount > 0
-end
-
--- Also try clicking the car button
-local function ClickCarButton(carButton)
-    print("\n🖱️ CLICKING CAR BUTTON...")
-    
-    local clickCount = 0
-    
-    for i = 1, 10 do
-        local success = pcall(function()
-            -- Try different click methods
-            carButton:Fire("Activated")
-            carButton:Fire("MouseButton1Click")
-            
-            -- Look for click remote
-            for _, child in pairs(carButton:GetChildren()) do
-                if child:IsA("RemoteEvent") then
-                    child:FireServer("add")
-                    child:FireServer("click")
-                end
-            end
-            
-            clickCount = clickCount + 1
-            return true
-        end)
-        
-        if success then
-            print("✅ Click " .. i .. " successful")
-        end
-        
-        wait(0.1)
-    end
-    
-    print("📊 Total successful clicks: " .. clickCount)
-    return clickCount > 0
-end
-
--- Main function
-local function DuplicateCarOnly()
-    print("\n🚀 DUPLICATING CAR ONLY...")
-    
-    -- Step 1: Find only real cars
-    local cars = FindRealCarsInTrade()
-    
-    if #cars == 0 then
-        print("❌ No cars found in trade")
-        print("Add a Car- item to the trade first!")
-        return false
-    end
-    
-    local car = cars[1]  -- Use first car
-    print("\n🎯 Selected car: " .. car.name)
-    print("Car ID: " .. car.id)
-    
-    -- Step 2: Try to add to session
-    local sessionSuccess = AddCarToSession(car.id, car.name)
-    
-    -- Step 3: Also try clicking
-    local clickSuccess = ClickCarButton(car.button)
-    
-    -- Step 4: Check results
-    wait(1)
-    local newCars = FindRealCarsInTrade()
-    
-    print("\n📊 FINAL RESULTS:")
-    print("Original cars: " .. #cars)
-    print("Current cars: " .. #newCars)
-    print("Session add success: " .. tostring(sessionSuccess))
-    print("Click success: " .. tostring(clickSuccess))
-    
-    if #newCars > #cars then
-        print("🎉 DUPLICATION SUCCESSFUL!")
-        return true
     else
-        print("⚠️ Car count unchanged")
-        
-        -- Try one more thing: clone the UI button
-        print("\n🔄 TRYING UI CLONE AS LAST RESORT...")
-        local scrollingFrame = GetScrollingFrame()
-        if scrollingFrame then
-            local clone = car.button:Clone()
-            clone.Name = car.name .. "_Clone"
-            clone.Parent = scrollingFrame
-            print("✅ Cloned button in UI")
-            
-            -- Check again
-            wait(0.5)
-            newCars = FindRealCarsInTrade()
-            print("After clone - Cars: " .. #newCars)
-            
-            if #newCars > #cars then
-                print("🎉 UI CLONE SUCCESSFUL!")
-                return true
-            end
+        print("❌ Original call failed: " .. result)
+    end
+    
+    return result
+end
+
+print("✅ Hooked SessionAddItem to capture parameters")
+
+-- Function to manually test the remote
+local function TestManualAdd()
+    print("\n🧪 MANUAL TESTING SessionAddItem...")
+    
+    -- First, let's see what happens when you normally add a car
+    print("1. Try adding a car NORMALLY through the game UI")
+    print("2. Watch the CAPTURED output above")
+    print("3. We'll see what parameters the game uses")
+    
+    -- Wait for user to add a car
+    print("\n⏳ Waiting for you to add a car to trade...")
+    print("(Click a car button in the trade window)")
+    
+    local initialCalls = #capturedCalls
+    
+    -- Wait for a call to be captured
+    for i = 1, 30 do  -- Wait up to 30 seconds
+        wait(1)
+        if #capturedCalls > initialCalls then
+            print("✅ Got it! Captured a successful call")
+            break
         end
+        if i % 5 == 0 then
+            print("Still waiting... (" .. i .. "/30)")
+        end
+    end
+    
+    if #capturedCalls > initialCalls then
+        local lastCall = capturedCalls[#capturedCalls]
+        print("\n📋 CAPTURED PARAMETERS:")
+        print("Argument count: " .. lastCall.argCount)
+        
+        -- Now try to duplicate using the same parameters
+        print("\n🔄 ATTEMPTING TO DUPLICATE...")
+        
+        for i = 1, 5 do
+            print("\nDuplicate attempt " .. i .. "...")
+            local success, result = pcall(function()
+                return SessionAddItem:InvokeServer(unpack(lastCall.args))
+            end)
+            
+            if success then
+                print("✅ Duplication successful!")
+                if result then
+                    print("   Result: " .. tostring(result))
+                end
+                return true
+            else
+                print("❌ Failed: " .. tostring(result))
+            end
+            
+            wait(0.5)
+        end
+    else
+        print("❌ No calls captured")
+        print("Try adding a car to the trade window")
     end
     
     return false
 end
 
--- Create simple UI
-local function CreateUI()
+-- Alternative: Try to find the correct parameters by brute force
+local function BruteForceParameters()
+    print("\n🔍 BRUTE FORCING PARAMETERS...")
+    
+    local carName = "Car-AstonMartin8"
+    local playerId = Player.UserId
+    
+    -- Common parameter combinations to try
+    local testCombinations = {
+        -- Single argument
+        {carName},
+        {tostring(playerId)},
+        {"trade"},
+        
+        -- Two arguments
+        {"session_1", carName},
+        {playerId, carName},
+        {carName, 1},  -- Item + quantity
+        {carName, "add"},
+        
+        -- Three arguments  
+        {"session_1", carName, 1},
+        {playerId, carName, 1},
+        {carName, 1, true},
+        
+        -- Player as argument
+        {Player, carName},
+        {"session_1", Player, carName},
+        
+        -- Table formats
+        {{item = carName}},
+        {{item = carName, quantity = 1}},
+        {"session_1", {item = carName}},
+        {Player, {item = carName}}
+    }
+    
+    local successCount = 0
+    
+    for i, params in ipairs(testCombinations) do
+        print("\nTest " .. i .. ": " .. #params .. " params")
+        
+        -- Show params
+        for j, param in ipairs(params) do
+            local paramType = type(param)
+            if paramType == "string" then
+                print("  [" .. j .. "] String: \"" .. param .. "\"")
+            elseif paramType == "table" then
+                print("  [" .. j .. "] Table")
+            else
+                print("  [" .. j .. "] " .. tostring(param) .. " (" .. paramType .. ")")
+            end
+        end
+        
+        -- Try the call
+        local success, result = pcall(function()
+            return SessionAddItem:InvokeServer(unpack(params))
+        end)
+        
+        if success then
+            print("✅ SUCCESS!")
+            if result then
+                print("   Result: " .. tostring(result))
+            end
+            successCount = successCount + 1
+            
+            -- Try a few more times with same params
+            for repeatCount = 1, 3 do
+                wait(0.2)
+                pcall(function()
+                    SessionAddItem:InvokeServer(unpack(params))
+                    print("   Repeated successfully")
+                end)
+            end
+            
+            break  -- Stop if we found working params
+        else
+            print("❌ Failed")
+        end
+        
+        wait(0.3)
+    end
+    
+    print("\n📊 Brute force results: " .. successCount .. " successful combinations")
+    return successCount > 0
+end
+
+-- Get session ID from captured calls
+local function GetSessionFromCaptured()
+    if #capturedCalls == 0 then
+        return nil
+    end
+    
+    print("\n🔍 ANALYZING CAPTURED CALLS...")
+    
+    for i, call in ipairs(capturedCalls) do
+        print("\nCall " .. i .. " (" .. call.argCount .. " args):")
+        
+        -- Look for session ID in arguments
+        for j, arg in ipairs(call.args) do
+            if type(arg) == "string" then
+                if arg:find("session") or arg:find("trade_") then
+                    print("  Potential session ID at arg " .. j .. ": " .. arg)
+                    return arg
+                end
+            end
+        end
+    end
+    
+    return nil
+end
+
+-- Create monitoring UI
+local function CreateMonitorUI()
     local gui = Instance.new("ScreenGui")
-    gui.Name = "CarOnlyDuplicator"
+    gui.Name = "TradeMonitor"
     gui.Parent = Player:WaitForChild("PlayerGui")
     
     local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(0, 300, 0, 200)
-    frame.Position = UDim2.new(0.5, -150, 0, 20)
-    frame.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+    frame.Size = UDim2.new(0, 350, 0, 250)
+    frame.Position = UDim2.new(0.5, -175, 0, 20)
+    frame.BackgroundColor3 = Color3.fromRGB(30, 40, 50)
     frame.Active = true
     frame.Draggable = true
     
     local title = Instance.new("TextLabel")
-    title.Text = "CAR-ONLY DUPLICATOR"
+    title.Text = "TRADE PARAMETER CAPTURER"
     title.Size = UDim2.new(1, 0, 0, 40)
-    title.BackgroundColor3 = Color3.fromRGB(60, 60, 90)
-    title.TextColor3 = Color3.fromRGB(255, 150, 100)
+    title.BackgroundColor3 = Color3.fromRGB(50, 70, 90)
+    title.TextColor3 = Color3.fromRGB(255, 200, 100)
     
-    local output = Instance.new("TextLabel")
-    output.Text = "Only duplicates Car- items\nIgnores customization items"
-    output.Size = UDim2.new(1, -20, 0, 110)
-    output.Position = UDim2.new(0, 10, 0, 50)
-    output.BackgroundTransparency = 1
-    output.TextColor3 = Color3.fromRGB(200, 220, 255)
-    output.TextWrapped = true
+    local status = Instance.new("TextLabel")
+    status.Text = "Monitoring SessionAddItem calls..."
+    status.Size = UDim2.new(1, -20, 0, 80)
+    status.Position = UDim2.new(0, 10, 0, 50)
+    status.BackgroundTransparency = 1
+    status.TextColor3 = Color3.fromRGB(200, 230, 255)
+    status.TextWrapped = true
     
-    local findBtn = Instance.new("TextButton")
-    findBtn.Text = "🔍 FIND CARS"
-    findBtn.Size = UDim2.new(0.48, 0, 0, 30)
-    findBtn.Position = UDim2.new(0.01, 0, 0, 170)
-    findBtn.BackgroundColor3 = Color3.fromRGB(70, 100, 140)
+    local callsLabel = Instance.new("TextLabel")
+    callsLabel.Text = "Calls captured: 0"
+    callsLabel.Size = UDim2.new(1, -20, 0, 30)
+    callsLabel.Position = UDim2.new(0, 10, 0, 140)
+    callsLabel.BackgroundTransparency = 1
+    callsLabel.TextColor3 = Color3.fromRGB(150, 255, 150)
     
-    local dupBtn = Instance.new("TextButton")
-    dupBtn.Text = "🚀 DUPLICATE"
-    dupBtn.Size = UDim2.new(0.48, 0, 0, 30)
-    dupBtn.Position = UDim2.new(0.51, 0, 0, 170)
-    dupBtn.BackgroundColor3 = Color3.fromRGB(70, 140, 100)
+    -- Buttons
+    local buttons = {
+        {text = "📝 MANUAL TEST", func = TestManualAdd, pos = UDim2.new(0.025, 0, 0, 180)},
+        {text = "🔍 BRUTE FORCE", func = BruteForceParameters, pos = UDim2.new(0.525, 0, 0, 180)},
+        {text = "🔄 ANALYZE", func = GetSessionFromCaptured, pos = UDim2.new(0.025, 0, 0, 215)},
+        {text = "📊 SHOW CALLS", func = function()
+            print("\n📋 ALL CAPTURED CALLS (" .. #capturedCalls .. "):")
+            for i, call in ipairs(capturedCalls) do
+                print("\nCall " .. i .. " (" .. call.argCount .. " args):")
+                for j, arg in ipairs(call.args) do
+                    print("  [" .. j .. "] " .. type(arg) .. ": " .. tostring(arg))
+                end
+            end
+        end, pos = UDim2.new(0.525, 0, 0, 215)}
+    }
     
-    -- Update output
-    local function updateOutput(text)
-        output.Text = text
-        print(text)
+    for _, btnInfo in pairs(buttons) do
+        local btn = Instance.new("TextButton")
+        btn.Text = btnInfo.text
+        btn.Size = UDim2.new(0.45, 0, 0, 30)
+        btn.Position = btnInfo.pos
+        btn.BackgroundColor3 = Color3.fromRGB(70, 100, 140)
+        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        
+        btn.MouseButton1Click:Connect(function()
+            status.Text = "Running: " .. btnInfo.text
+            spawn(function()
+                btnInfo.func()
+                wait(0.5)
+                status.Text = "Completed"
+                callsLabel.Text = "Calls captured: " .. #capturedCalls
+            end)
+        end)
+        
+        btn.Parent = frame
     end
-    
-    findBtn.MouseButton1Click:Connect(function()
-        updateOutput("Finding real cars...")
-        spawn(function()
-            local cars = FindRealCarsInTrade()
-            if #cars > 0 then
-                updateOutput("Found " .. #cars .. " car(s)")
-            else
-                updateOutput("No cars found\nAdd Car- item to trade")
-            end
-        end)
-    end)
-    
-    dupBtn.MouseButton1Click:Connect(function()
-        updateOutput("Duplicating car...")
-        spawn(function()
-            local success = DuplicateCarOnly()
-            if success then
-                updateOutput("✅ Duplication attempted!\nCheck other player.")
-            else
-                updateOutput("❌ Duplication failed\nCheck output window")
-            end
-        end)
-    end)
     
     -- Parent everything
     title.Parent = frame
-    output.Parent = frame
-    findBtn.Parent = frame
-    dupBtn.Parent = frame
+    status.Parent = frame
+    callsLabel.Parent = frame
     frame.Parent = gui
     
-    return updateOutput
+    -- Update calls count periodically
+    spawn(function()
+        while true do
+            wait(1)
+            callsLabel.Text = "Calls captured: " .. #capturedCalls
+        end
+    end)
+    
+    return status
 end
 
 -- Initialize
-local updateOutput = CreateUI()
+CreateMonitorUI()
 
--- Auto-start
+-- Instructions
 wait(3)
-print("\n=== CAR-ONLY DUPLICATOR ===")
-print("Only targets items starting with 'Car-'")
-print("Ignores customization items")
+print("\n=== TRADE PARAMETER CAPTURER ACTIVE ===")
+print("🎯 This script HOOKS SessionAddItem remote")
+print("It captures parameters when you add items to trade")
+print("\n📋 HOW TO USE:")
+print("1. Start a trade with another player")
+print("2. Add a car to trade NORMALLY (click it)")
+print("3. Watch the CAPTURED output above")
+print("4. Click 'ANALYZE' or 'SHOW CALLS' to see parameters")
+print("5. Click 'MANUAL TEST' to try duplication")
+print("\n⚠️ The key is capturing CORRECT parameters!")
 
--- Initial scan
+-- Auto-update instructions
 spawn(function()
-    wait(2)
-    print("\n🔍 Initial car scan...")
-    FindRealCarsInTrade()
-    updateOutput("Ready\nAdd Car- item to trade")
+    while true do
+        wait(10)
+        if #capturedCalls > 0 then
+            print("\n🔔 TIP: Found " .. #capturedCalls .. " captured calls!")
+            print("Click 'ANALYZE' to see session parameters")
+            print("Click 'MANUAL TEST' to try duplication")
+        end
+    end
 end)
 
 -- Keybinds
@@ -437,19 +368,15 @@ local UIS = game:GetService("UserInputService")
 UIS.InputBegan:Connect(function(input, processed)
     if processed then return end
     
-    if input.KeyCode == Enum.KeyCode.C then
-        print("\n🎮 C KEY - FINDING CARS")
-        FindRealCarsInTrade()
-    elseif input.KeyCode == Enum.KeyCode.D then
-        print("\n🎮 D KEY - DUPLICATING")
-        DuplicateCarOnly()
+    if input.KeyCode == Enum.KeyCode.M then
+        print("\n🎮 M KEY - MANUAL TEST")
+        TestManualAdd()
+    elseif input.KeyCode == Enum.KeyCode.B then
+        print("\n🎮 B KEY - BRUTE FORCE")
+        BruteForceParameters()
     end
 end)
 
 print("\n🔑 QUICK KEYS:")
-print("C = Find cars (Car- items only)")
-print("D = Duplicate car")
-print("\n📋 REQUIRED:")
-print("1. Must have a 'Car-' item in trade")
-print("2. Not customization items")
-print("3. Check other player's screen after duplication")
+print("M = Manual test (capture & duplicate)")
+print("B = Brute force parameters")
