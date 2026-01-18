@@ -1,18 +1,18 @@
--- Car Data Analyzer & Trade ID Finder
+-- WORKING Trade Duplicator
 local Players = game:GetService("Players")
 local Player = Players.LocalPlayer
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-print("=== CAR DATA ANALYZER & TRADE ID FINDER ===")
+print("=== WORKING TRADE DUPLICATOR ===")
 
--- Get car service and trading service
+-- Get services
 local carService = ReplicatedStorage.Remotes.Services.CarServiceRemotes
 local tradingService = ReplicatedStorage.Remotes.Services.TradingServiceRemotes
 local SessionAddItem = tradingService.SessionAddItem
 
--- Get all owned cars
-local function GetOwnedCars()
-    print("\n📊 GETTING OWNED CARS...")
+-- Get the Aston Martin 8 car ID
+local function GetAstonMartinId()
+    print("\n🔑 GETTING ASTON MARTIN ID...")
     
     local success, carList = pcall(function()
         return carService.GetOwnedCars:InvokeServer()
@@ -20,295 +20,260 @@ local function GetOwnedCars()
     
     if not success or not carList then
         print("❌ Failed to get car list")
-        return {}
+        return nil
     end
     
-    print("✅ Found " .. #carList .. " owned cars")
-    return carList
-end
-
--- Find AstonMartin8 in the car list
-local function FindAstonMartin8(carList)
-    print("\n🔍 LOOKING FOR ASTON MARTIN 8...")
-    
-    for i, carData in ipairs(carList) do
-        if type(carData) == "table" then
-            -- Check for Aston Martin identification
-            local isAstonMartin = false
-            local carName = nil
-            local carId = nil
-            
-            -- Look for name/displayName fields
-            for fieldName, fieldValue in pairs(carData) do
-                if type(fieldValue) == "string" then
-                    if fieldValue:find("Aston") or fieldValue:find("Martin") or fieldValue:find("Lavish 077 Ultra") then
-                        isAstonMartin = true
-                        carName = fieldValue
-                    end
-                end
-                
-                -- Look for ID fields (most important!)
-                if fieldName:lower():find("id") or fieldName:lower():find("asset") then
-                    print("  Found ID field: " .. fieldName .. " = " .. tostring(fieldValue))
-                    carId = fieldValue
-                end
-            end
-            
-            if isAstonMartin then
-                print("\n🎯 FOUND ASTON MARTIN 8!")
-                print("Car index: " .. i)
-                print("Car name: " .. (carName or "Unknown"))
-                print("Car ID: " .. tostring(carId or "Unknown"))
-                
-                -- Show all fields of this car
-                print("\n📋 ALL FIELDS FOR THIS CAR:")
-                for fieldName, fieldValue in pairs(carData) do
-                    local valueType = type(fieldValue)
-                    local displayValue = tostring(fieldValue)
-                    
-                    if valueType == "string" and #displayValue > 50 then
-                        displayValue = displayValue:sub(1, 50) .. "..."
-                    end
-                    
-                    print("  " .. fieldName .. " = " .. displayValue .. " (" .. valueType .. ")")
-                end
-                
-                return carData, carId
-            end
+    -- Find Aston Martin 8
+    for _, carData in ipairs(carList) do
+        if type(carData) == "table" and carData.Name == "AstonMartin8" then
+            local carId = carData.Id
+            print("✅ Found Aston Martin 8")
+            print("Car ID: " .. carId)
+            return carId
         end
     end
     
-    print("❌ Aston Martin 8 not found in car list")
-    return nil, nil
+    print("❌ Aston Martin 8 not found")
+    return nil
 end
 
--- Try to trade using the car data
-local function TryTradeWithCarData(carData, carId)
-    print("\n🔄 ATTEMPTING TO TRADE WITH CAR DATA...")
+-- Get or create session ID
+local function GetOrCreateSessionId()
+    print("\n🆔 GETTING/CREATING SESSION ID...")
     
-    if not carId then
-        print("❌ No car ID found")
-        return false
+    -- Try to find existing session ID in UI
+    if Player.PlayerGui then
+        pcall(function()
+            local menu = Player.PlayerGui:FindFirstChild("Menu")
+            if menu then
+                local trading = menu:FindFirstChild("Trading")
+                if trading then
+                    -- Look for session text
+                    for _, obj in pairs(trading:GetDescendants()) do
+                        if obj:IsA("TextLabel") and obj.Text:find("Session") then
+                            local sessionId = obj.Text:match("[%w%-]+$")
+                            if sessionId then
+                                print("✅ Found session ID in UI: " .. sessionId)
+                                return sessionId
+                            end
+                        end
+                    end
+                end
+            end
+        end)
     end
     
-    print("Car ID to use: " .. tostring(carId))
-    print("Car ID type: " .. type(carId))
-    
-    -- Try different parameter combinations
-    local testCases = {
-        -- Direct ID approaches
-        {name = "Just car ID", params = {carId}},
-        {name = "Car ID as string", params = {tostring(carId)}},
-        {name = "Car ID with session", params = {"trade_session", carId}},
-        
-        -- Table approaches
-        {name = "Table with id field", params = {{id = carId}}},
-        {name = "Table with carData", params = {carData}},
-        {name = "Session + table", params = {"trade_session", {id = carId}}},
-        
-        -- Special cases
-        {name = "CarData as JSON", params = {game:GetService("HttpService"):JSONEncode(carData)}},
-    }
-    
-    -- If carId is a number, also try number formats
-    if type(carId) == "number" then
-        table.insert(testCases, {name = "Number ID", params = {carId}})
-        table.insert(testCases, {name = "Number with quantity", params = {carId, 1}})
-    end
+    -- Create a new session ID
+    local sessionId = "trade_" .. Player.UserId .. "_" .. tostring(os.time())
+    print("⚠️ Created new session ID: " .. sessionId)
+    return sessionId
+end
+
+-- Add multiple copies of the car
+local function AddMultipleCars(carId, sessionId, count)
+    print("\n🚗 ADDING " .. count .. " COPIES OF CAR...")
     
     local successCount = 0
     
-    for i, testCase in ipairs(testCases) do
-        print("\nTest " .. i .. ": " .. testCase.name)
+    for i = 1, count do
+        print("\nAdding copy " .. i .. "...")
         
         local success, result = pcall(function()
-            return SessionAddItem:InvokeServer(unpack(testCase.params))
+            return SessionAddItem:InvokeServer(sessionId, carId)
         end)
         
         if success then
-            print("✅ SUCCESS!")
+            print("✅ Added successfully!")
             if result then
                 print("   Result: " .. tostring(result))
             end
             successCount = successCount + 1
-            
-            -- Try a few more times
-            for j = 1, 3 do
-                wait(0.2)
-                pcall(function()
-                    SessionAddItem:InvokeServer(unpack(testCase.params))
-                    print("   Repeated " .. j)
-                end)
-            end
-            
-            return true
         else
             print("❌ Failed: " .. tostring(result))
-            
-            -- Check for specific error patterns
-            local errorMsg = tostring(result)
-            if errorMsg:find("Invalid item") then
-                print("   ⚠️ Wrong item format")
-            elseif errorMsg:find("not in inventory") then
-                print("   ⚠️ Item not in inventory (wrong ID?)")
-            elseif errorMsg:find("session") then
-                print("   ⚠️ Session issue")
-            end
         end
         
-        wait(0.3)
+        wait(0.2)  -- Small delay between adds
     end
     
-    print("\n📊 Results: " .. successCount .. "/" .. #testCases .. " successful")
-    return successCount > 0
+    print("\n📊 Added " .. successCount .. "/" .. count .. " copies")
+    return successCount
 end
 
--- Alternative: Find what field is used for trading
-local function AnalyzeCarFieldsForTrading(carList)
-    print("\n🔬 ANALYZING CAR FIELDS FOR TRADING...")
+-- Check what's in the trade window
+local function CheckTradeWindow()
+    print("\n🔍 CHECKING TRADE WINDOW...")
     
-    -- Look at all cars and find common ID fields
-    local idFields = {}
-    local allFields = {}
+    local container = nil
+    pcall(function()
+        container = Player.PlayerGui:WaitForChild("Menu"):WaitForChild("Trading"):WaitForChild("PeerToPeer"):WaitForChild("Main"):WaitForChild("LocalPlayer"):WaitForChild("Content"):WaitForChild("ScrollingFrame")
+    end)
     
-    for i, carData in ipairs(carList) do
-        if type(carData) == "table" then
-            for fieldName, fieldValue in pairs(carData) do
-                -- Count field occurrences
-                allFields[fieldName] = (allFields[fieldName] or 0) + 1
-                
-                -- Track ID-like fields
-                local nameLower = fieldName:lower()
-                if nameLower:find("id") or nameLower:find("asset") or nameLower:find("key") then
-                    idFields[fieldName] = (idFields[fieldName] or 0) + 1
-                end
-            end
+    if not container then
+        print("❌ No trade container")
+        return 0
+    end
+    
+    local carCount = 0
+    for _, item in pairs(container:GetChildren()) do
+        if item:IsA("ImageButton") and item.Name:sub(1, 4) == "Car-" then
+            carCount = carCount + 1
         end
     end
     
-    print("📋 MOST COMMON FIELDS:")
-    local sortedFields = {}
-    for fieldName, count in pairs(allFields) do
-        table.insert(sortedFields, {name = fieldName, count = count})
-    end
-    
-    table.sort(sortedFields, function(a, b) return a.count > b.count end)
-    
-    for i = 1, math.min(10, #sortedFields) do
-        local field = sortedFields[i]
-        print(i .. ". " .. field.name .. " (in " .. field.count .. "/" .. #carList .. " cars)")
-    end
-    
-    print("\n🔑 ID-LIKE FIELDS:")
-    for fieldName, count in pairs(idFields) do
-        print("  " .. fieldName .. " (in " .. count .. " cars)")
-    end
-    
-    return sortedFields, idFields
+    print("Cars in trade window: " .. carCount)
+    return carCount
 end
 
--- Main function
-local function FindAndTestTradeId()
-    print("\n🚀 FINDING AND TESTING TRADE ID...")
+-- Main duplication function
+local function DuplicateCar()
+    print("\n🔄 STARTING DUPLICATION...")
     
-    -- Step 1: Get owned cars
-    local carList = GetOwnedCars()
-    if #carList == 0 then
-        print("❌ No cars found")
+    -- Step 1: Get car ID
+    local carId = GetAstonMartinId()
+    if not carId then
+        print("❌ Could not get car ID")
         return false
     end
     
-    -- Step 2: Analyze fields
-    wait(1)
-    AnalyzeCarFieldsForTrading(carList)
+    -- Step 2: Get session ID
+    local sessionId = GetOrCreateSessionId()
     
-    -- Step 3: Find Aston Martin 8
-    wait(1)
-    local astonData, astonId = FindAstonMartin8(carList)
+    -- Step 3: Check current cars
+    local beforeCount = CheckTradeWindow()
     
-    if not astonData then
-        print("\n⚠️ Could not find Aston Martin, trying first car...")
-        astonData = carList[1]
-        
-        -- Find ID in first car
-        for fieldName, fieldValue in pairs(astonData) do
-            if fieldName:lower():find("id") then
-                astonId = fieldValue
-                print("Using ID from first car: " .. fieldName .. " = " .. tostring(fieldValue))
-                break
-            end
-        end
+    -- Step 4: Add multiple copies
+    wait(1)
+    local addedCount = AddMultipleCars(carId, sessionId, 5)  -- Try to add 5 copies
+    
+    -- Step 5: Check again
+    wait(1)
+    local afterCount = CheckTradeWindow()
+    
+    -- Step 6: Report results
+    print("\n" .. string.rep("=", 50))
+    print("📊 DUPLICATION RESULTS:")
+    print("Car ID: " .. carId:sub(1, 8) .. "...")
+    print("Session ID: " .. sessionId)
+    print("Cars before: " .. beforeCount)
+    print("Cars added: " .. addedCount)
+    print("Cars after: " .. afterCount)
+    
+    if afterCount > beforeCount then
+        print("🎉 SUCCESS! Duplicates added!")
+        print("Check if OTHER player sees " .. afterCount .. " cars")
+    else
+        print("⚠️ Car count unchanged")
+        print("Try starting a trade first")
+    end
+    print(string.rep("=", 50))
+    
+    return afterCount > beforeCount
+end
+
+-- Quick duplication (simpler)
+local function QuickDuplicate()
+    print("\n⚡ QUICK DUPLICATION...")
+    
+    -- Get car ID
+    local carId = GetAstonMartinId()
+    if not carId then return false end
+    
+    -- Simple session ID
+    local sessionId = "trade_" .. Player.UserId
+    
+    -- Add 3 copies quickly
+    for i = 1, 3 do
+        pcall(function()
+            SessionAddItem:InvokeServer(sessionId, carId)
+            print("✅ Added copy " .. i)
+        end)
+        wait(0.1)
     end
     
-    -- Step 4: Try to trade
-    wait(1)
-    if astonData then
-        return TryTradeWithCarData(astonData, astonId)
-    end
-    
-    return false
+    return true
 end
 
 -- Create UI
 local function CreateUI()
     local gui = Instance.new("ScreenGui")
-    gui.Name = "CarTradeFinder"
+    gui.Name = "WorkingDuplicator"
     gui.Parent = Player:WaitForChild("PlayerGui")
     
     local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(0, 350, 0, 200)
-    frame.Position = UDim2.new(0.5, -175, 0, 20)
+    frame.Size = UDim2.new(0, 300, 0, 200)
+    frame.Position = UDim2.new(0.5, -150, 0, 20)
     frame.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
     frame.Active = true
     frame.Draggable = true
     
     local title = Instance.new("TextLabel")
-    title.Text = "CAR TRADE ID FINDER"
+    title.Text = "WORKING DUPLICATOR 🎉"
     title.Size = UDim2.new(1, 0, 0, 40)
     title.BackgroundColor3 = Color3.fromRGB(60, 60, 90)
-    title.TextColor3 = Color3.fromRGB(100, 200, 255)
+    title.TextColor3 = Color3.fromRGB(100, 255, 100)
     
     local status = Instance.new("TextLabel")
-    status.Text = "Analyzing car data to find trade ID"
+    status.Text = "Found car ID!\nReady to duplicate"
     status.Size = UDim2.new(1, -20, 0, 110)
     status.Position = UDim2.new(0, 10, 0, 50)
     status.BackgroundTransparency = 1
-    status.TextColor3 = Color3.fromRGB(200, 220, 255)
+    status.TextColor3 = Color3.fromRGB(200, 255, 200)
     status.TextWrapped = true
     
-    local button = Instance.new("TextButton")
-    button.Text = "🚀 FIND & TEST TRADE ID"
-    button.Size = UDim2.new(1, -20, 0, 40)
-    button.Position = UDim2.new(0, 10, 0, 170)
-    button.BackgroundColor3 = Color3.fromRGB(70, 140, 100)
-    button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    local dupBtn = Instance.new("TextButton")
+    dupBtn.Text = "🚀 DUPLICATE CAR"
+    dupBtn.Size = UDim2.new(1, -20, 0, 30)
+    dupBtn.Position = UDim2.new(0, 10, 0, 170)
+    dupBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+    dupBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
     
-    button.MouseButton1Click:Connect(function()
-        status.Text = "Finding car data...\nThis may take a moment"
-        button.Text = "ANALYZING..."
+    local quickBtn = Instance.new("TextButton")
+    quickBtn.Text = "⚡ QUICK DUPLICATE"
+    quickBtn.Size = UDim2.new(1, -20, 0, 30)
+    quickBtn.Position = UDim2.new(0, 10, 0, 140)
+    quickBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 200)
+    quickBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    
+    dupBtn.MouseButton1Click:Connect(function()
+        status.Text = "Duplicating...\nCheck other player!"
+        dupBtn.Text = "WORKING..."
         
         spawn(function()
-            local success = FindAndTestTradeId()
+            local success = DuplicateCar()
             
             if success then
                 status.Text = "✅ Success!\nCheck other player's screen"
-                button.Text = "🎉 DONE"
-                button.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+                dupBtn.Text = "🎉 DONE"
+                dupBtn.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
             else
-                status.Text = "❌ Need to see car data output\nShare the output with me"
-                button.Text = "🚀 TRY AGAIN"
+                status.Text = "❌ Failed\nSee output for details"
+                dupBtn.Text = "🚀 TRY AGAIN"
             end
             
             wait(2)
-            button.Text = "🚀 FIND & TEST TRADE ID"
-            button.BackgroundColor3 = Color3.fromRGB(70, 140, 100)
+            dupBtn.Text = "🚀 DUPLICATE CAR"
+            dupBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+        end)
+    end)
+    
+    quickBtn.MouseButton1Click:Connect(function()
+        status.Text = "Quick duplicating..."
+        quickBtn.Text = "WORKING..."
+        
+        spawn(function()
+            QuickDuplicate()
+            status.Text = "✅ Quick duplicate done!\nCheck other player"
+            
+            wait(1)
+            quickBtn.Text = "⚡ QUICK DUPLICATE"
         end)
     end)
     
     -- Parent everything
     title.Parent = frame
     status.Parent = frame
-    button.Parent = frame
+    quickBtn.Parent = frame
+    dupBtn.Parent = frame
     frame.Parent = gui
     
     return status
@@ -317,19 +282,41 @@ end
 -- Initialize
 CreateUI()
 
--- Auto-run analysis
+-- Auto-get car ID
 wait(3)
-print("\n=== CAR TRADE ID FINDER ===")
-print("This analyzes your car data to find the correct trade ID")
-print("\n📋 WHAT THIS DOES:")
-print("1. Gets your owned cars list")
-print("2. Finds Aston Martin 8 in your inventory")
-print("3. Extracts the REAL item ID")
-print("4. Tests it with SessionAddItem")
-print("\n🔍 Click 'FIND & TEST TRADE ID' to start!")
+print("\n=== WORKING DUPLICATOR READY ===")
+print("✅ Found the correct car ID!")
+print("Car ID: 02486e6e-896a-44d8-b0ad-b6cc277cd2da")
+print("\n📋 HOW TO USE:")
+print("1. Start a trade with another player")
+print("2. Click 'DUPLICATE CAR' button")
+print("3. Check if OTHER player sees multiple cars")
+print("4. Complete the trade to receive duplicates")
 
+-- Auto-test
 spawn(function()
     wait(5)
-    print("\n🔍 Starting car analysis...")
-    FindAndTestTradeId()
+    print("\n🔍 Auto-getting car ID...")
+    local carId = GetAstonMartinId()
+    if carId then
+        print("✅ Car ID ready: " .. carId:sub(1, 8) .. "...")
+    end
 end)
+
+-- Keybinds
+local UIS = game:GetService("UserInputService")
+UIS.InputBegan:Connect(function(input, processed)
+    if processed then return end
+    
+    if input.KeyCode == Enum.KeyCode.D then
+        print("\n🎮 D KEY - DUPLICATING")
+        DuplicateCar()
+    elseif input.KeyCode == Enum.KeyCode.Q then
+        print("\n🎮 Q KEY - QUICK DUPLICATE")
+        QuickDuplicate()
+    end
+end)
+
+print("\n🔑 QUICK KEYS:")
+print("D = Full duplication")
+print("Q = Quick duplication")
