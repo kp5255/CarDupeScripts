@@ -1,21 +1,19 @@
--- Trade Duplicator - Inside ScrollingFrame
+-- Trade Duplicator - Car Only
 local Players = game:GetService("Players")
 local Player = Players.LocalPlayer
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 wait(2)
 
-print("=== TRADE DUPLICATOR - INSIDE SCROLLINGFRAME ===")
+print("=== CAR-ONLY TRADE DUPLICATOR ===")
 
 -- Get remotes
 local TradingServiceRemotes = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Services"):WaitForChild("TradingServiceRemotes")
 local SessionAddItem = TradingServiceRemotes:WaitForChild("SessionAddItem")
-local SessionSetConfirmation = TradingServiceRemotes:WaitForChild("SessionSetConfirmation")
-local OnSessionItemsUpdated = TradingServiceRemotes:WaitForChild("OnSessionItemsUpdated")
 
 print("✅ Loaded TradingServiceRemotes")
 
--- Get the ScrollingFrame container
+-- Get the ScrollingFrame
 local function GetScrollingFrame()
     if not Player.PlayerGui then return nil end
     local menu = Player.PlayerGui:FindFirstChild("Menu")
@@ -33,148 +31,87 @@ local function GetScrollingFrame()
     return content:FindFirstChild("ScrollingFrame")
 end
 
--- Search INSIDE the ScrollingFrame for car items
-local function FindCarItemsInScrollingFrame()
-    print("\n🔍 SEARCHING INSIDE SCROLLINGFRAME...")
+-- Find ONLY actual cars (not customization items)
+local function FindRealCarsInTrade()
+    print("\n🔍 FINDING REAL CARS ONLY...")
     
     local scrollingFrame = GetScrollingFrame()
     if not scrollingFrame then
-        print("❌ No ScrollingFrame found")
+        print("❌ No trade window found")
         return {}
     end
     
-    print("✅ Found ScrollingFrame")
-    print("ScrollingFrame children count: " .. #scrollingFrame:GetChildren())
+    print("ScrollingFrame items: " .. #scrollingFrame:GetChildren())
     
-    local carItems = {}
+    local realCars = {}
     
-    -- Check ALL children of ScrollingFrame
-    for _, child in pairs(scrollingFrame:GetChildren()) do
-        print("\nChecking: " .. child.Name .. " (" .. child.ClassName .. ")")
-        
-        -- If child is a Frame, check its contents
-        if child:IsA("Frame") then
-            print("  This is a Frame, checking its children...")
+    -- Check each item
+    for _, item in pairs(scrollingFrame:GetChildren()) do
+        if item:IsA("ImageButton") or item:IsA("TextButton") then
+            local itemName = item.Name
             
-            for _, frameChild in pairs(child:GetChildren()) do
-                print("    - " .. frameChild.Name .. " (" .. frameChild.ClassName .. ")")
+            -- IMPORTANT: Only get items that start with "Car-"
+            if itemName:sub(1, 4) == "Car-" then
+                print("🚗 REAL CAR FOUND: " .. itemName)
                 
-                -- Look for TextButtons, ImageButtons, or TextLabels that might contain car info
-                if frameChild:IsA("TextButton") or frameChild:IsA("ImageButton") then
-                    local buttonName = frameChild.Name
-                    local buttonText = frameChild:IsA("TextButton") and frameChild.Text or ""
-                    
-                    print("      Button: " .. buttonName .. " - \"" .. buttonText .. "\"")
-                    
-                    -- Check if it contains car info
-                    if buttonName:lower():find("car") or buttonText:lower():find("car") then
-                        print("      🚗 CAR FOUND!")
-                        table.insert(carItems, {
-                            object = frameChild,
-                            name = buttonName,
-                            text = buttonText,
-                            parent = child
-                        })
-                    end
-                elseif frameChild:IsA("TextLabel") then
-                    print("      Label: \"" .. frameChild.Text .. "\"")
-                    if frameChild.Text:lower():find("car") then
-                        print("      🚗 CAR TEXT FOUND!")
+                -- Look for ID in children
+                local carId = nil
+                for _, child in pairs(item:GetChildren()) do
+                    if child:IsA("StringValue") then
+                        if child.Name:lower():find("id") then
+                            carId = child.Value
+                            print("  Found ID: " .. carId)
+                        end
                     end
                 end
-            end
-        elseif child:IsA("TextButton") or child:IsA("ImageButton") then
-            -- Direct button in ScrollingFrame
-            local buttonName = child.Name
-            local buttonText = child:IsA("TextButton") and child.Text or ""
-            
-            print("  Direct button: " .. buttonName .. " - \"" .. buttonText .. "\"")
-            
-            if buttonName:lower():find("car") or buttonText:lower():find("car") then
-                print("  🚗 DIRECT CAR BUTTON FOUND!")
-                table.insert(carItems, {
-                    object = child,
-                    name = buttonName,
-                    text = buttonText,
-                    parent = scrollingFrame
+                
+                -- If no ID found, use the item name
+                if not carId then
+                    carId = itemName
+                    print("  Using name as ID: " .. carId)
+                end
+                
+                table.insert(realCars, {
+                    button = item,
+                    name = itemName,
+                    id = carId,
+                    isCar = true
                 })
-            end
-        end
-        
-        -- Also check for any StringValue/IntValue that might be car ID
-        for _, valueChild in pairs(child:GetDescendants()) do
-            if (valueChild:IsA("StringValue") or valueChild:IsA("IntValue")) and 
-               valueChild.Name:lower():find("id") then
-                print("  Found ID value: " .. valueChild.Name .. " = " .. tostring(valueChild.Value))
+            else
+                -- This is a customization item, ignore it
+                if itemName:lower():find("car") then
+                    print("⚠️ Ignoring customization: " .. itemName)
+                end
             end
         end
     end
     
-    print("\n📊 Found " .. #carItems .. " car items in ScrollingFrame")
-    return carItems
+    print("\n📊 Found " .. #realCars .. " real car(s)")
+    return realCars
 end
 
--- Get the actual car ID from a car item
-local function GetCarIdFromItem(carItem)
-    print("\n🔑 EXTRACTING CAR ID FROM ITEM...")
-    print("Item name: " .. carItem.name)
-    print("Item text: \"" .. carItem.text .. "\"")
-    
-    -- Method 1: Look for ID in children
-    for _, child in pairs(carItem.object:GetDescendants()) do
-        if child:IsA("StringValue") then
-            if child.Name:lower():find("id") or child.Name:lower():find("car") then
-                print("✅ Found StringValue ID: " .. child.Value)
-                return child.Value
-            end
-        elseif child:IsA("IntValue") then
-            if child.Name:lower():find("id") then
-                print("✅ Found IntValue ID: " .. child.Value)
-                return tostring(child.Value)
-            end
-        end
-    end
-    
-    -- Method 2: Extract from name
-    local idFromName = carItem.name:match("%d+")
-    if idFromName then
-        print("✅ Extracted ID from name: " .. idFromName)
-        return idFromName
-    end
-    
-    -- Method 3: Extract from text
-    if carItem.text ~= "" then
-        local idFromText = carItem.text:match("%d+")
-        if idFromText then
-            print("✅ Extracted ID from text: " .. idFromText)
-            return idFromText
-        end
-    end
-    
-    -- Method 4: Use the object name
-    print("⚠️ Using object name as ID: " .. carItem.object.Name)
-    return carItem.object.Name
-end
-
--- Get session ID (try to find it in UI)
+-- Get session ID (try smarter approach)
 local function GetSessionId()
-    print("\n🆔 LOOKING FOR SESSION ID...")
+    print("\n🆔 GETTING SESSION ID...")
     
-    -- Look for session ID in the trade UI
+    -- Method 1: Try to find in trade UI
     if Player.PlayerGui then
         local menu = Player.PlayerGui:FindFirstChild("Menu")
         if menu then
             local trading = menu:FindFirstChild("Trading")
             if trading then
-                -- Search for any text containing "session"
+                -- Look for any text that might contain session info
                 for _, obj in pairs(trading:GetDescendants()) do
-                    if obj:IsA("TextLabel") or obj:IsA("TextButton") then
-                        local text = obj.Text:lower()
-                        if text:find("session") then
-                            local sessionId = text:match("session[%s:]?([%w_]+)")
-                            if sessionId then
-                                print("✅ Found session ID in UI: " .. sessionId)
-                                return sessionId
+                    if obj:IsA("TextLabel") then
+                        local text = obj.Text
+                        if text:find("Session") or text:find("Trade") then
+                            -- Try to extract ID
+                            local id = text:match("ID:%s*(%S+)") or 
+                                       text:match("Session:%s*(%S+)") or
+                                       text:match("Trade:%s*(%S+)")
+                            if id then
+                                print("✅ Found session ID in UI: " .. id)
+                                return id
                             end
                         end
                     end
@@ -183,211 +120,316 @@ local function GetSessionId()
         end
     end
     
-    -- If not found, use a default
-    print("⚠️ Using default session ID")
-    return "trade_session_" .. Player.UserId
-end
-
--- Main duplication function
-local function DuplicateCar()
-    print("\n🚀 ATTEMPTING CAR DUPLICATION...")
-    
-    -- Step 1: Find car items in ScrollingFrame
-    local carItems = FindCarItemsInScrollingFrame()
-    
-    if #carItems == 0 then
-        print("❌ No cars found in trade window")
-        print("Add a car to the trade first!")
-        return false
-    end
-    
-    print("\n🎯 Found " .. #carItems .. " car(s). Using first one:")
-    local firstCar = carItems[1]
-    
-    -- Step 2: Get car ID
-    local carId = GetCarIdFromItem(firstCar)
-    local sessionId = GetSessionId()
-    
-    print("\n📋 DUPLICATION PARAMETERS:")
-    print("Session ID: " .. sessionId)
-    print("Car ID: " .. carId)
-    print("Car Name: " .. firstCar.name)
-    
-    -- Step 3: Try to add duplicate
-    local successCount = 0
-    local totalAttempts = 0
-    
-    print("\n🔄 TRYING TO ADD DUPLICATE...")
-    
-    -- Try multiple parameter formats
-    local testParams = {
-        {desc = "Simple ID", params = {sessionId, carId}},
-        {desc = "ID with quantity", params = {sessionId, carId, 1}},
-        {desc = "ID with quantity and flag", params = {sessionId, carId, 1, "duplicate"}},
-        {desc = "Table format", params = {sessionId, {id = carId, name = firstCar.name}}},
-        {desc = "Just car name", params = {sessionId, firstCar.name}},
-        {desc = "Car name with quantity", params = {sessionId, firstCar.name, 2}}
+    -- Method 2: Try common session ID patterns
+    local possibleSessions = {
+        Player.UserId .. "_trade",
+        "trade_" .. tostring(os.time()),
+        "session_1",
+        "current_trade"
     }
     
-    for i, test in ipairs(testParams) do
-        totalAttempts = totalAttempts + 1
-        print("\nAttempt " .. i .. ": " .. test.desc)
-        print("Params: " .. tostring(test.params[2]) .. " ...")
+    -- Try each one
+    for _, sessionId in pairs(possibleSessions) do
+        print("Trying session ID: " .. sessionId)
         
-        local success, result = pcall(function()
-            return SessionAddItem:InvokeServer(unpack(test.params))
+        local success = pcall(function()
+            -- Just test if the remote accepts this session ID
+            SessionAddItem:InvokeServer(sessionId, "test")
+            return true
         end)
         
         if success then
-            print("✅ Success!")
-            if result then
-                print("   Server response: " .. tostring(result))
+            print("✅ Session ID works: " .. sessionId)
+            return sessionId
+        end
+    end
+    
+    -- Method 3: Ask the remote what session we're in
+    print("⚠️ Trying to get session from remote...")
+    local success, result = pcall(function()
+        return SessionAddItem:InvokeServer("get_session", Player)
+    end)
+    
+    if success and result then
+        print("✅ Remote returned session: " .. tostring(result))
+        return tostring(result)
+    end
+    
+    print("❌ Could not find session ID")
+    return nil
+end
+
+-- Try to add car with different session ID strategies
+local function AddCarToSession(carId, carName)
+    print("\n🎯 ADDING CAR TO SESSION: " .. carName)
+    
+    -- Try multiple session ID strategies
+    local sessionStrategies = {
+        function() return GetSessionId() end,  -- Try to find it
+        function() return "trade_session" end,  -- Simple
+        function() return Player.UserId .. "_session" end,  -- User-based
+        function() return "session_" .. tostring(math.random(1000, 9999)) end,  -- Random
+        function() return nil end  -- Try without session ID
+    }
+    
+    local successCount = 0
+    
+    for strategyIndex, getSessionFunc in pairs(sessionStrategies) do
+        local sessionId = getSessionFunc()
+        
+        if not sessionId then
+            print("\nTrying without session ID...")
+            -- Try without session ID
+            local attempts = {
+                {desc = "Just car ID", params = {carId}},
+                {desc = "Car ID + quantity", params = {carId, 1}},
+                {desc = "Car name", params = {carName}},
+            }
+            
+            for _, attempt in pairs(attempts) do
+                print("Attempt: " .. attempt.desc)
+                local success = pcall(function()
+                    return SessionAddItem:InvokeServer(unpack(attempt.params))
+                end)
+                
+                if success then
+                    print("✅ Success without session ID!")
+                    successCount = successCount + 1
+                    break
+                end
             end
-            successCount = successCount + 1
+            
         else
-            print("❌ Failed")
+            print("\nUsing session ID: " .. sessionId)
+            
+            -- Try different parameter formats WITH session ID
+            local attempts = {
+                {desc = "Session + Car ID", params = {sessionId, carId}},
+                {desc = "Session + Car ID + Qty", params = {sessionId, carId, 1}},
+                {desc = "Session + Car Name", params = {sessionId, carName}},
+                {desc = "Session + Car Name + Qty", params = {sessionId, carName, 1}},
+                {desc = "Session + Table", params = {sessionId, {id = carId, name = carName}}},
+            }
+            
+            for _, attempt in pairs(attempts) do
+                print("Attempt: " .. attempt.desc)
+                local success, result = pcall(function()
+                    return SessionAddItem:InvokeServer(unpack(attempt.params))
+                end)
+                
+                if success then
+                    print("✅ Success!")
+                    if result then
+                        print("   Result: " .. tostring(result))
+                    end
+                    successCount = successCount + 1
+                    break  -- Stop if one works
+                end
+            end
         end
         
-        wait(0.3)  -- Small delay between attempts
-    end
-    
-    -- Step 4: Also try clicking the car button multiple times
-    print("\n🖱️ TRYING BUTTON CLICKS...")
-    for i = 1, 5 do
-        pcall(function()
-            firstCar.object:Fire("MouseButton1Click")
-            firstCar.object:Fire("Activated")
-            print("✅ Button click " .. i)
-            successCount = successCount + 1
-        end)
-        wait(0.2)
-    end
-    
-    -- Step 5: Force update
-    if successCount > 0 then
-        print("\n🔄 FORCING SESSION UPDATE...")
-        pcall(function()
-            OnSessionItemsUpdated:FireServer(sessionId, {forceUpdate = true})
-        end)
-        
-        -- Wait and check
-        wait(1)
-        
-        local newCarItems = FindCarItemsInScrollingFrame()
-        print("\n📊 FINAL RESULTS:")
-        print("Original cars: " .. #carItems)
-        print("Current cars: " .. #newCarItems)
-        print("Success attempts: " .. successCount .. "/" .. (totalAttempts + 5))
-        
-        if #newCarItems > #carItems then
-            print("🎉 DUPLICATION SUCCESSFUL!")
-            return true
-        else
-            print("⚠️ Item count unchanged")
+        if successCount > 0 then
+            break  -- Stop if we found a working method
         end
-    else
-        print("❌ All attempts failed")
+        
+        wait(0.5)
     end
     
     return successCount > 0
 end
 
--- Create UI
+-- Also try clicking the car button
+local function ClickCarButton(carButton)
+    print("\n🖱️ CLICKING CAR BUTTON...")
+    
+    local clickCount = 0
+    
+    for i = 1, 10 do
+        local success = pcall(function()
+            -- Try different click methods
+            carButton:Fire("Activated")
+            carButton:Fire("MouseButton1Click")
+            
+            -- Look for click remote
+            for _, child in pairs(carButton:GetChildren()) do
+                if child:IsA("RemoteEvent") then
+                    child:FireServer("add")
+                    child:FireServer("click")
+                end
+            end
+            
+            clickCount = clickCount + 1
+            return true
+        end)
+        
+        if success then
+            print("✅ Click " .. i .. " successful")
+        end
+        
+        wait(0.1)
+    end
+    
+    print("📊 Total successful clicks: " .. clickCount)
+    return clickCount > 0
+end
+
+-- Main function
+local function DuplicateCarOnly()
+    print("\n🚀 DUPLICATING CAR ONLY...")
+    
+    -- Step 1: Find only real cars
+    local cars = FindRealCarsInTrade()
+    
+    if #cars == 0 then
+        print("❌ No cars found in trade")
+        print("Add a Car- item to the trade first!")
+        return false
+    end
+    
+    local car = cars[1]  -- Use first car
+    print("\n🎯 Selected car: " .. car.name)
+    print("Car ID: " .. car.id)
+    
+    -- Step 2: Try to add to session
+    local sessionSuccess = AddCarToSession(car.id, car.name)
+    
+    -- Step 3: Also try clicking
+    local clickSuccess = ClickCarButton(car.button)
+    
+    -- Step 4: Check results
+    wait(1)
+    local newCars = FindRealCarsInTrade()
+    
+    print("\n📊 FINAL RESULTS:")
+    print("Original cars: " .. #cars)
+    print("Current cars: " .. #newCars)
+    print("Session add success: " .. tostring(sessionSuccess))
+    print("Click success: " .. tostring(clickSuccess))
+    
+    if #newCars > #cars then
+        print("🎉 DUPLICATION SUCCESSFUL!")
+        return true
+    else
+        print("⚠️ Car count unchanged")
+        
+        -- Try one more thing: clone the UI button
+        print("\n🔄 TRYING UI CLONE AS LAST RESORT...")
+        local scrollingFrame = GetScrollingFrame()
+        if scrollingFrame then
+            local clone = car.button:Clone()
+            clone.Name = car.name .. "_Clone"
+            clone.Parent = scrollingFrame
+            print("✅ Cloned button in UI")
+            
+            -- Check again
+            wait(0.5)
+            newCars = FindRealCarsInTrade()
+            print("After clone - Cars: " .. #newCars)
+            
+            if #newCars > #cars then
+                print("🎉 UI CLONE SUCCESSFUL!")
+                return true
+            end
+        end
+    end
+    
+    return false
+end
+
+-- Create simple UI
 local function CreateUI()
     local gui = Instance.new("ScreenGui")
-    gui.Name = "InsideScrollingFrameDuplicator"
+    gui.Name = "CarOnlyDuplicator"
     gui.Parent = Player:WaitForChild("PlayerGui")
     
     local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(0, 350, 0, 250)
-    frame.Position = UDim2.new(0.5, -175, 0, 20)
+    frame.Size = UDim2.new(0, 300, 0, 200)
+    frame.Position = UDim2.new(0.5, -150, 0, 20)
     frame.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
     frame.Active = true
     frame.Draggable = true
     
     local title = Instance.new("TextLabel")
-    title.Text = "INSIDE SCROLLINGFRAME"
+    title.Text = "CAR-ONLY DUPLICATOR"
     title.Size = UDim2.new(1, 0, 0, 40)
     title.BackgroundColor3 = Color3.fromRGB(60, 60, 90)
-    title.TextColor3 = Color3.fromRGB(100, 200, 255)
-    title.Font = Enum.Font.GothamBold
+    title.TextColor3 = Color3.fromRGB(255, 150, 100)
     
-    local status = Instance.new("TextLabel")
-    status.Text = "Status: Ready\nWill search INSIDE ScrollingFrame"
-    status.Size = UDim2.new(1, -20, 0, 80)
-    status.Position = UDim2.new(0, 10, 0, 50)
-    status.BackgroundTransparency = 1
-    status.TextColor3 = Color3.fromRGB(200, 230, 255)
-    status.TextWrapped = true
+    local output = Instance.new("TextLabel")
+    output.Text = "Only duplicates Car- items\nIgnores customization items"
+    output.Size = UDim2.new(1, -20, 0, 110)
+    output.Position = UDim2.new(0, 10, 0, 50)
+    output.BackgroundTransparency = 1
+    output.TextColor3 = Color3.fromRGB(200, 220, 255)
+    output.TextWrapped = true
     
-    -- Buttons
-    local buttons = {
-        {text = "🔍 FIND CARS", func = FindCarItemsInScrollingFrame, pos = UDim2.new(0.025, 0, 0, 140)},
-        {text = "🚀 DUPLICATE", func = DuplicateCar, pos = UDim2.new(0.525, 0, 0, 140)},
-        {text = "🆔 GET SESSION", func = GetSessionId, pos = UDim2.new(0.025, 0, 0, 175)},
-        {text = "🔄 FORCE UPDATE", func = function()
-            pcall(function()
-                OnSessionItemsUpdated:FireServer(GetSessionId(), {force = true})
-            end)
-        end, pos = UDim2.new(0.525, 0, 0, 175)},
-        {text = "🎯 SCROLLINGFRAME INFO", func = function()
-            local sf = GetScrollingFrame()
-            if sf then
-                print("ScrollingFrame Info:")
-                print("Children: " .. #sf:GetChildren())
-                print("Visible: " .. tostring(sf.Visible))
-            end
-        end, pos = UDim2.new(0.025, 0, 0, 210)}
-    }
+    local findBtn = Instance.new("TextButton")
+    findBtn.Text = "🔍 FIND CARS"
+    findBtn.Size = UDim2.new(0.48, 0, 0, 30)
+    findBtn.Position = UDim2.new(0.01, 0, 0, 170)
+    findBtn.BackgroundColor3 = Color3.fromRGB(70, 100, 140)
     
-    for _, btnInfo in pairs(buttons) do
-        local btn = Instance.new("TextButton")
-        btn.Text = btnInfo.text
-        btn.Size = UDim2.new(0.45, 0, 0, 30)
-        btn.Position = btnInfo.pos
-        btn.BackgroundColor3 = Color3.fromRGB(70, 100, 140)
-        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        btn.TextSize = 12
-        
-        btn.MouseButton1Click:Connect(function()
-            status.Text = "Running: " .. btnInfo.text
-            spawn(function()
-                btnInfo.func()
-                wait(0.5)
-                status.Text = "Completed: " .. btnInfo.text
-            end)
-        end)
-        
-        btn.Parent = frame
+    local dupBtn = Instance.new("TextButton")
+    dupBtn.Text = "🚀 DUPLICATE"
+    dupBtn.Size = UDim2.new(0.48, 0, 0, 30)
+    dupBtn.Position = UDim2.new(0.51, 0, 0, 170)
+    dupBtn.BackgroundColor3 = Color3.fromRGB(70, 140, 100)
+    
+    -- Update output
+    local function updateOutput(text)
+        output.Text = text
+        print(text)
     end
+    
+    findBtn.MouseButton1Click:Connect(function()
+        updateOutput("Finding real cars...")
+        spawn(function()
+            local cars = FindRealCarsInTrade()
+            if #cars > 0 then
+                updateOutput("Found " .. #cars .. " car(s)")
+            else
+                updateOutput("No cars found\nAdd Car- item to trade")
+            end
+        end)
+    end)
+    
+    dupBtn.MouseButton1Click:Connect(function()
+        updateOutput("Duplicating car...")
+        spawn(function()
+            local success = DuplicateCarOnly()
+            if success then
+                updateOutput("✅ Duplication attempted!\nCheck other player.")
+            else
+                updateOutput("❌ Duplication failed\nCheck output window")
+            end
+        end)
+    end)
     
     -- Parent everything
     title.Parent = frame
-    status.Parent = frame
+    output.Parent = frame
+    findBtn.Parent = frame
+    dupBtn.Parent = frame
     frame.Parent = gui
     
-    return status
+    return updateOutput
 end
 
 -- Initialize
-CreateUI()
+local updateOutput = CreateUI()
 
 -- Auto-start
 wait(3)
-print("\n=== INSIDE SCROLLINGFRAME DUPLICATOR ===")
-print("This searches INSIDE the ScrollingFrame for car items")
-print("\n📋 HOW TO USE:")
-print("1. Start trade with another player")
-print("2. Add a CAR to the trade")
-print("3. Click 'FIND CARS' to locate car in ScrollingFrame")
-print("4. Click 'DUPLICATE' to attempt duplication")
-print("5. Check other player's screen for duplicates")
+print("\n=== CAR-ONLY DUPLICATOR ===")
+print("Only targets items starting with 'Car-'")
+print("Ignores customization items")
 
--- Run initial scan
+-- Initial scan
 spawn(function()
-    wait(5)
-    print("\n🔍 Initial scan of ScrollingFrame...")
-    FindCarItemsInScrollingFrame()
+    wait(2)
+    print("\n🔍 Initial car scan...")
+    FindRealCarsInTrade()
+    updateOutput("Ready\nAdd Car- item to trade")
 end)
 
 -- Keybinds
@@ -395,16 +437,19 @@ local UIS = game:GetService("UserInputService")
 UIS.InputBegan:Connect(function(input, processed)
     if processed then return end
     
-    if input.KeyCode == Enum.KeyCode.F then
-        print("\n🎮 F KEY - FINDING CARS")
-        FindCarItemsInScrollingFrame()
+    if input.KeyCode == Enum.KeyCode.C then
+        print("\n🎮 C KEY - FINDING CARS")
+        FindRealCarsInTrade()
     elseif input.KeyCode == Enum.KeyCode.D then
         print("\n🎮 D KEY - DUPLICATING")
-        DuplicateCar()
+        DuplicateCarOnly()
     end
 end)
 
 print("\n🔑 QUICK KEYS:")
-print("F = Find cars in ScrollingFrame")
+print("C = Find cars (Car- items only)")
 print("D = Duplicate car")
-print("\n⚠️ Make sure you're IN A TRADE with a car added!")
+print("\n📋 REQUIRED:")
+print("1. Must have a 'Car-' item in trade")
+print("2. Not customization items")
+print("3. Check other player's screen after duplication")
