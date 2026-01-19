@@ -1,387 +1,406 @@
--- =============== BULLETPROOF TRADE HELPER ===============
--- 100% error-free, will work no matter what
+-- 🔍 TRADE FORMAT DETECTOR
+-- Finds the EXACT format the server wants
 
--- Wait for game to load
-repeat task.wait(1) until game:IsLoaded()
-print("✅ Game loaded")
+local Players = game:GetService("Players")
+local Player = Players.LocalPlayer
+local RS = game:GetService("ReplicatedStorage")
 
--- Get services with maximum safety
-local Players, Player, ReplicatedStorage
-local success, err = pcall(function()
-    Players = game:GetService("Players")
-    Player = Players.LocalPlayer
-    ReplicatedStorage = game:GetService("ReplicatedStorage")
-end)
+print("=== TRADE FORMAT DETECTOR ===")
 
-if not success then
-    print("❌ Failed to get services:", err)
-    return
-end
+-- Get the remote
+local tradingRemote = RS.Remotes.Services.TradingServiceRemotes.SessionAddItem
+print("✅ Remote found:", tradingRemote.Name)
 
--- Wait for player
-repeat task.wait(1) until Player
-print("✅ Player ready")
-
--- Storage for captured calls
-local capturedCalls = {}
-
--- Simple function to call remotes safely
-local function CallRemote(remoteName, ...)
-    local args = {...}
+-- ===== TEST DIFFERENT FORMATS =====
+local function TestFormat(formatName, data)
+    print("\n🧪 Testing:", formatName)
+    print("Data:", data)
     
-    -- Find the remote
-    local remote = ReplicatedStorage:FindFirstChild("Remotes", true)
-    if remote then
-        remote = remote:FindFirstChild("Services", true)
-    end
-    if remote then
-        remote = remote:FindFirstChild("TradingServiceRemotes", true)
-    end
-    if remote then
-        remote = remote:FindFirstChild(remoteName)
-    end
-    
-    if not remote or not remote:IsA("RemoteFunction") then
-        print("❌ Remote not found:", remoteName)
-        return nil
-    end
-    
-    -- Record the call
-    table.insert(capturedCalls, {
-        remote = remoteName,
-        args = args,
-        time = os.time()
-    })
-    
-    print("📞 Calling:", remoteName)
-    
-    -- Call the remote
-    local result
-    local ok, err = pcall(function()
-        result = remote:InvokeServer(unpack(args))
+    local success, result = pcall(function()
+        return tradingRemote:InvokeServer(data)
     end)
     
-    if ok then
-        print("✅ Success")
-        return result
+    if success then
+        print("✅ SUCCESS!")
+        print("Result:", result)
+        return true, result
     else
-        print("❌ Error:", err)
-        return nil
+        print("❌ Error:", result)
+        return false, result
     end
 end
 
--- Find car in inventory
-local function FindCar(carName)
-    print("🔍 Looking for:", carName)
+-- ===== ALL POSSIBLE FORMATS =====
+local testFormats = {
+    -- Format 1: Simple string (what we tried)
+    {"Simple String", "AstonMartin12"},
     
-    local button = nil
+    -- Format 2: Table with ItemId
+    {"Table with ItemId", {ItemId = "AstonMartin12"}},
     
-    local ok = pcall(function()
-        local gui = Player.PlayerGui
-        if not gui then return end
-        
-        -- Search through all GUI
-        for _, obj in pairs(gui:GetDescendants()) do
-            if obj.Name == carName then
-                button = obj
-                print("✅ Found in:", obj:GetFullName())
-                break
-            end
-        end
-    end)
+    -- Format 3: Table with id
+    {"Table with id", {id = "AstonMartin12"}},
     
-    if not ok or not button then
-        print("❌ Car not found in GUI")
-    end
+    -- Format 4: Table with Name
+    {"Table with Name", {Name = "AstonMartin12"}},
     
-    return button
-end
+    -- Format 5: Table with item
+    {"Table with item", {item = "AstonMartin12"}},
+    
+    -- Format 6: Table with itemId (lowercase i)
+    {"Table with itemId", {itemId = "AstonMartin12"}},
+    
+    -- Format 7: Table with type
+    {"Table with ItemId + Type", {ItemId = "AstonMartin12", Type = "Car"}},
+    
+    -- Format 8: Table with itemType
+    {"Table with ItemId + itemType", {ItemId = "AstonMartin12", itemType = "Car"}},
+    
+    -- Format 9: Table with ItemType
+    {"Table with ItemId + ItemType", {ItemId = "AstonMartin12", ItemType = "Car"}},
+    
+    -- Format 10: Table with category
+    {"Table with ItemId + Category", {ItemId = "AstonMartin12", Category = "Vehicle"}},
+    
+    -- Format 11: Table with multiple properties
+    {"Table with multiple", {ItemId = "AstonMartin12", Type = "Car", Category = "Vehicle"}},
+    
+    -- Format 12: Number instead of string
+    {"Table with numeric ID", {ItemId = 123}}, -- Some games use numeric IDs
+    
+    -- Format 13: With player ID
+    {"Table with PlayerId", {ItemId = "AstonMartin12", PlayerId = Player.UserId}},
+    
+    -- Format 14: With timestamp
+    {"Table with timestamp", {ItemId = "AstonMartin12", Time = os.time()}},
+    
+    -- Format 15: Try Car- prefix
+    {"Car-AstonMartin12", "Car-AstonMartin12"},
+    
+    -- Format 16: Table with Car- prefix
+    {"Table with Car- prefix", {ItemId = "Car-AstonMartin12"}},
+    
+    -- Format 17: Try vehicle type
+    {"Table with vehicle type", {ItemId = "AstonMartin12", Type = "Vehicle"}},
+    
+    -- Format 18: Try automotive type
+    {"Table with automotive type", {ItemId = "AstonMartin12", Type = "Automotive"}},
+}
 
--- Try to add a car
-local function TryAddCar(carName)
-    print("\n🎯 Attempting to add:", carName)
+-- ===== FIND THE CORRECT TYPE =====
+local function FindItemType()
+    print("\n🔍 FINDING CORRECT ITEM TYPE...")
     
-    -- Try different remotes that might work
-    local remotesToTry = {
-        "SessionAddItem",
-        "AddItem", 
-        "AddCar",
-        "AddVehicle",
-        "AddToTrade",
-        "AddToSession"
+    -- Common item types in car games
+    local itemTypes = {
+        "Car", "Vehicle", "Automobile", "Automotive",
+        "Ride", "Drive", "Motor", "Engine",
+        "Body", "Chassis", "Frame"
     }
     
-    -- Try different argument formats
-    local argFormats = {
-        carName,  -- Just the name
-        {item = carName},
-        {ItemId = carName},
-        {Name = carName},
-        {car = carName},
-        {vehicle = carName}
-    }
-    
-    for _, remoteName in pairs(remotesToTry) do
-        print("\n🔄 Trying remote:", remoteName)
+    for _, itemType in ipairs(itemTypes) do
+        print("\nTesting type:", itemType)
         
-        for i, args in ipairs(argFormats) do
-            print("  Format", i, "...")
-            
-            local result
-            if type(args) == "table" then
-                result = CallRemote(remoteName, args)
-            else
-                result = CallRemote(remoteName, args)
-            end
-            
-            if result then
-                print("  ✅ Possible success!")
-                return true
-            end
-            
-            task.wait(0.1)
+        local data = {ItemId = "AstonMartin12", Type = itemType}
+        local success, result = TestFormat("Type: " .. itemType, data)
+        
+        if success then
+            print("🎉 FOUND CORRECT TYPE:", itemType)
+            return itemType
         end
     end
     
-    return false
+    return nil
 end
 
--- Bulk add function
-local function BulkAddCar(carName, count)
-    print("\n📦 Bulk adding:", carName, "x", count)
+-- ===== FIND THE CORRECT KEY NAMES =====
+local function FindCorrectKeys()
+    print("\n🔑 FINDING CORRECT KEY NAMES...")
     
-    -- First, ask user to click manually once
-    print("📝 Please click", carName, "MANUALLY in your inventory")
-    print("I will watch what happens...")
+    -- Different key name combinations
+    local keyCombinations = {
+        {"ItemId", "Type"},
+        {"id", "type"},
+        {"Name", "Category"},
+        {"itemId", "itemType"},
+        {"Item", "Kind"},
+        {"productId", "productType"}
+    }
     
-    local startTime = os.time()
-    local initialCalls = #capturedCalls
+    for _, keys in ipairs(keyCombinations) do
+        local idKey, typeKey = keys[1], keys[2]
+        
+        print("\nTesting keys:", idKey, "and", typeKey)
+        
+        local data = {}
+        data[idKey] = "AstonMartin12"
+        data[typeKey] = "Car"
+        
+        local success, result = TestFormat("Keys: " .. idKey .. "/" .. typeKey, data)
+        
+        if success then
+            print("🎉 FOUND CORRECT KEYS!")
+            return idKey, typeKey
+        end
+    end
     
-    -- Wait for user to click
+    return nil, nil
+end
+
+-- ===== AUTO-DETECT FROM MANUAL CLICK =====
+local function CaptureManualFormat()
+    print("\n👀 CAPTURE MANUAL CLICK FORMAT")
+    print("===============================")
+    print("1. I will hook the remote")
+    print("2. YOU click AstonMartin12 in inventory")
+    print("3. I will capture the EXACT format")
+    print("===============================")
+    
+    -- Store original function
+    local originalInvoke = tradingRemote.InvokeServer
+    local capturedData = nil
+    
+    -- Create hook
+    tradingRemote.InvokeServer = function(self, ...)
+        local args = {...}
+        capturedData = args[1]
+        
+        print("\n🎯 CAPTURED MANUAL CLICK!")
+        print("Data type:", type(capturedData))
+        
+        if type(capturedData) == "table" then
+            print("Table contents:")
+            for k, v in pairs(capturedData) do
+                print("  " .. tostring(k) .. " = " .. tostring(v))
+            end
+        else
+            print("Value:", capturedData)
+        end
+        
+        -- Call original
+        return originalInvoke(self, ...)
+    end
+    
+    print("\n✅ Hook installed!")
+    print("Now click AstonMartin12 in your inventory...")
+    
+    -- Wait for click
     for i = 1, 30 do
         task.wait(1)
-        if #capturedCalls > initialCalls then
-            print("🎉 Click captured!")
-            break
+        if capturedData then
+            print("\n✅ Format captured successfully!")
+            return capturedData
         end
         if i % 5 == 0 then
-            print("Still waiting... (" .. i .. "/30)")
+            print("Waiting... (" .. i .. "/30 seconds)")
         end
     end
     
-    if #capturedCalls == initialCalls then
-        print("❌ No click captured. Trying auto-discovery...")
-        local found = TryAddCar(carName)
-        if not found then
-            print("❌ Auto-discovery failed")
-            return false
-        end
-    end
-    
-    -- Get the successful call
-    local successfulCall = capturedCalls[#capturedCalls]
-    if not successfulCall then
-        print("❌ No call to replicate")
+    print("\n❌ No click captured")
+    return nil
+end
+
+-- ===== BULK ADD WITH CORRECT FORMAT =====
+local function BulkAddWithFormat(itemData, count)
+    if not itemData then
+        print("❌ No format data provided")
         return false
     end
     
-    print("\n🔁 Replicating:", successfulCall.remote)
+    print("\n📦 BULK ADDING WITH CORRECT FORMAT")
+    print("Format:", itemData)
     
-    -- Bulk replicate
+    local successCount = 0
+    
     for i = 1, count do
-        print("Adding", i, "/", count)
+        print("\nAdding", i, "/", count)
         
-        if type(successfulCall.args[1]) == "table" then
-            CallRemote(successfulCall.remote, successfulCall.args[1])
+        local success, result = pcall(function()
+            return tradingRemote:InvokeServer(itemData)
+        end)
+        
+        if success then
+            print("✅ Added successfully!")
+            successCount = successCount + 1
         else
-            CallRemote(successfulCall.remote, unpack(successfulCall.args))
+            print("❌ Failed:", result)
         end
         
         -- Random delay
         task.wait(math.random(50, 200) / 1000)
     end
     
-    print("✅ Bulk add complete!")
-    return true
+    print("\n📊 RESULTS:")
+    print("Success:", successCount, "/", count)
+    print("Failed:", count - successCount)
+    
+    return successCount > 0
 end
 
--- Create simple UI
-local function CreateUI()
-    print("🖥️ Creating UI...")
+-- ===== MAIN TEST SEQUENCE =====
+print("\n🚀 STARTING FORMAT DETECTION...")
+
+-- Step 1: Try all basic formats
+print("\n" .. string.rep("=", 50))
+print("STEP 1: Testing all basic formats")
+print(string.rep("=", 50))
+
+local foundFormat = nil
+for i, formatInfo in ipairs(testFormats) do
+    local formatName, data = formatInfo[1], formatInfo[2]
+    local success, result = TestFormat(formatName, data)
     
+    if success then
+        print("\n🎉 FOUND WORKING FORMAT!")
+        print("Format:", formatName)
+        print("Data:", data)
+        foundFormat = data
+        break
+    end
+end
+
+-- Step 2: If no format found, find correct item type
+if not foundFormat then
+    print("\n" .. string.rep("=", 50))
+    print("STEP 2: Finding correct item type")
+    print(string.rep("=", 50))
+    
+    local itemType = FindItemType()
+    if itemType then
+        foundFormat = {ItemId = "AstonMartin12", Type = itemType}
+    end
+end
+
+-- Step 3: If still no format, find correct keys
+if not foundFormat then
+    print("\n" .. string.rep("=", 50))
+    print("STEP 3: Finding correct key names")
+    print(string.rep("=", 50))
+    
+    local idKey, typeKey = FindCorrectKeys()
+    if idKey and typeKey then
+        foundFormat = {}
+        foundFormat[idKey] = "AstonMartin12"
+        foundFormat[typeKey] = "Car"
+    end
+end
+
+-- Step 4: If all else fails, capture manual click
+if not foundFormat then
+    print("\n" .. string.rep("=", 50))
+    print("STEP 4: Capturing manual click format")
+    print(string.rep("=", 50))
+    
+    foundFormat = CaptureManualFormat()
+end
+
+-- Step 5: Use the found format for bulk add
+if foundFormat then
+    print("\n" .. string.rep("=", 50))
+    print("STEP 5: Bulk adding with correct format")
+    print(string.rep("=", 50))
+    
+    -- Ask how many to add
+    print("\nHow many AstonMartin12 to add?")
+    print("Enter number (10, 50, 100, etc):")
+    
+    -- In a real script, you'd get user input
+    -- For now, let's add 10
+    BulkAddWithFormat(foundFormat, 10)
+else
+    print("\n❌ Could not find correct format")
+    print("Try clicking manually and checking error messages")
+end
+
+-- ===== CREATE SIMPLE UI =====
+local function CreateFormatUI()
     local gui = Instance.new("ScreenGui")
-    gui.Name = "TradeHelper"
+    gui.Name = "FormatDetector"
     gui.Parent = Player:WaitForChild("PlayerGui")
-    gui.ResetOnSpawn = false
     
-    -- Main frame
     local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(0, 220, 0, 280)
-    frame.Position = UDim2.new(0.5, -110, 0.5, -140)
-    frame.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+    frame.Size = UDim2.new(0, 300, 0, 400)
+    frame.Position = UDim2.new(0.5, -150, 0.5, -200)
+    frame.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
     
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 10)
-    corner.Parent = frame
-    
-    -- Title
     local title = Instance.new("TextLabel")
-    title.Text = "🚗 Trade Helper"
+    title.Text = "🔍 FORMAT DETECTOR"
     title.Size = UDim2.new(1, 0, 0, 40)
-    title.BackgroundColor3 = Color3.fromRGB(65, 65, 85)
+    title.BackgroundColor3 = Color3.fromRGB(60, 60, 90)
     title.TextColor3 = Color3.fromRGB(255, 255, 255)
-    title.Font = Enum.Font.GothamBold
-    title.TextSize = 16
     
-    -- Car input
-    local input = Instance.new("TextBox")
-    input.Text = "Car-AstonMartin12"
-    input.PlaceholderText = "Car name..."
-    input.Size = UDim2.new(1, -20, 0, 35)
-    input.Position = UDim2.new(0, 10, 0, 50)
-    input.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-    input.TextColor3 = Color3.fromRGB(255, 255, 255)
-    input.Font = Enum.Font.Gotham
-    input.TextSize = 14
+    local log = Instance.new("ScrollingFrame")
+    log.Size = UDim2.new(1, -20, 0, 300)
+    log.Position = UDim2.new(0, 10, 0, 50)
+    log.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
+    log.ScrollBarThickness = 8
     
-    local inputCorner = Instance.new("UICorner")
-    inputCorner.CornerRadius = UDim.new(0, 6)
-    inputCorner.Parent = input
+    local logText = Instance.new("TextLabel")
+    logText.Size = UDim2.new(1, -10, 0, 500)
+    logText.Position = UDim2.new(0, 5, 0, 5)
+    logText.BackgroundTransparency = 1
+    logText.TextColor3 = Color3.fromRGB(220, 220, 255)
+    logText.TextWrapped = true
+    logText.TextXAlignment = Enum.TextXAlignment.Left
+    logText.TextYAlignment = Enum.TextYAlignment.Top
     
-    -- Status
-    local status = Instance.new("TextLabel")
-    status.Text = "Ready"
-    status.Size = UDim2.new(1, -20, 0, 40)
-    status.Position = UDim2.new(0, 10, 0, 90)
-    status.BackgroundTransparency = 1
-    status.TextColor3 = Color3.fromRGB(200, 200, 100)
-    status.Font = Enum.Font.Gotham
-    status.TextSize = 12
-    status.TextWrapped = true
-    
-    -- Button creator
-    local function AddButton(text, y, color, onClick)
-        local btn = Instance.new("TextButton")
-        btn.Text = text
-        btn.Size = UDim2.new(1, -20, 0, 35)
-        btn.Position = UDim2.new(0, 10, 0, y)
-        btn.BackgroundColor3 = color
-        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        btn.Font = Enum.Font.Gotham
-        btn.TextSize = 13
-        
-        local btnCorner = Instance.new("UICorner")
-        btnCorner.CornerRadius = UDim.new(0, 6)
-        btnCorner.Parent = btn
-        
-        btn.MouseButton1Click:Connect(function()
-            pcall(onClick)
-        end)
-        
-        return btn
+    local function AddLog(text)
+        logText.Text = logText.Text .. text .. "\n"
     end
     
-    -- Add buttons
-    local testBtn = AddButton("🔍 Test", 140, Color3.fromRGB(70, 120, 180), function()
-        status.Text = "Testing..."
-        task.wait(0.5)
-        TryAddCar(input.Text)
-        status.Text = "Test complete"
+    -- Test buttons
+    local testBtn = Instance.new("TextButton")
+    testBtn.Text = "🧪 Test Formats"
+    testBtn.Size = UDim2.new(1, -20, 0, 35)
+    testBtn.Position = UDim2.new(0, 10, 1, -80)
+    testBtn.BackgroundColor3 = Color3.fromRGB(70, 120, 180)
+    testBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    
+    testBtn.MouseButton1Click:Connect(function()
+        AddLog("\n=== Testing formats ===")
+        for i, formatInfo in ipairs(testFormats) do
+            local formatName, data = formatInfo[1], formatInfo[2]
+            local success, result = TestFormat(formatName, data)
+            
+            if success then
+                AddLog("✅ " .. formatName .. ": SUCCESS")
+            else
+                AddLog("❌ " .. formatName .. ": " .. tostring(result))
+            end
+        end
     end)
     
-    local add10Btn = AddButton("📦 Add 10", 180, Color3.fromRGB(180, 100, 60), function()
-        status.Text = "Adding 10..."
-        add10Btn.Text = "⏳"
-        task.spawn(function()
-            BulkAddCar(input.Text, 10)
-            task.wait(1)
-            add10Btn.Text = "📦 Add 10"
-            status.Text = "Ready"
-        end)
-    end)
+    local captureBtn = Instance.new("TextButton")
+    captureBtn.Text = "👀 Capture Manual Click"
+    captureBtn.Size = UDim2.new(1, -20, 0, 35)
+    captureBtn.Position = UDim2.new(0, 10, 1, -40)
+    captureBtn.BackgroundColor3 = Color3.fromRGB(70, 180, 120)
+    captureBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
     
-    local add50Btn = AddButton("📦 Add 50", 220, Color3.fromRGB(180, 60, 60), function()
-        status.Text = "Adding 50..."
-        add50Btn.Text = "⏳"
-        task.spawn(function()
-            BulkAddCar(input.Text, 50)
-            task.wait(1)
-            add50Btn.Text = "📦 Add 50"
-            status.Text = "Ready"
-        end)
-    end)
-    
-    -- Close button
-    local closeBtn = Instance.new("TextButton")
-    closeBtn.Text = "X"
-    closeBtn.Size = UDim2.new(0, 25, 0, 25)
-    closeBtn.Position = UDim2.new(1, -30, 0, 7)
-    closeBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 100)
-    closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    closeBtn.Font = Enum.Font.GothamBold
-    
-    closeBtn.MouseButton1Click:Connect(function()
-        gui:Destroy()
+    captureBtn.MouseButton1Click:Connect(function()
+        AddLog("\n=== Capturing manual click ===")
+        local captured = CaptureManualFormat()
+        if captured then
+            AddLog("✅ Captured: " .. tostring(captured))
+        else
+            AddLog("❌ No click captured")
+        end
     end)
     
     -- Parent everything
+    logText.Parent = log
     title.Parent = frame
-    input.Parent = frame
-    status.Parent = frame
+    log.Parent = frame
     testBtn.Parent = frame
-    add10Btn.Parent = frame
-    add50Btn.Parent = frame
-    closeBtn.Parent = title
+    captureBtn.Parent = frame
     frame.Parent = gui
     
-    -- Update status
-    game:GetService("RunService").Heartbeat:Connect(function()
-        pcall(function()
-            status.Text = "Calls: " .. #capturedCalls
-        end)
-    end)
+    AddLog("Format Detector Ready")
+    AddLog("Click 'Test Formats' to begin")
     
-    print("✅ UI created")
     return gui
 end
 
--- Main execution
+-- Start UI after tests
 task.wait(2)
-
--- Create UI
-local success, err = pcall(CreateUI)
-if not success then
-    print("❌ UI creation failed:", err)
-    -- Try simple print instead
-    print("📋 MANUAL INSTRUCTIONS:")
-    print("1. Call: CallRemote('SessionAddItem', 'Car-AstonMartin12')")
-    print("2. Or: CallRemote('AddItem', 'Car-AstonMartin12')")
-    print("3. Check capturedCalls for successful calls")
-else
-    print("✅ System ready!")
-    print("\n📋 HOW TO USE:")
-    print("1. Enter car name (like Car-AstonMartin12)")
-    print("2. Click 'Test' to try auto-add")
-    print("3. OR: Click car manually, then use 'Add 10/50'")
-end
-
--- List available remotes
-task.wait(3)
-print("\n🔍 Available trading remotes:")
-local tradingFolder = ReplicatedStorage:FindFirstChild("Remotes", true)
-if tradingFolder then
-    tradingFolder = tradingFolder:FindFirstChild("Services", true)
-end
-if tradingFolder then
-    tradingFolder = tradingFolder:FindFirstChild("TradingServiceRemotes", true)
-end
-
-if tradingFolder then
-    for _, remote in pairs(tradingFolder:GetChildren()) do
-        if remote:IsA("RemoteFunction") then
-            print("  • " .. remote.Name)
-        end
-    end
-else
-    print("❌ Trading folder not found")
-end
+CreateFormatUI()
