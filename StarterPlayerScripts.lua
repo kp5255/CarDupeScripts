@@ -1,310 +1,339 @@
--- Car Format Tester - Found Working Session ID!
+-- Trade Item Analyzer & Duplicator
 local Players = game:GetService("Players")
 local Player = Players.LocalPlayer
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-print("=== CAR FORMAT TESTER ===")
-print("✅ Found working session ID: 'otherplayer'")
+print("=== TRADE ITEM ANALYZER ===")
+print("Found Car-AstonMartin12 in trade window!")
 
 -- Get services
 local tradingService = ReplicatedStorage.Remotes.Services.TradingServiceRemotes
 local carService = ReplicatedStorage.Remotes.Services.CarServiceRemotes
 
 local SessionAddItem = tradingService:WaitForChild("SessionAddItem")
-local workingSessionId = "otherplayer"  -- PROVEN TO WORK!
+local workingSessionId = "otherplayer"  -- Proven to work!
 
--- Get car data to test different formats
-local function GetCarData()
-    print("\n📊 GETTING CAR DATA FOR FORMAT TESTING...")
+-- Get the car that's ALREADY in the trade
+local function GetCarInTrade()
+    print("\n🔍 EXAMINING CAR IN TRADE WINDOW...")
     
-    local success, carList = pcall(function()
-        return carService.GetOwnedCars:InvokeServer()
+    local tradeCar = nil
+    local tradeCarData = nil
+    
+    pcall(function()
+        local main = Player.PlayerGui.Menu.Trading.PeerToPeer.Main
+        local localPlayer = main.LocalPlayer
+        local scrolling = localPlayer.Content.ScrollingFrame
+        
+        -- Find Car-AstonMartin12 in trade
+        for _, item in pairs(scrolling:GetChildren()) do
+            if item.Name == "Car-AstonMartin12" then
+                tradeCar = item
+                print("✅ Found in trade: " .. item.Name)
+                
+                -- Look for car data in the button
+                for _, child in pairs(item:GetDescendants()) do
+                    if child:IsA("StringValue") then
+                        print("  StringValue: " .. child.Name .. " = " .. child.Value)
+                        if child.Name:lower():find("id") then
+                            tradeCarData = {id = child.Value, name = item.Name}
+                        end
+                    end
+                end
+                break
+            end
+        end
     end)
     
-    if not success or not carList then
-        print("❌ Failed to get car list")
-        return nil
-    end
-    
-    -- Find Aston Martin 8
-    for _, carData in ipairs(carList) do
-        if type(carData) == "table" and carData.Name == "AstonMartin8" then
-            print("✅ Found Aston Martin 8 data")
-            
-            -- Show all fields
-            print("\n📋 CAR DATA FIELDS:")
-            for fieldName, fieldValue in pairs(carData) do
-                local valueType = type(fieldValue)
-                local displayValue = tostring(fieldValue)
-                
-                if valueType == "table" then
-                    print("  " .. fieldName .. " = [TABLE]")
-                    -- Show table contents
-                    for k, v in pairs(fieldValue) do
-                        print("    " .. tostring(k) .. " = " .. tostring(v))
+    if tradeCar then
+        -- Get full car data from inventory
+        print("\n📊 GETTING FULL CAR DATA...")
+        local success, carList = pcall(function()
+            return carService.GetOwnedCars:InvokeServer()
+        end)
+        
+        if success and carList then
+            -- Find AstonMartin12 in inventory
+            for _, carData in ipairs(carList) do
+                if type(carData) == "table" and carData.Name == "AstonMartin12" then
+                    print("✅ Found AstonMartin12 in inventory")
+                    print("Car ID: " .. carData.Id)
+                    
+                    -- Show key fields
+                    print("\n📋 KEY CAR DATA:")
+                    for fieldName, fieldValue in pairs(carData) do
+                        if fieldName == "Id" or fieldName == "Name" or fieldName == "Created" then
+                            print("  " .. fieldName .. " = " .. tostring(fieldValue))
+                        end
                     end
-                else
-                    if #displayValue > 50 then
-                        displayValue = displayValue:sub(1, 50) .. "..."
-                    end
-                    print("  " .. fieldName .. " = " .. displayValue .. " (" .. valueType .. ")")
+                    
+                    return carData
                 end
             end
-            
-            return carData
         end
+    else
+        print("❌ No car found in trade window")
     end
     
-    print("❌ Aston Martin 8 not found")
     return nil
 end
 
--- Test different car ID/formats with working session ID
-local function TestCarFormats(carData)
-    print("\n🧪 TESTING DIFFERENT CAR FORMATS...")
-    print("Using PROVEN session ID: 'otherplayer'")
+-- Test: Maybe SessionAddItem needs the car that's ALREADY in trade
+local function TestWithTradeCar(carData)
+    print("\n🧪 TESTING WITH TRADE CAR...")
     
     if not carData then
         print("❌ No car data")
         return false
     end
     
-    local carId = carData.Id  -- The UUID
-    local carName = carData.Name  -- "AstonMartin8"
+    print("Car Name: " .. carData.Name)
+    print("Car ID: " .. carData.Id)
     
-    print("Car UUID: " .. carId)
-    print("Car Name: " .. carName)
+    -- The car is ALREADY in trade, so maybe SessionAddItem works differently
+    print("\n⚠️ IMPORTANT: Car is ALREADY in trade window")
+    print("SessionAddItem might work differently in this case")
     
-    -- Different formats to test
-    local testFormats = {
-        -- Direct UUID formats (what we tried)
-        {name = "UUID as string", value = carId},
-        {name = "UUID without dashes", value = carId:gsub("-", "")},
-        
-        -- Name-based formats
-        {name = "Just car name", value = carName},
-        {name = "Car- prefix", value = "Car-" .. carName},
-        {name = "Lowercase name", value = carName:lower()},
-        
-        -- Number extraction (AstonMartin8 → 8)
-        {name = "Extracted number", value = carName:match("%d+")},
-        {name = "Number as string", value = tostring(carName:match("%d+"))},
-        
-        -- Table formats
-        {name = "Table with id", value = {id = carId}},
-        {name = "Table with name", value = {name = carName}},
-        {name = "Full car data table", value = carData},
-        {name = "Data field from car", value = carData.Data},
-        
-        -- Combination formats
-        {name = "Table with id+name", value = {id = carId, name = carName}},
-        {name = "Table with id+type", value = {id = carId, type = "car"}},
-        
-        -- Maybe it needs a quantity
-        {name = "UUID + quantity", value = carId, quantity = 1},
-        {name = "Name + quantity", value = carName, quantity = 1},
-    }
+    -- Maybe we need to remove and re-add? Or duplicate existing?
+    local SessionRemoveItem = tradingService:FindFirstChild("SessionRemoveItem")
     
-    local successCount = 0
-    
-    for i, format in ipairs(testFormats) do
-        print("\nTest " .. i .. ": " .. format.name)
-        print("  Format: " .. type(format.value))
+    if SessionRemoveItem then
+        print("\n🔄 TESTING REMOVE/ADD CYCLE...")
         
-        local params = nil
-        
-        if format.quantity then
-            -- Format with quantity
-            params = {workingSessionId, format.value, format.quantity}
-            print("  Params: session, " .. type(format.value) .. ", quantity=" .. format.quantity)
-        else
-            -- Format without quantity
-            params = {workingSessionId, format.value}
-            print("  Params: session, " .. type(format.value))
-        end
-        
-        local success, result = pcall(function()
-            return SessionAddItem:InvokeServer(unpack(params))
+        -- Try to remove the car first
+        print("1. Attempting to remove car...")
+        local removeSuccess, removeResult = pcall(function()
+            return SessionRemoveItem:InvokeServer(workingSessionId, carData.Id)
         end)
         
-        if success then
-            print("  ✅ SUCCESS!")
-            if result then
-                print("  Result: " .. tostring(result))
-            end
-            successCount = successCount + 1
+        if removeSuccess then
+            print("✅ Remove successful: " .. tostring(removeResult))
             
-            -- Try a few more times
-            for j = 1, 3 do
-                wait(0.2)
-                pcall(function()
-                    SessionAddItem:InvokeServer(unpack(params))
-                    print("  Repeated " .. j)
-                end)
-            end
+            -- Wait a bit
+            wait(1)
             
-            return true, format
+            -- Try to add it back
+            print("\n2. Attempting to add car back...")
+            local addSuccess, addResult = pcall(function()
+                return SessionAddItem:InvokeServer(workingSessionId, carData.Id)
+            end)
+            
+            if addSuccess then
+                print("✅ Add successful: " .. tostring(addResult))
+                
+                -- Try to add multiple times
+                print("\n3. Attempting to add multiple times...")
+                for i = 1, 5 do
+                    wait(0.2)
+                    pcall(function()
+                        SessionAddItem:InvokeServer(workingSessionId, carData.Id)
+                        print("  Added copy " .. i)
+                    end)
+                end
+                
+                return true
+            else
+                print("❌ Add failed: " .. tostring(addResult))
+            end
         else
-            print("  ❌ Failed: " .. tostring(result))
-            
-            -- Analyze error
-            local errorMsg = tostring(result)
-            if errorMsg:find("Invalid item") then
-                print("  ⚠️ Wrong item format")
-            elseif errorMsg:find("not in inventory") then
-                print("  ⚠️ Item not in inventory")
-            elseif errorMsg:find("already in trade") then
-                print("  ⚠️ Item already in trade")
-            end
+            print("❌ Remove failed: " .. tostring(removeResult))
         end
-        
-        wait(0.3)
     end
     
-    print("\n📊 Results: " .. successCount .. "/" .. #testFormats .. " successful")
-    return successCount > 0
+    return false
 end
 
--- Check what's in the trade windows
-local function CheckTradeWindows()
-    print("\n🔍 CHECKING TRADE WINDOWS...")
+-- Check the actual error more carefully
+local function AnalyzeError()
+    print("\n🔍 ANALYZING ERROR PATTERN...")
     
-    pcall(function()
-        local main = Player.PlayerGui.Menu.Trading.PeerToPeer.Main
-        
-        -- LocalPlayer window
-        local localPlayer = main.LocalPlayer
-        local localContent = localPlayer.Content
-        local localScrolling = localContent.ScrollingFrame
-        
-        print("📦 YOUR TRADE WINDOW:")
-        local yourItems = {}
-        for _, item in pairs(localScrolling:GetChildren()) do
-            if item:IsA("ImageButton") then
-                table.insert(yourItems, item.Name)
-            end
+    -- The error is ALWAYS: "ServerScriptService.Services.TradingService:650: Invalid item type"
+    print("Error pattern: 'Invalid item type'")
+    print("Line 650 in TradingService")
+    
+    print("\n🎯 WHAT THIS MEANS:")
+    print("1. The REMOTE CALL IS WORKING (reaching server)")
+    print("2. Session ID 'otherplayer' IS CORRECT")
+    print("3. But the ITEM DATA FORMAT is wrong")
+    
+    print("\n📋 POSSIBLE SOLUTIONS:")
+    print("A. Maybe need to use DIFFERENT REMOTE for adding to trade")
+    print("B. Maybe car needs to be in different state")
+    print("C. Maybe trade session needs different setup")
+    
+    -- Check other remotes
+    print("\n🔍 CHECKING OTHER TRADING REMOTES:")
+    for _, remote in pairs(tradingService:GetChildren()) do
+        if remote:IsA("RemoteFunction") and remote.Name ~= "SessionAddItem" then
+            print("  " .. remote.Name)
         end
-        
-        if #yourItems > 0 then
-            for _, itemName in ipairs(yourItems) do
-                print("  - " .. itemName)
-            end
-        else
-            print("  (empty)")
-        end
-        
-        -- OtherPlayer window
-        local otherPlayer = main.OtherPlayer
-        local otherContent = otherPlayer.Content
-        local otherScrolling = otherContent.ScrollingFrame
-        
-        print("\n📦 OTHER PLAYER'S WINDOW (on YOUR screen):")
-        local theirItems = {}
-        for _, item in pairs(otherScrolling:GetChildren()) do
-            if item:IsA("ImageButton") then
-                table.insert(theirItems, item.Name)
-            end
-        end
-        
-        if #theirItems > 0 then
-            for _, itemName in ipairs(theirItems) do
-                print("  - " .. itemName)
-            end
-        else
-            print("  (empty)")
-        end
-    end)
+    end
 end
 
--- Try to add car normally first
-local function AddCarNormallyForReference()
-    print("\n🖱️ TRYING TO ADD CAR NORMALLY FIRST...")
+-- Maybe we need to click the inventory button to see what happens
+local function MonitorInventoryClick()
+    print("\n🖱️ MONITORING INVENTORY CLICK...")
     
-    -- Find Car-AstonMartin8 in inventory
-    local carButton = nil
+    -- Find Car-AstonMartin12 in inventory
+    local inventoryButton = nil
     
     pcall(function()
         local inventory = Player.PlayerGui.Menu.Trading.PeerToPeer.Main.Inventory
         local scrolling = inventory.List.ScrollingFrame
         
         for _, item in pairs(scrolling:GetChildren()) do
-            if item.Name == "Car-AstonMartin8" then
-                carButton = item
+            if item.Name == "Car-AstonMartin12" then
+                inventoryButton = item
                 break
             end
         end
     end)
     
-    if carButton then
-        print("✅ Found Car-AstonMartin8 in inventory")
-        print("Try clicking it normally to see what happens")
-        print("Then we can compare with script results")
+    if inventoryButton then
+        print("✅ Found Car-AstonMartin12 in inventory")
+        print("Class: " .. inventoryButton.ClassName)
         
-        -- Optional: Click it programmatically to see
-        print("\n🔄 Clicking programmatically to observe...")
-        for i = 1, 3 do
-            pcall(function()
-                carButton:Fire("Activated")
-                print("  Click " .. i)
-            end)
-            wait(0.2)
+        -- Look for data in the button
+        print("\n🔍 INVENTORY BUTTON DATA:")
+        for _, child in pairs(inventoryButton:GetDescendants()) do
+            if child:IsA("StringValue") or child:IsA("IntValue") then
+                print("  " .. child.Name .. " = " .. tostring(child.Value))
+            end
         end
         
-        return carButton
+        -- Try clicking it and see what remote gets called
+        print("\n🔄 Clicking inventory button 3 times...")
+        for i = 1, 3 do
+            pcall(function()
+                inventoryButton:Fire("Activated")
+                inventoryButton:Fire("MouseButton1Click")
+                print("  Click " .. i)
+            end)
+            wait(0.5)
+        end
+        
+        print("\n⏳ Check if car appears in trade window...")
+        wait(2)
+        
+        -- Check trade window again
+        pcall(function()
+            local main = Player.PlayerGui.Menu.Trading.PeerToPeer.Main
+            local localPlayer = main.LocalPlayer
+            local scrolling = localPlayer.Content.ScrollingFrame
+            
+            local carCount = 0
+            for _, item in pairs(scrolling:GetChildren()) do
+                if item.Name:sub(1, 4) == "Car-" then
+                    carCount = carCount + 1
+                end
+            end
+            
+            print("Cars in trade window now: " .. carCount)
+        end)
+        
+        return inventoryButton
     else
-        print("❌ Car-AstonMartin8 not in inventory")
+        print("❌ Car-AstonMartin12 not in inventory")
         return nil
     end
 end
 
--- Main test
-local function RunFormatTests()
-    print("\n🎯 RUNNING FORMAT TESTS...")
+-- Try a completely different approach
+local function TryAlternativeApproach()
+    print("\n🎯 TRYING ALTERNATIVE APPROACH...")
     
-    -- Check current trade state
-    CheckTradeWindows()
+    -- Maybe the issue is we're in the wrong trade state
+    print("1. Checking trade state...")
     
-    -- Try normal addition first
-    wait(1)
-    AddCarNormallyForReference()
+    local inCorrectState = false
+    pcall(function()
+        local peerToPeer = Player.PlayerGui.Menu.Trading.PeerToPeer
+        if peerToPeer and peerToPeer.Visible then
+            local top = peerToPeer.Top
+            for _, child in pairs(top:GetChildren()) do
+                if child:IsA("TextLabel") and child.Text:find("Trading with") then
+                    print("✅ Trading with: " .. child.Text)
+                    inCorrectState = true
+                end
+            end
+        end
+    end)
     
-    -- Get car data
-    wait(1)
-    local carData = GetCarData()
+    if not inCorrectState then
+        print("❌ Not in correct trade state")
+        return false
+    end
     
-    -- Test different formats
-    if carData then
-        wait(1)
-        local success, format = TestCarFormats(carData)
+    -- Maybe we need to use a different parameter order
+    print("\n2. Testing different parameter orders...")
+    
+    local carData = GetCarInTrade()
+    if not carData then return false end
+    
+    local testCases = {
+        {name = "Session, CarId", params = {workingSessionId, carData.Id}},
+        {name = "CarId, Session", params = {carData.Id, workingSessionId}},
+        {name = "Just CarId", params = {carData.Id}},
+        {name = "Player, Session, CarId", params = {Player, workingSessionId, carData.Id}},
+    }
+    
+    for i, testCase in ipairs(testCases) do
+        print("\nTest " .. i .. ": " .. testCase.name)
+        
+        local success, result = pcall(function()
+            return SessionAddItem:InvokeServer(unpack(testCase.params))
+        end)
         
         if success then
-            print("\n" .. string.rep("=", 60))
-            print("🎉 FOUND WORKING FORMAT!")
-            print("Session ID: 'otherplayer'")
-            print("Car Format: " .. format.name)
-            print(string.rep("=", 60))
-            
-            -- Check trade windows again
-            wait(1)
-            CheckTradeWindows()
-            
+            print("✅ SUCCESS!")
+            if result then
+                print("Result: " .. tostring(result))
+            end
             return true
+        else
+            print("❌ Failed: " .. tostring(result))
         end
     end
     
-    print("\n" .. string.rep("=", 60))
-    print("❌ No working format found")
-    print("But we KNOW 'otherplayer' is correct session ID!")
-    print("The car format must be different than we expect")
-    print(string.rep("=", 60))
-    
     return false
+end
+
+-- Main function
+local function RunAnalysis()
+    print("\n🔍 RUNNING COMPLETE ANALYSIS...")
+    
+    -- Get the car that's in trade
+    local tradeCarData = GetCarInTrade()
+    
+    -- Monitor inventory click
+    wait(1)
+    MonitorInventoryClick()
+    
+    -- Try with trade car
+    if tradeCarData then
+        wait(1)
+        TestWithTradeCar(tradeCarData)
+    end
+    
+    -- Analyze error pattern
+    wait(1)
+    AnalyzeError()
+    
+    -- Try alternative approach
+    wait(1)
+    TryAlternativeApproach()
+    
+    print("\n" .. string.rep("=", 60))
+    print("ANALYSIS COMPLETE")
+    print("Key finding: Car-AstonMartin12 is IN trade window")
+    print("We need to understand how it got there")
+    print(string.rep("=", 60))
 end
 
 -- Create UI
 local function CreateUI()
     local gui = Instance.new("ScreenGui")
-    gui.Name = "FormatTester"
+    gui.Name = "TradeAnalyzer"
     gui.Parent = Player:WaitForChild("PlayerGui")
     
     local frame = Instance.new("Frame")
@@ -315,51 +344,44 @@ local function CreateUI()
     frame.Draggable = true
     
     local title = Instance.new("TextLabel")
-    title.Text = "CAR FORMAT TESTER 🎉"
+    title.Text = "TRADE ITEM ANALYZER"
     title.Size = UDim2.new(1, 0, 0, 40)
     title.BackgroundColor3 = Color3.fromRGB(60, 60, 90)
-    title.TextColor3 = Color3.fromRGB(100, 255, 100)
+    title.TextColor3 = Color3.fromRGB(100, 200, 255)
     
     local status = Instance.new("TextLabel")
-    status.Text = "Found working session ID: 'otherplayer'\nTesting car formats..."
+    status.Text = "Found Car-AstonMartin12 in trade!\nAnalyzing how it got there..."
     status.Size = UDim2.new(1, -20, 0, 110)
     status.Position = UDim2.new(0, 10, 0, 50)
     status.BackgroundTransparency = 1
-    status.TextColor3 = Color3.fromRGB(200, 255, 200)
+    status.TextColor3 = Color3.fromRGB(200, 230, 255)
     status.TextWrapped = true
     
-    local testBtn = Instance.new("TextButton")
-    testBtn.Text = "🧪 TEST CAR FORMATS"
-    testBtn.Size = UDim2.new(1, -20, 0, 40)
-    testBtn.Position = UDim2.new(0, 10, 0, 170)
-    testBtn.BackgroundColor3 = Color3.fromRGB(70, 140, 100)
-    testBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    local analyzeBtn = Instance.new("TextButton")
+    analyzeBtn.Text = "🔍 ANALYZE TRADE ITEM"
+    analyzeBtn.Size = UDim2.new(1, -20, 0, 40)
+    analyzeBtn.Position = UDim2.new(0, 10, 0, 170)
+    analyzeBtn.BackgroundColor3 = Color3.fromRGB(70, 140, 100)
+    analyzeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
     
-    testBtn.MouseButton1Click:Connect(function()
-        status.Text = "Testing car formats...\nSession ID: 'otherplayer'"
-        testBtn.Text = "TESTING..."
+    analyzeBtn.MouseButton1Click:Connect(function()
+        status.Text = "Analyzing trade item...\nCheck output!"
+        analyzeBtn.Text = "ANALYZING..."
         
         spawn(function()
-            local success = RunFormatTests()
+            RunAnalysis()
             
-            if success then
-                status.Text = "✅ Found working format!\nCheck output"
-                testBtn.Text = "🎉 SUCCESS"
-                testBtn.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
-            else
-                status.Text = "❌ Need different format\nSee output"
-                testBtn.Text = "🧪 TRY AGAIN"
-            end
+            status.Text = "✅ Analysis complete!\nSee output for details"
             
             wait(2)
-            testBtn.Text = "🧪 TEST CAR FORMATS"
+            analyzeBtn.Text = "🔍 ANALYZE TRADE ITEM"
         end)
     end)
     
     -- Parent everything
     title.Parent = frame
     status.Parent = frame
-    testBtn.Parent = frame
+    analyzeBtn.Parent = frame
     frame.Parent = gui
     
     return status
@@ -370,12 +392,10 @@ CreateUI()
 
 -- Instructions
 wait(3)
-print("\n=== CAR FORMAT TESTER ===")
-print("✅ PROVEN: Session ID = 'otherplayer'")
-print("❌ PROBLEM: Car UUID format wrong for SessionAddItem")
-print("\n📋 TESTING STRATEGY:")
-print("1. Try different car ID formats with 'otherplayer'")
-print("2. Check car Data field (might be correct format)")
-print("3. Try name/number instead of UUID")
-print("4. Try table formats")
-print("\n🔍 Click 'TEST CAR FORMATS' to find correct format!")
+print("\n=== TRADE ITEM ANALYZER ===")
+print("CRITICAL DISCOVERY: Car-AstonMartin12 is IN trade window")
+print("\n📋 KEY QUESTIONS:")
+print("1. How did Car-AstonMartin12 get into the trade?")
+print("2. What data format was used to add it?")
+print("3. Can we duplicate it using the same method?")
+print("\n🔍 Click 'ANALYZE TRADE ITEM' to investigate!")
