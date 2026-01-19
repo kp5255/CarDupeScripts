@@ -1,182 +1,185 @@
--- Simple Trade Test - CORRECTED Version
+-- Trade Interaction Test - ACTUAL CLICK VERSION
 local Players = game:GetService("Players")
 local Player = Players.LocalPlayer
-local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
-print("=== SIMPLE TRADE TEST - CORRECTED ===")
+print("🎮 TRADE CLICK SIMULATOR")
 
--- Try different click methods
-local function TestClickMethods(carButton)
-    print("\n🖱️ TESTING CLICK METHODS on: " .. carButton.Name)
+-- Method: Use actual mouse position clicking
+local function SimulateActualClick(button)
+    print("🖱️ Attempting to simulate actual click...")
     
-    -- Method 1: Simulate mouse click via InputBegan/InputEnded
-    local function simulateMouseClick(button)
-        print("🔄 Method 1: Simulating mouse input...")
-        
-        -- Create mouse input objects
-        local mousePos = button.AbsolutePosition + button.AbsoluteSize / 2
-        
-        -- Trigger InputBegan
-        local inputBegan = {
-            UserInputType = Enum.UserInputType.MouseButton1,
-            UserInputState = Enum.UserInputState.Begin,
-            Position = mousePos
-        }
-        
-        local inputEnded = {
-            UserInputType = Enum.UserInputType.MouseButton1,
-            UserInputState = Enum.UserInputState.End,
-            Position = mousePos
-        }
-        
-        -- Try to fire the events
-        local success1 = pcall(function()
-            button:Fire("InputBegan", inputBegan)
-            return true
-        end)
-        
-        local success2 = pcall(function()
-            button:Fire("InputEnded", inputEnded)
-            return true
-        end)
-        
-        if success1 then print("✅ Fired InputBegan") end
-        if success2 then print("✅ Fired InputEnded") end
-        
-        return success1 and success2
-    end
+    -- Get button position and size
+    local absPos = button.AbsolutePosition
+    local absSize = button.AbsoluteSize
+    local centerPos = absPos + absSize / 2
     
-    -- Method 2: Try to find and trigger the event
-    local function triggerMouseButton1Click(button)
-        print("🔄 Method 2: Looking for MouseButton1Click event...")
-        
-        -- Check if button has MouseButton1Click event
-        local success, event = pcall(function()
-            return button.MouseButton1Click
-        end)
-        
-        if success and event then
-            print("✅ Found MouseButton1Click event")
-            event:Fire()
-            return true
-        else
-            print("❌ No MouseButton1Click event found")
-            return false
-        end
-    end
+    print("   Button position: " .. tostring(absPos.X) .. ", " .. tostring(absPos.Y))
+    print("   Button size: " .. tostring(absSize.X) .. "x" .. tostring(absSize.Y))
+    print("   Center: " .. tostring(centerPos.X) .. ", " .. tostring(centerPos.Y))
     
-    -- Method 3: Use Activated event (for ImageButtons)
-    local function triggerActivated(button)
-        print("🔄 Method 3: Looking for Activated event...")
-        
-        local success, event = pcall(function()
-            return button.Activated
+    -- Method 1: Try to connect to the event and then trigger it via actual UI interaction
+    local success, connection = pcall(function()
+        local clicked = false
+        local conn = button.MouseButton1Click:Connect(function()
+            clicked = true
+            print("✅ MouseButton1Click event fired!")
         end)
         
-        if success and event then
-            print("✅ Found Activated event")
-            event:Fire()
-            return true
-        else
-            print("❌ No Activated event found")
-            return false
-        end
-    end
-    
-    -- Method 4: Direct property change (visual only)
-    local function simulateSelection(button)
-        print("🔄 Method 4: Simulating selection...")
-        
-        -- Try to change selection visual states
-        local success1 = pcall(function()
-            if button:IsA("GuiButton") then
-                button.Selected = true
-                wait(0.1)
-                button.Selected = false
-                return true
-            end
-            return false
-        end)
-        
-        local success2 = pcall(function()
-            if button:FindFirstChild("SelectionImageObject") then
-                button.SelectionImageObject.Visible = true
-                wait(0.1)
-                button.SelectionImageObject.Visible = false
-                return true
-            end
-            return false
-        end)
-        
-        if success1 then print("✅ Changed Selected property") end
-        if success2 then print("✅ Changed SelectionImageObject") end
-        
-        return success1 or success2
-    end
-    
-    -- Method 5: Hook into the button's click function
-    local function hookClickFunction(button)
-        print("🔄 Method 5: Attempting to hook click function...")
-        
-        local oldMouseButton1Down = button.MouseButton1Down
-        local oldMouseButton1Up = button.MouseButton1Up
-        
-        if oldMouseButton1Down then
-            print("✅ Found MouseButton1Down event")
-            oldMouseButton1Down:Fire()
-            return true
+        -- Try to trigger the button's Activated event
+        if button.Activated then
+            button.Activated:Connect(function()
+                print("✅ Activated event fired!")
+                clicked = true
+            end)
         end
         
-        if oldMouseButton1Up then
-            print("✅ Found MouseButton1Up event")
-            oldMouseButton1Up:Fire()
-            return true
-        end
+        -- Try to simulate a click by changing properties that might trigger the button
+        button.Selected = true
+        wait(0.05)
+        button.Selected = false
         
-        print("❌ No click events found")
-        return false
+        wait(0.1)
+        
+        return clicked
+    end)
+    
+    if success and connection then
+        print("✅ Click simulation attempted")
+        return true
     end
     
-    -- Run all methods
-    local results = {
-        simulateMouseClick(carButton),
-        triggerMouseButton1Click(carButton),
-        triggerActivated(carButton),
-        simulateSelection(carButton),
-        hookClickFunction(carButton)
-    }
-    
-    -- Check if any method succeeded
-    local anySuccess = false
-    for _, success in ipairs(results) do
-        if success then anySuccess = true end
-    end
-    
-    return anySuccess
+    return false
 end
 
--- Find and test the car
-local function TestCarInteraction()
-    print("\n🔍 LOOKING FOR Car-AstonMartin12")
+-- Method: Try to find and trigger the button's functionality directly
+local function TriggerButtonFunctionality(button)
+    print("🔧 Looking for button functionality...")
     
+    -- Check what kind of button this is
+    print("   Button type: " .. button.ClassName)
+    
+    -- Look for scripts attached to the button
+    local scriptsFound = 0
+    for _, child in pairs(button:GetDescendants()) do
+        if child:IsA("LocalScript") or child:IsA("Script") then
+            scriptsFound = scriptsFound + 1
+            print("   Found script: " .. child.Name)
+        end
+    end
+    
+    if scriptsFound > 0 then
+        print("   Total scripts: " .. scriptsFound)
+    end
+    
+    -- Try to find RemoteEvents that might be triggered
+    for _, child in pairs(button:GetDescendants()) do
+        if child:IsA("RemoteEvent") then
+            print("   Found RemoteEvent: " .. child.Name)
+            
+            -- Try to fire the remote with different data
+            local success, result = pcall(function()
+                child:FireServer("select", button.Name)
+                return true
+            end)
+            
+            if success then
+                print("   ✅ Fired RemoteEvent")
+                return true
+            end
+        end
+    end
+    
+    -- Look for the parent frame that might handle clicks
+    local parent = button.Parent
+    if parent then
+        print("   Parent: " .. parent.Name .. " (" .. parent.ClassName .. ")")
+        
+        -- Check parent for scripts
+        for _, child in pairs(parent:GetDescendants()) do
+            if child:IsA("LocalScript") and child.Name:lower():find("click") then
+                print("   Found click handler script: " .. child.Name)
+            end
+        end
+    end
+    
+    return false
+end
+
+-- Method: Check if we can duplicate the visual appearance
+local function CheckVisualDuplication(button)
+    print("🎨 Analyzing button for duplication...")
+    
+    -- Get all properties
+    local properties = {}
+    
+    local function safeGet(prop)
+        local success, value = pcall(function()
+            return button[prop]
+        end)
+        if success then
+            properties[prop] = value
+        end
+    end
+    
+    -- Get visual properties
+    safeGet("Image")
+    safeGet("ImageColor3")
+    safeGet("ImageTransparency")
+    safeGet("BackgroundColor3")
+    safeGet("BackgroundTransparency")
+    safeGet("BorderColor3")
+    safeGet("BorderSizePixel")
+    safeGet("Position")
+    safeGet("Size")
+    safeGet("Rotation")
+    safeGet("ScaleType")
+    safeGet("SliceScale")
+    safeGet("TileSize")
+    
+    print("   Visual properties found: " .. #properties)
+    
+    -- Check for children that make up the car display
+    local childrenInfo = {}
+    for _, child in pairs(button:GetChildren()) do
+        local info = child.Name .. " (" .. child.ClassName .. ")"
+        if child:IsA("TextLabel") and child.Text ~= "" then
+            info = info .. ": \"" .. child.Text .. "\""
+        elseif child:IsA("ImageLabel") and child.Image ~= "" then
+            info = info .. " [Image]"
+        end
+        table.insert(childrenInfo, info)
+    end
+    
+    if #childrenInfo > 0 then
+        print("   Children:")
+        for _, info in ipairs(childrenInfo) do
+            print("     • " .. info)
+        end
+    end
+    
+    return properties
+end
+
+-- Main test function
+local function TestCarButton(carName)
+    print("\n" .. string.rep("=", 60))
+    print("🎯 TESTING: " .. carName)
+    
+    -- Find the car button
     local carButton = nil
-    local carPath = nil
-    
-    -- Safely search for the car
     local success, result = pcall(function()
-        local menu = Player.PlayerGui:WaitForChild("Menu")
-        local trading = menu:WaitForChild("Trading")
-        local peerToPeer = trading:WaitForChild("PeerToPeer")
-        local main = peerToPeer:WaitForChild("Main")
-        local inventory = main:WaitForChild("Inventory")
-        local list = inventory:WaitForChild("List")
-        local scrolling = list:WaitForChild("ScrollingFrame")
+        local menu = Player.PlayerGui.Menu
+        local trading = menu.Trading
+        local peerToPeer = trading.PeerToPeer
+        local main = peerToPeer.Main
+        local inventory = main.Inventory
+        local list = inventory.List
+        local scrolling = list.ScrollingFrame
         
         for _, item in pairs(scrolling:GetChildren()) do
-            if item.Name == "Car-AstonMartin12" then
-                carButton = item
-                carPath = item:GetFullName()
+            if item.Name == carName then
                 return item
             end
         end
@@ -184,100 +187,103 @@ local function TestCarInteraction()
     end)
     
     if not success then
-        print("❌ Error: " .. tostring(result))
+        print("❌ Error finding button: " .. tostring(result))
         return false
     end
     
-    if carButton then
-        print("✅ FOUND: " .. carPath)
-        print("📊 Button Info:")
-        print("   Class: " .. carButton.ClassName)
-        print("   Visible: " .. tostring(carButton.Visible))
-        print("   Active: " .. tostring(carButton.Active))
+    if not carButton then
+        print("❌ Button not found: " .. carName)
+        return false
+    end
+    
+    print("✅ Found button: " .. carButton:GetFullName())
+    
+    -- Test different methods
+    local methods = {
+        SimulateActualClick,
+        TriggerButtonFunctionality,
+        CheckVisualDuplication
+    }
+    
+    local methodNames = {
+        "Click Simulation",
+        "Functionality Trigger",
+        "Visual Analysis"
+    }
+    
+    local anySuccess = false
+    
+    for i, method in ipairs(methods) do
+        print("\n🔄 Method " .. i .. ": " .. methodNames[i])
+        local success = method(carButton)
+        if success then
+            print("✅ " .. methodNames[i] .. " succeeded!")
+            anySuccess = true
+        else
+            print("❌ " .. methodNames[i] .. " failed")
+        end
+    end
+    
+    -- Check if car appeared in trade
+    wait(1)
+    print("\n📊 CHECKING TRADE OFFER...")
+    
+    local checkSuccess, carsInOffer = pcall(function()
+        local menu = Player.PlayerGui.Menu
+        local trading = menu.Trading
+        local peerToPeer = trading.PeerToPeer
+        local main = peerToPeer.Main
+        local localPlayer = main.LocalPlayer
+        local content = localPlayer.Content
+        local scrolling = content.ScrollingFrame
         
-        -- Check what events/properties are available
-        print("\n🔍 Checking available properties:")
-        
-        local propertiesToCheck = {
-            "Activated",
-            "MouseButton1Click", 
-            "MouseButton1Down",
-            "MouseButton1Up",
-            "Selected",
-            "SelectionImageObject",
-            "AutoButtonColor",
-            "Modal"
-        }
-        
-        for _, prop in ipairs(propertiesToCheck) do
-            local success, value = pcall(function()
-                return carButton[prop]
-            end)
-            if success then
-                if type(value) == "boolean" then
-                    print("   " .. prop .. ": " .. tostring(value))
-                elseif value ~= nil then
-                    print("   " .. prop .. ": [Exists]")
-                end
+        local cars = {}
+        for _, item in pairs(scrolling:GetChildren()) do
+            if item.Name:sub(1, 4) == "Car-" then
+                table.insert(cars, item.Name)
             end
         end
-        
-        -- Try to interact with the button
-        print("\n🎯 ATTEMPTING INTERACTION...")
-        local interactionSuccess = TestClickMethods(carButton)
-        
-        -- Check if car was added to trade
-        wait(2)
-        print("\n📊 CHECKING TRADE STATUS...")
-        
-        local tradeSuccess, tradeResult = pcall(function()
-            local menu = Player.PlayerGui.Menu
-            local trading = menu.Trading
-            local peerToPeer = trading.PeerToPeer
-            local main = peerToPeer.Main
-            local localPlayer = main.LocalPlayer
-            local content = localPlayer.Content
-            local scrolling = content.ScrollingFrame
+        return cars
+    end)
+    
+    if checkSuccess then
+        if #carsInOffer > 0 then
+            print("✅ Cars in trade offer:")
+            for _, car in ipairs(carsInOffer) do
+                print("   🚗 " .. car)
+            end
             
-            local cars = {}
-            for _, item in pairs(scrolling:GetChildren()) do
-                if item.Name:sub(1, 4) == "Car-" then
-                    table.insert(cars, item.Name)
+            -- Check if our tested car is there
+            local found = false
+            for _, car in ipairs(carsInOffer) do
+                if car == carName then
+                    found = true
+                    break
                 end
             end
             
-            return cars
-        end)
-        
-        if tradeSuccess then
-            if #tradeResult > 0 then
-                print("✅ CARS IN TRADE OFFER:")
-                for _, carName in ipairs(tradeResult) do
-                    print("   🚗 " .. carName)
-                end
+            if found then
+                print("🎉 SUCCESS! " .. carName .. " was added to trade!")
+                anySuccess = true
             else
-                print("📭 No cars in trade offer")
+                print("❌ " .. carName .. " was NOT added to trade")
             end
         else
-            print("❌ Could not check trade: " .. tostring(tradeResult))
+            print("📭 No cars in trade offer")
         end
-        
-        return interactionSuccess
     else
-        print("❌ Car-AstonMartin12 not found in inventory")
-        print("💡 Make sure:")
-        print("   1. You're in a trade")
-        print("   2. The car is in your inventory")
-        print("   3. You can see it in the trade window")
-        return false
+        print("❌ Could not check trade: " .. tostring(carsInOffer))
     end
+    
+    print(string.rep("=", 60))
+    return anySuccess
 end
 
--- Try alternative: Look for ANY car
-local function TestAnyCar()
-    print("\n🔍 LOOKING FOR ANY CAR...")
+-- Find and test all cars
+local function TestAllCars()
+    print("\n🔍 SCANNING FOR ALL CARS...")
     
-    local foundCars = {}
+    local carsFound = {}
     
     local success, result = pcall(function()
         local menu = Player.PlayerGui.Menu
@@ -290,83 +296,87 @@ local function TestAnyCar()
         
         for _, item in pairs(scrolling:GetChildren()) do
             if item.Name:sub(1, 4) == "Car-" then
-                table.insert(foundCars, {
+                table.insert(carsFound, {
                     Name = item.Name,
                     Object = item,
-                    Class = item.ClassName
+                    Index = #carsFound + 1
                 })
             end
         end
-        return foundCars
+        return carsFound
     end)
     
-    if success then
-        if #foundCars > 0 then
-            print("✅ FOUND " .. #foundCars .. " CARS:")
-            for i, car in ipairs(foundCars) do
-                print("   " .. i .. ". " .. car.Name .. " (" .. car.Class .. ")")
-            end
-            
-            -- Try the first car
-            print("\n🎯 TESTING FIRST CAR: " .. foundCars[1].Name)
-            return TestClickMethods(foundCars[1].Object)
-        else
-            print("❌ No cars found in inventory")
-            return false
+    if not success then
+        print("❌ Error: " .. tostring(result))
+        return {}
+    end
+    
+    if #carsFound > 0 then
+        print("✅ Found " .. #carsFound .. " cars:")
+        for i, car in ipairs(carsFound) do
+            print("   " .. i .. ". " .. car.Name)
         end
     else
-        print("❌ Error: " .. tostring(result))
-        return false
+        print("❌ No cars found")
     end
+    
+    return carsFound
 end
 
--- Create test UI with options
-local function CreateTestUI()
+-- Create control panel
+local function CreateControlPanel()
     local gui = Instance.new("ScreenGui")
-    gui.Name = "TradeTestUI"
+    gui.Name = "TradeClickTester"
     gui.Parent = Player:WaitForChild("PlayerGui")
+    gui.ResetOnSpawn = false
     
     local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(0, 300, 0, 200)
-    frame.Position = UDim2.new(0.5, -150, 0, 20)
+    frame.Size = UDim2.new(0, 350, 0, 300)
+    frame.Position = UDim2.new(0.7, 0, 0.2, 0)
     frame.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
     frame.Active = true
     frame.Draggable = true
     
     local title = Instance.new("TextLabel")
-    title.Text = "🎮 TRADE INTERACTION TEST"
-    title.Size = UDim2.new(1, 0, 0, 30)
+    title.Text = "🎮 TRADE CLICK TESTER"
+    title.Size = UDim2.new(1, 0, 0, 40)
     title.BackgroundColor3 = Color3.fromRGB(60, 60, 90)
     title.TextColor3 = Color3.fromRGB(255, 255, 255)
     title.Font = Enum.Font.GothamBold
     
-    local button1 = Instance.new("TextButton")
-    button1.Text = "🖱️ TEST SPECIFIC CAR"
-    button1.Size = UDim2.new(1, -20, 0, 40)
-    button1.Position = UDim2.new(0, 10, 0, 40)
-    button1.BackgroundColor3 = Color3.fromRGB(70, 140, 100)
-    button1.TextColor3 = Color3.fromRGB(255, 255, 255)
-    
-    local button2 = Instance.new("TextButton")
-    button2.Text = "🔍 TEST ANY CAR"
-    button2.Size = UDim2.new(1, -20, 0, 40)
-    button2.Position = UDim2.new(0, 10, 0, 90)
-    button2.BackgroundColor3 = Color3.fromRGB(100, 100, 200)
-    button2.TextColor3 = Color3.fromRGB(255, 255, 255)
-    
     local status = Instance.new("TextLabel")
-    status.Text = "Ready to test..."
-    status.Size = UDim2.new(1, -20, 0, 50)
-    status.Position = UDim2.new(0, 10, 1, -60)
+    status.Text = "Ready..."
+    status.Size = UDim2.new(1, -20, 0, 60)
+    status.Position = UDim2.new(0, 10, 0, 50)
     status.BackgroundTransparency = 1
     status.TextColor3 = Color3.fromRGB(200, 200, 255)
     status.Font = Enum.Font.Gotham
     status.TextWrapped = true
     
-    local function updateStatus(text, color)
-        status.Text = text
-        status.TextColor3 = color or Color3.fromRGB(200, 200, 255)
-    end
+    local scanButton = Instance.new("TextButton")
+    scanButton.Text = "🔍 SCAN CARS"
+    scanButton.Size = UDim2.new(1, -20, 0, 40)
+    scanButton.Position = UDim2.new(0, 10, 0, 120)
+    scanButton.BackgroundColor3 = Color3.fromRGB(70, 140, 100)
+    scanButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    
+    local testButton = Instance.new("TextButton")
+    testButton.Text = "🖱️ TEST CLICK"
+    testButton.Size = UDim2.new(1, -20, 0, 40)
+    testButton.Position = UDim2.new(0, 10, 0, 170)
+    testButton.BackgroundColor3 = Color3.fromRGB(100, 100, 200)
+    testButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    
+    local carList = Instance.new("ScrollingFrame")
+    carList.Size = UDim2.new(1, -20, 0, 80)
+    carList.Position = UDim2.new(0, 10, 1, -100)
+    carList.BackgroundColor3 = Color3.fromRGB(30, 30, 50)
+    carList.BorderSizePixel = 0
+    carList.ScrollBarThickness = 6
+    carList.Visible = false
+    
+    local carLayout = Instance.new("UIListLayout")
+    carLayout.Padding = UDim.new(0, 5)
     
     -- Add corners
     local corner = Instance.new("UICorner")
@@ -374,55 +384,124 @@ local function CreateTestUI()
     
     corner:Clone().Parent = frame
     corner:Clone().Parent = title
-    corner:Clone().Parent = button1
-    corner:Clone().Parent = button2
+    corner:Clone().Parent = scanButton
+    corner:Clone().Parent = testButton
+    corner:Clone().Parent = carList
     
-    -- Parenting
+    -- Parent
     title.Parent = frame
-    button1.Parent = frame
-    button2.Parent = frame
     status.Parent = frame
+    scanButton.Parent = frame
+    testButton.Parent = frame
+    carLayout.Parent = carList
+    carList.Parent = frame
     frame.Parent = gui
     
-    -- Button events
-    button1.MouseButton1Click:Connect(function()
-        updateStatus("Testing Car-AstonMartin12...", Color3.fromRGB(255, 200, 100))
-        button1.Text = "TESTING..."
-        spawn(function()
-            local success = TestCarInteraction()
-            if success then
-                updateStatus("✅ Test completed!", Color3.fromRGB(100, 255, 100))
-            else
-                updateStatus("❌ Test failed", Color3.fromRGB(255, 100, 100))
+    -- Variables
+    local cars = {}
+    local selectedCar = nil
+    
+    local function updateStatus(text, color)
+        status.Text = text
+        status.TextColor3 = color or Color3.fromRGB(200, 200, 255)
+    end
+    
+    local function addCarButton(carInfo)
+        local btn = Instance.new("TextButton")
+        btn.Text = carInfo.Name
+        btn.Size = UDim2.new(0.9, 0, 0, 30)
+        btn.Position = UDim2.new(0.05, 0, 0, 0)
+        btn.BackgroundColor3 = Color3.fromRGB(60, 60, 90)
+        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        
+        btn.MouseButton1Click:Connect(function()
+            selectedCar = carInfo.Name
+            updateStatus("Selected: " .. carInfo.Name, Color3.fromRGB(255, 255, 200))
+            
+            -- Highlight selected
+            for _, child in pairs(carList:GetChildren()) do
+                if child:IsA("TextButton") then
+                    child.BackgroundColor3 = Color3.fromRGB(60, 60, 90)
+                end
             end
-            wait(2)
-            button1.Text = "🖱️ TEST SPECIFIC CAR"
-            updateStatus("Ready to test...")
+            btn.BackgroundColor3 = Color3.fromRGB(80, 80, 120)
         end)
+        
+        btn.Parent = carList
+        return btn
+    end
+    
+    -- Button events
+    scanButton.MouseButton1Click:Connect(function()
+        updateStatus("Scanning for cars...", Color3.fromRGB(255, 200, 100))
+        scanButton.Text = "SCANNING..."
+        
+        -- Clear old list
+        for _, child in pairs(carList:GetChildren()) do
+            if child:IsA("TextButton") then
+                child:Destroy()
+            end
+        end
+        
+        cars = TestAllCars()
+        
+        if #cars > 0 then
+            updateStatus("Found " .. #cars .. " cars", Color3.fromRGB(100, 255, 100))
+            carList.Visible = true
+            
+            for _, car in ipairs(cars) do
+                addCarButton(car)
+            end
+            
+            -- Auto-select first car
+            selectedCar = cars[1].Name
+        else
+            updateStatus("No cars found", Color3.fromRGB(255, 100, 100))
+            carList.Visible = false
+        end
+        
+        scanButton.Text = "🔍 SCAN CARS"
     end)
     
-    button2.MouseButton1Click:Connect(function()
-        updateStatus("Testing any car...", Color3.fromRGB(255, 200, 100))
-        button2.Text = "TESTING..."
-        spawn(function()
-            local success = TestAnyCar()
-            if success then
-                updateStatus("✅ Test completed!", Color3.fromRGB(100, 255, 100))
-            else
-                updateStatus("❌ Test failed", Color3.fromRGB(255, 100, 100))
-            end
-            wait(2)
-            button2.Text = "🔍 TEST ANY CAR"
-            updateStatus("Ready to test...")
-        end)
+    testButton.MouseButton1Click:Connect(function()
+        if not selectedCar then
+            updateStatus("Please select a car first!", Color3.fromRGB(255, 100, 100))
+            return
+        end
+        
+        updateStatus("Testing " .. selectedCar .. "...", Color3.fromRGB(255, 200, 100))
+        testButton.Text = "TESTING..."
+        
+        local success = TestCarButton(selectedCar)
+        
+        if success then
+            updateStatus("✅ Test completed for " .. selectedCar, Color3.fromRGB(100, 255, 100))
+        else
+            updateStatus("❌ Test failed for " .. selectedCar, Color3.fromRGB(255, 100, 100))
+        end
+        
+        testButton.Text = "🖱️ TEST CLICK"
     end)
+    
+    -- Initial scan
+    wait(1)
+    scanButton:Click()
     
     return gui
 end
 
 -- Initialize
-CreateTestUI()
+print("\n" .. string.rep("=", 60))
+print("🎮 TRADE CLICK SIMULATOR LOADED")
+print("📍 Will analyze and test car buttons")
+print("💡 Click SCAN CARS, select a car, then TEST CLICK")
+print(string.rep("=", 60))
 
-print("\n✅ CORRECTED SCRIPT LOADED!")
-print("🎮 Use the test panel to try different methods")
-print("💡 The script now properly tries to interact with ImageButtons")
+CreateControlPanel()
+
+print("\n✅ Control panel created!")
+print("💡 Features:")
+print("   • Scan all available cars")
+print("   • Select specific car to test")
+print("   • Multiple click simulation methods")
+print("   • Detailed output analysis")
