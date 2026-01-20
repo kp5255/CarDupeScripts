@@ -1,9 +1,9 @@
--- 💀 FINAL BATTLE - NO ERRORS, JUST TRUTH
+-- FIXED VERSION: Use Fire instead of FireServer for RemoteEvents
 local Players = game:GetService("Players")
 local Player = Players.LocalPlayer
 local RS = game:GetService("ReplicatedStorage")
 
-print("💀 FINAL BATTLE")
+print("💀 FINAL BATTLE - FIXED VERSION")
 print("=" .. string.rep("=", 60))
 
 -- Get ALL trading remotes
@@ -62,9 +62,9 @@ for _, remote in pairs(tradingFolder:GetChildren()) do
         end
         
     elseif remote.ClassName == "RemoteEvent" then
-        -- Hook RemoteEvent
-        local originalFire = remote.FireServer
-        remote.FireServer = function(self, ...)
+        -- FIXED: Use Fire instead of FireServer
+        local originalFire = remote.Fire
+        remote.Fire = function(self, ...)  -- Changed from FireServer to Fire
             local args = {...}
             
             print("\n🔥 CAPTURED EVENT: " .. remote.Name)
@@ -86,7 +86,7 @@ for _, remote in pairs(tradingFolder:GetChildren()) do
             end
             
             -- Call original
-            return originalFire(self, ...)
+            return originalFire(self, ...)  -- Changed from FireServer to Fire
         end
     end
 end
@@ -160,7 +160,12 @@ if capturedData and capturedRemote then
         function testAdd()
             print("🧪 Testing add...")
             local success, result = pcall(function()
-                return remote:InvokeServer(data)
+                if remote.ClassName == "RemoteFunction" then
+                    return remote:InvokeServer(data)
+                else
+                    remote:Fire(data)
+                    return "Event fired"
+                end
             end)
             
             if success then
@@ -173,7 +178,7 @@ if capturedData and capturedRemote then
             end
         end
         
-        -- Bulk add function
+        -- Bulk add function (FIXED for both RemoteEvent and RemoteFunction)
         function addMultiple(count)
             print("📦 Adding " .. count .. " items...")
             
@@ -182,7 +187,12 @@ if capturedData and capturedRemote then
                 print("[" .. i .. "/" .. count .. "] Adding...")
                 
                 local success = pcall(function()
-                    return remote:InvokeServer(data)
+                    if remote.ClassName == "RemoteFunction" then
+                        return remote:InvokeServer(data)
+                    else
+                        remote:Fire(data)
+                        return true
+                    end
                 end)
                 
                 if success then
@@ -227,37 +237,6 @@ if capturedData and capturedRemote then
     local success, err = pcall(loadstring, botCode)
     if not success then
         print("❌ Failed to create bot:", err)
-        
-        -- Try simpler approach
-        print("\n💥 SIMPLER APPROACH...")
-        
-        local simpleCode = [[
-            local remote = game:GetService("ReplicatedStorage").Remotes.Services.TradingServiceRemotes.]] .. capturedRemote.Name .. [[
-            local data = ]] .. (type(capturedData) == "table" and 
-                "{" .. 
-                (function()
-                    local parts = {}
-                    for k, v in pairs(capturedData) do
-                        table.insert(parts, tostring(k) .. ' = "' .. tostring(v) .. '"')
-                    end
-                    return table.concat(parts, ", ")
-                end)() .. 
-                "}" 
-            or 
-                '"' .. tostring(capturedData) .. '"') .. [[
-            
-            -- Add 5 immediately
-            for i = 1, 5 do
-                print("Adding " .. i .. "...")
-                pcall(function()
-                    remote:InvokeServer(data)
-                end)
-                wait(1)
-            end
-            print("✅ Added 5 cars!")
-        ]]
-        
-        pcall(loadstring, simpleCode)
     end
     
 else
@@ -306,10 +285,16 @@ else
         end
         
         -- Try to trigger the button
-        if button:IsA("TextButton") then
+        if button:IsA("TextButton") or button:IsA("ImageButton") then
             pcall(function()
-                button:Fire("Activated")
-                print("Fired Activated event")
+                local event = button:FindFirstChild("Activated")
+                if event then
+                    event:Fire()
+                    print("Fired Activated event")
+                else
+                    button.Activated:Fire()
+                    print("Fired Activated method")
+                end
             end)
         end
     else
