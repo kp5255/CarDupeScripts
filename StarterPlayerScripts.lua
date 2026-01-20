@@ -1,327 +1,420 @@
--- 🚀 ASTON MARTIN 12 TRADE BOT - FIXED VERSION
--- Simple version that works without errors
+-- 🔍 FIND EXACT ITEM TYPE
+-- Tests ALL possible item types to find the right one
 
 local Players = game:GetService("Players")
 local Player = Players.LocalPlayer
 local RS = game:GetService("ReplicatedStorage")
 
-print("=== ASTON MARTIN 12 TRADE BOT ===")
+print("=== FINDING EXACT ITEM TYPE ===")
 
--- Wait for game to fully load
-repeat task.wait(1) until game:IsLoaded()
-task.wait(2)
-
--- Get the trading remote
+-- Get the remote
 local tradingRemote = RS.Remotes.Services.TradingServiceRemotes.SessionAddItem
-print("✅ Remote found: SessionAddItem")
+print("✅ Remote: SessionAddItem")
 
--- ===== THE CORRECT DATA FORMAT =====
-local CORRECT_DATA = {
-    ItemId = "AstonMartin12",
-    itemType = "Car"
-}
-
-print("✅ Using format: {ItemId = 'AstonMartin12', itemType = 'Car'}")
-
--- ===== SIMPLE QUANTITY ASKER =====
-local function AskHowMany()
-    -- Create popup
-    local gui = Instance.new("ScreenGui")
-    gui.Name = "TradeBotPopup"
-    gui.Parent = Player:WaitForChild("PlayerGui")
-    
-    -- Main frame
-    local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(0, 280, 0, 180)
-    frame.Position = UDim2.new(0.5, -140, 0.5, -90)
-    frame.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
-    frame.BackgroundTransparency = 0.1
-    
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 12)
-    corner.Parent = frame
-    
-    -- Title
-    local title = Instance.new("TextLabel")
-    title.Text = "🚗 ASTON MARTIN 12 BOT"
-    title.Size = UDim2.new(1, 0, 0, 40)
-    title.BackgroundColor3 = Color3.fromRGB(60, 60, 90)
-    title.TextColor3 = Color3.fromRGB(255, 255, 255)
-    title.Font = Enum.Font.GothamBold
-    title.TextSize = 16
-    
-    -- Question
-    local question = Instance.new("TextLabel")
-    question.Text = "How many to add to trade?"
-    question.Size = UDim2.new(1, -20, 0, 30)
-    question.Position = UDim2.new(0, 10, 0, 50)
-    question.BackgroundTransparency = 1
-    question.TextColor3 = Color3.fromRGB(200, 200, 255)
-    question.Font = Enum.Font.Gotham
-    question.TextSize = 14
-    
-    -- Input box
-    local inputBox = Instance.new("TextBox")
-    inputBox.Text = "10"
-    inputBox.PlaceholderText = "Enter number..."
-    inputBox.Size = UDim2.new(1, -40, 0, 35)
-    inputBox.Position = UDim2.new(0, 20, 0, 85)
-    inputBox.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-    inputBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-    inputBox.Font = Enum.Font.GothamBold
-    inputBox.TextSize = 16
-    inputBox.TextScaled = false
-    
-    local inputCorner = Instance.new("UICorner")
-    inputCorner.CornerRadius = UDim.new(0, 8)
-    inputCorner.Parent = inputBox
-    
-    -- Quick buttons
-    local quickNumbers = {10, 25, 50, 100}
-    local quickColors = {
-        Color3.fromRGB(70, 120, 180),
-        Color3.fromRGB(180, 100, 60),
-        Color3.fromRGB(180, 60, 120),
-        Color3.fromRGB(60, 180, 120)
+-- ===== TEST ALL POSSIBLE ITEM TYPES =====
+local function TestItemType(itemType)
+    local testData = {
+        ItemId = "AstonMartin12",
+        itemType = itemType
     }
     
-    for i, number in ipairs(quickNumbers) do
-        local quickBtn = Instance.new("TextButton")
-        quickBtn.Text = tostring(number)
-        quickBtn.Size = UDim2.new(0, 50, 0, 25)
-        quickBtn.Position = UDim2.new(0, 20 + (i-1)*65, 0, 125)
-        quickBtn.BackgroundColor3 = quickColors[i]
-        quickBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        quickBtn.Font = Enum.Font.GothamBold
-        quickBtn.TextSize = 12
-        
-        local quickCorner = Instance.new("UICorner")
-        quickCorner.CornerRadius = UDim.new(0, 6)
-        quickCorner.Parent = quickBtn
-        
-        quickBtn.MouseButton1Click:Connect(function()
-            inputBox.Text = tostring(number)
-        end)
-        
-        quickBtn.Parent = frame
-    end
+    print("\n🧪 Testing itemType: '" .. itemType .. "'")
     
-    -- Add button
-    local addBtn = Instance.new("TextButton")
-    addBtn.Text = "✅ START ADDING"
-    addBtn.Size = UDim2.new(1, -40, 0, 35)
-    addBtn.Position = UDim2.new(0, 20, 1, -45)
-    addBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
-    addBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    addBtn.Font = Enum.Font.GothamBold
-    addBtn.TextSize = 14
-    
-    local addCorner = Instance.new("UICorner")
-    addCorner.CornerRadius = UDim.new(0, 8)
-    addCorner.Parent = addBtn
-    
-    -- Cancel button
-    local cancelBtn = Instance.new("TextButton")
-    cancelBtn.Text = "✕"
-    cancelBtn.Size = UDim2.new(0, 25, 0, 25)
-    cancelBtn.Position = UDim2.new(1, -30, 0, 7)
-    cancelBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 100)
-    cancelBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    cancelBtn.Font = Enum.Font.GothamBold
-    
-    cancelBtn.MouseButton1Click:Connect(function()
-        gui:Destroy()
-        print("❌ Cancelled by user")
+    local success, result = pcall(function()
+        return tradingRemote:InvokeServer(testData)
     end)
     
-    -- Parent everything
-    title.Parent = frame
-    question.Parent = frame
-    inputBox.Parent = frame
-    addBtn.Parent = frame
-    cancelBtn.Parent = title
-    frame.Parent = gui
-    
-    -- Return the gui and input box for external control
-    return gui, inputBox, addBtn
+    if success then
+        print("✅ SUCCESS! Result:", result)
+        return true, result, testData
+    else
+        print("❌ Failed:", result)
+        return false, result
+    end
 end
 
--- ===== ADD CARS FUNCTION =====
-local function AddCars(quantity)
-    print("\n" .. string.rep("=", 50))
-    print("🚀 STARTING TO ADD " .. quantity .. " ASTON MARTIN 12")
-    print(string.rep("=", 50))
+-- ===== ALL POSSIBLE ITEM TYPES =====
+local itemTypesToTest = {
+    -- Common car/vehicle types
+    "Car", "Vehicle", "Automobile", "Automotive",
+    "Ride", "Drive", "Motor", "Engine",
     
-    local successCount = 0
-    local failCount = 0
+    -- Try with different capitalization
+    "car", "vehicle", "automobile",
+    "CAR", "VEHICLE", "AUTOMOBILE",
     
-    -- Create simple status display
-    local statusGui = Instance.new("ScreenGui")
-    statusGui.Name = "StatusUI"
-    statusGui.Parent = Player:WaitForChild("PlayerGui")
+    -- Game-specific types
+    "Rideable", "Driveable", "Movable",
+    "Transport", "Transportation",
     
-    local statusFrame = Instance.new("Frame")
-    statusFrame.Size = UDim2.new(0, 250, 0, 100)
-    statusFrame.Position = UDim2.new(0, 10, 0, 10)
-    statusFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
-    statusFrame.BackgroundTransparency = 0.2
+    -- Try numeric types
+    "1", "2", "3", "4", "5", "6", "7", "8", "9", "10",
     
-    local statusCorner = Instance.new("UICorner")
-    statusCorner.CornerRadius = UDim.new(0, 10)
-    statusCorner.Parent = statusFrame
+    -- Try type IDs
+    "Type1", "Type2", "Type3", "TypeCar", "TypeVehicle",
     
-    -- Status text
-    local statusText = Instance.new("TextLabel")
-    statusText.Text = "Adding: 0/" .. quantity
-    statusText.Size = UDim2.new(1, -20, 0.7, 0)
-    statusText.Position = UDim2.new(0, 10, 0, 10)
-    statusText.BackgroundTransparency = 1
-    statusText.TextColor3 = Color3.fromRGB(255, 255, 255)
-    statusText.Font = Enum.Font.Gotham
-    statusText.TextSize = 14
+    -- Try category names
+    "CategoryCar", "CategoryVehicle", "Category1",
     
-    -- Stop button
-    local stopBtn = Instance.new("TextButton")
-    stopBtn.Text = "⏹️ STOP"
-    stopBtn.Size = UDim2.new(0.4, 0, 0, 25)
-    stopBtn.Position = UDim2.new(0.3, 0, 0.7, 0)
-    stopBtn.BackgroundColor3 = Color3.fromRGB(180, 60, 60)
-    stopBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    stopBtn.Font = Enum.Font.Gotham
-    stopBtn.TextSize = 12
+    -- Try nothing/null
+    "", nil,
     
-    local stopCorner = Instance.new("UICorner")
-    stopCorner.CornerRadius = UDim.new(0, 6)
-    stopCorner.Parent = stopBtn
+    -- Try boolean
+    true, false,
     
-    -- Parent status UI
-    statusText.Parent = statusFrame
-    stopBtn.Parent = statusFrame
-    statusFrame.Parent = statusGui
+    -- Try with spaces
+    "Car Type", "Vehicle Type", "Auto Mobile",
     
-    -- Variable to control adding
-    local isAdding = true
+    -- Try abbreviations
+    "Veh", "Auto", "Ride", "Mov",
     
-    -- Stop button action
-    stopBtn.MouseButton1Click:Connect(function()
-        isAdding = false
-        stopBtn.Text = "⏹️ STOPPED"
-    end)
+    -- Try plural
+    "Cars", "Vehicles", "Automobiles",
     
-    -- Start adding in a separate thread
-    task.spawn(function()
-        for i = 1, quantity do
-            if not isAdding then
-                print("⏹️ Stopped by user at " .. i .. "/" .. quantity)
-                break
-            end
+    -- Try with underscore
+    "Car_Type", "Vehicle_Type", "Auto_Vehicle",
+    
+    -- Try with hyphen
+    "Car-Type", "Vehicle-Type",
+    
+    -- Try property names
+    "PropertyCar", "PropertyVehicle",
+    
+    -- Try class names
+    "ClassCar", "ClassVehicle",
+    
+    -- Try other common game item types
+    "Part", "Model", "Tool", "Weapon", "Item", "Product", "Asset"
+}
+
+-- ===== TEST DIFFERENT KEY NAMES =====
+local function TestKeyCombinations()
+    print("\n🔑 TESTING DIFFERENT KEY NAMES...")
+    
+    local keyCombinations = {
+        -- Original
+        {idKey = "ItemId", typeKey = "itemType"},
+        
+        -- Different capitalizations
+        {idKey = "itemId", typeKey = "itemType"},
+        {idKey = "itemid", typeKey = "itemtype"},
+        {idKey = "ItemID", typeKey = "ItemType"},
+        
+        -- Different key names
+        {idKey = "id", typeKey = "type"},
+        {idKey = "Id", typeKey = "Type"},
+        {idKey = "ID", typeKey = "TYPE"},
+        
+        {idKey = "name", typeKey = "category"},
+        {idKey = "Name", typeKey = "Category"},
+        
+        {idKey = "item", typeKey = "kind"},
+        {idKey = "Item", typeKey = "Kind"},
+        
+        {idKey = "productId", typeKey = "productType"},
+        {idKey = "ProductId", typeKey = "ProductType"},
+        
+        {idKey = "assetId", typeKey = "assetType"},
+        {idKey = "AssetId", typeKey = "AssetType"}
+    }
+    
+    -- Common type values to test with each key combo
+    local typeValues = {"Car", "Vehicle", "1", "car", "vehicle"}
+    
+    for _, keys in ipairs(keyCombinations) do
+        for _, typeValue in ipairs(typeValues) do
+            local testData = {}
+            testData[keys.idKey] = "AstonMartin12"
+            testData[keys.typeKey] = typeValue
             
-            -- Update status
-            statusText.Text = "Adding: " .. i .. "/" .. quantity
-            
-            -- Add car
-            print("[" .. i .. "/" .. quantity .. "] Adding AstonMartin12...")
+            print("\n🔧 Testing: " .. keys.idKey .. " + " .. keys.typeKey .. " = '" .. typeValue .. "'")
             
             local success, result = pcall(function()
-                return tradingRemote:InvokeServer(CORRECT_DATA)
+                return tradingRemote:InvokeServer(testData)
             end)
             
             if success then
-                successCount = successCount + 1
-                print("✅ Success!")
-            else
-                failCount = failCount + 1
-                print("❌ Failed:", tostring(result))
-                
-                -- Handle rate limits
-                local errorMsg = tostring(result)
-                if errorMsg:find("rate") or errorMsg:find("wait") or errorMsg:find("too fast") then
-                    print("⚠️ Rate limited, waiting 2 seconds...")
-                    task.wait(2)
-                end
+                print("✅ SUCCESS! Format found!")
+                print("Data:", testData)
+                return true, testData
             end
-            
-            -- Small random delay
-            task.wait(math.random(50, 300) / 1000)
         end
-        
-        -- Update final status
-        statusText.Text = "✅ COMPLETE!\nSuccess: " .. successCount .. "\nFailed: " .. failCount
-        stopBtn.Text = "✕ CLOSE"
-        
-        -- Change stop button to close
-        stopBtn.MouseButton1Click:Connect(function()
-            statusGui:Destroy()
-        end)
-        
-        -- Auto-close after 8 seconds
-        task.wait(8)
-        statusGui:Destroy()
-        
-        -- Final report
-        print("\n" .. string.rep("=", 50))
-        print("📊 FINAL REPORT")
-        print(string.rep("=", 50))
-        print("✅ Successfully added:", successCount)
-        print("❌ Failed:", failCount)
-        print("🎯 Total attempted:", math.min(quantity, successCount + failCount))
-        
-        if successCount + failCount > 0 then
-            local rate = math.floor((successCount / (successCount + failCount)) * 100)
-            print("📈 Success rate:", rate .. "%")
-        end
-        
-        print(string.rep("=", 50))
-    end)
+    end
     
-    return statusGui
+    return false, nil
 end
 
--- ===== MAIN EXECUTION =====
-print("\n📋 INSTRUCTIONS:")
-print("1. A popup will ask how many AstonMartin12 to add")
-print("2. Enter number (or click: 10, 25, 50, 100)")
-print("3. Click ✅ START ADDING")
-print("4. Watch progress in top-left status")
-print("5. Click ⏹️ STOP to stop anytime")
-
--- Create and show the popup
-task.wait(1)
-
-local popupGui, inputBox, addBtn = AskHowMany()
-
--- Handle add button click
-addBtn.MouseButton1Click:Connect(function()
-    -- Get quantity from input
-    local quantityText = inputBox.Text
-    local quantity = tonumber(quantityText)
+-- ===== TEST WITHOUT ITEM TYPE =====
+local function TestWithoutItemType()
+    print("\n🎯 TESTING WITHOUT ITEM TYPE...")
     
-    if not quantity or quantity <= 0 then
-        print("❌ Invalid quantity:", quantityText)
-        quantity = 10  -- Default to 10
+    -- Try just ItemId
+    print("1. Just ItemId string...")
+    local success1, result1 = pcall(function()
+        return tradingRemote:InvokeServer("AstonMartin12")
+    end)
+    
+    if success1 then
+        print("✅ Success with just string!")
+        return true, "AstonMartin12"
     end
     
-    if quantity > 1000 then
-        print("⚠️ Limiting to 1000 max")
-        quantity = 1000
+    -- Try table with only ItemId
+    print("2. Table with only ItemId...")
+    local testData2 = {ItemId = "AstonMartin12"}
+    local success2, result2 = pcall(function()
+        return tradingRemote:InvokeServer(testData2)
+    end)
+    
+    if success2 then
+        print("✅ Success with table!")
+        return true, testData2
     end
     
-    -- Remove popup
-    popupGui:Destroy()
-    
-    -- Start adding
-    AddCars(quantity)
-end)
+    return false, nil
+end
 
--- Also allow Enter key to submit
-inputBox.FocusLost:Connect(function(enterPressed)
-    if enterPressed then
-        local quantityText = inputBox.Text
-        local quantity = tonumber(quantityText) or 10
+-- ===== TEST WITH DIFFERENT ITEM ID FORMATS =====
+local function TestDifferentItemIdFormats()
+    print("\n🔍 TESTING DIFFERENT ITEM ID FORMATS...")
+    
+    local itemIdFormats = {
+        "AstonMartin12",
+        "Car-AstonMartin12",
+        "astonmartin12",
+        "ASTONMARTIN12",
+        "Aston Martin 12",
+        "aston_martin_12",
+        "aston-martin-12",
         
-        popupGui:Destroy()
-        AddCars(quantity)
+        -- Try numeric
+        "123456", "1001", "999",
+        
+        -- Try with prefix
+        "item_astonmartin12", "product_astonmartin12",
+        
+        -- Try from your original success
+        "Car-AstonMartin12"  -- From earlier script
+    }
+    
+    for _, itemId in ipairs(itemIdFormats) do
+        print("\n🔄 Testing ItemId: '" .. itemId .. "'")
+        
+        -- Try with itemType = "Car"
+        local testData1 = {ItemId = itemId, itemType = "Car"}
+        local success1 = pcall(function()
+            return tradingRemote:InvokeServer(testData1)
+        end)
+        
+        if success1 then
+            print("✅ Success with itemType='Car'!")
+            return true, testData1
+        end
+        
+        -- Try with itemType = "Vehicle"
+        local testData2 = {ItemId = itemId, itemType = "Vehicle"}
+        local success2 = pcall(function()
+            return tradingRemote:InvokeServer(testData2)
+        end)
+        
+        if success2 then
+            print("✅ Success with itemType='Vehicle'!")
+            return true, testData2
+        end
     end
-end)
+    
+    return false, nil
+end
 
-print("\n✅ Bot is ready! Check your screen for the popup.")
+-- ===== CAPTURE MANUAL CLICK =====
+local function CaptureManualClick()
+    print("\n👀 CAPTURE MANUAL CLICK")
+    print("========================")
+    print("1. I will hook the remote")
+    print("2. YOU click AstonMartin12 in your inventory")
+    print("3. I will capture EXACT format")
+    print("========================")
+    
+    local originalInvoke = tradingRemote.InvokeServer
+    local capturedData = nil
+    
+    tradingRemote.InvokeServer = function(self, ...)
+        local args = {...}
+        capturedData = args[1]
+        
+        print("\n🎯 MANUAL CLICK CAPTURED!")
+        print("Data type:", type(capturedData))
+        
+        if type(capturedData) == "table" then
+            print("📋 Table contents:")
+            for k, v in pairs(capturedData) do
+                print("  " .. tostring(k) .. " = " .. tostring(v))
+            end
+        else
+            print("Value:", capturedData)
+        end
+        
+        return originalInvoke(self, ...)
+    end
+    
+    print("\n✅ Hook installed!")
+    print("Now click AstonMartin12 in your inventory...")
+    print("(Wait for 'CAPTURED' message)")
+    
+    -- Wait for click
+    for i = 1, 30 do
+        task.wait(1)
+        if capturedData then
+            print("\n✅ Format captured successfully!")
+            return capturedData
+        end
+        if i % 5 == 0 then
+            print("Waiting... (" .. i .. "/30)")
+        end
+    end
+    
+    print("\n❌ No click captured")
+    return nil
+end
+
+-- ===== MAIN TEST SEQUENCE =====
+print("\n🚀 STARTING COMPREHENSIVE TEST...")
+
+local foundFormat = nil
+
+-- Step 1: Test without item type
+print("\n" .. string.rep("=", 50))
+print("STEP 1: Testing without itemType")
+print(string.rep("=", 50))
+
+local success1, format1 = TestWithoutItemType()
+if success1 then
+    foundFormat = format1
+    print("🎉 Found working format (no itemType)!")
+end
+
+-- Step 2: Test different ItemId formats
+if not foundFormat then
+    print("\n" .. string.rep("=", 50))
+    print("STEP 2: Testing different ItemId formats")
+    print(string.rep("=", 50))
+    
+    local success2, format2 = TestDifferentItemIdFormats()
+    if success2 then
+        foundFormat = format2
+        print("🎉 Found working ItemId format!")
+    end
+end
+
+-- Step 3: Test all item types
+if not foundFormat then
+    print("\n" .. string.rep("=", 50))
+    print("STEP 3: Testing ALL item types")
+    print(string.rep("=", 50))
+    
+    for i, itemType in ipairs(itemTypesToTest) do
+        local success, result, data = TestItemType(itemType)
+        if success then
+            foundFormat = data
+            print("\n🎉 FOUND WORKING ITEM TYPE!")
+            print("itemType = '" .. tostring(itemType) .. "'")
+            break
+        end
+        
+        -- Pause every 5 tests
+        if i % 5 == 0 then
+            task.wait(0.5)
+        end
+    end
+end
+
+-- Step 4: Test key combinations
+if not foundFormat then
+    print("\n" .. string.rep("=", 50))
+    print("STEP 4: Testing different key names")
+    print(string.rep("=", 50))
+    
+    local success4, format4 = TestKeyCombinations()
+    if success4 then
+        foundFormat = format4
+        print("🎉 Found working key combination!")
+    end
+end
+
+-- Step 5: Capture manual click
+if not foundFormat then
+    print("\n" .. string.rep("=", 50))
+    print("STEP 5: Capturing manual click")
+    print(string.rep("=", 50))
+    
+    foundFormat = CaptureManualClick()
+end
+
+-- ===== FINAL RESULT =====
+print("\n" .. string.rep("=", 60))
+print("📊 TEST RESULTS")
+print(string.rep("=", 60))
+
+if foundFormat then
+    print("✅ SUCCESS! Found working format!")
+    print("🎯 Use this exact format:")
+    
+    if type(foundFormat) == "table" then
+        print("{")
+        for k, v in pairs(foundFormat) do
+            print("  " .. tostring(k) .. " = " .. tostring(v))
+        end
+        print("}")
+    else
+        print('"' .. tostring(foundFormat) .. '"')
+    end
+    
+    -- Create simple bot with found format
+    print("\n🚀 CREATING WORKING BOT...")
+    
+    local function CreateWorkingBot(correctData)
+        return function(quantity)
+            print("\n📦 Adding " .. quantity .. " items...")
+            
+            local successCount = 0
+            for i = 1, quantity do
+                print("[" .. i .. "/" .. quantity .. "] Adding...")
+                
+                local success = pcall(function()
+                    if type(correctData) == "table" then
+                        return tradingRemote:InvokeServer(correctData)
+                    else
+                        return tradingRemote:InvokeServer(correctData)
+                    end
+                end)
+                
+                if success then
+                    successCount = successCount + 1
+                    print("✅ Success!")
+                else
+                    print("❌ Failed")
+                end
+                
+                task.wait(0.1)
+            end
+            
+            print("\n✅ Added " .. successCount .. "/" .. quantity .. " successfully!")
+        end
+    end
+    
+    local bot = CreateWorkingBot(foundFormat)
+    
+    -- Test with 5 items
+    print("\n🧪 Testing with 5 items...")
+    bot(5)
+    
+else
+    print("❌ Could not find working format")
+    print("💡 Suggestions:")
+    print("1. Make sure you're in a trading session")
+    print("2. Make sure AstonMartin12 is in your inventory")
+    print("3. Try clicking it manually first")
+    print("4. Check the exact name in inventory")
+end
+
+print(string.rep("=", 60))
