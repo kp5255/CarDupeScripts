@@ -1,420 +1,251 @@
--- 🔍 FIND EXACT ITEM TYPE
--- Tests ALL possible item types to find the right one
+-- 🚀 ASTON MARTIN 12 TRADE BOT - FINAL WORKING VERSION
+-- Uses CORRECT format: {Id = "AstonMartin12", Type = "Vehicle"}
 
 local Players = game:GetService("Players")
 local Player = Players.LocalPlayer
 local RS = game:GetService("ReplicatedStorage")
 
-print("=== FINDING EXACT ITEM TYPE ===")
+print("=== ASTON MARTIN 12 TRADE BOT ===")
+print("✅ CORRECT FORMAT FOUND!")
+print("Format: {Id = 'AstonMartin12', Type = 'Vehicle'}")
+
+-- Wait a moment
+task.wait(2)
 
 -- Get the remote
 local tradingRemote = RS.Remotes.Services.TradingServiceRemotes.SessionAddItem
 print("✅ Remote: SessionAddItem")
 
--- ===== TEST ALL POSSIBLE ITEM TYPES =====
-local function TestItemType(itemType)
-    local testData = {
-        ItemId = "AstonMartin12",
-        itemType = itemType
-    }
-    
-    print("\n🧪 Testing itemType: '" .. itemType .. "'")
+-- ===== THE CORRECT DATA FORMAT =====
+local CORRECT_DATA = {
+    Id = "AstonMartin12",
+    Type = "Vehicle"  -- Capital T and V
+}
+
+-- ===== SAFE ADD FUNCTION =====
+local function AddOneCarSafely()
+    print("\n➕ Adding one AstonMartin12...")
     
     local success, result = pcall(function()
-        return tradingRemote:InvokeServer(testData)
+        return tradingRemote:InvokeServer(CORRECT_DATA)
     end)
     
     if success then
-        print("✅ SUCCESS! Result:", result)
-        return true, result, testData
+        print("✅ Success!")
+        if result ~= nil then
+            print("Result:", result)
+        end
+        return true
     else
         print("❌ Failed:", result)
-        return false, result
+        return false
     end
 end
 
--- ===== ALL POSSIBLE ITEM TYPES =====
-local itemTypesToTest = {
-    -- Common car/vehicle types
-    "Car", "Vehicle", "Automobile", "Automotive",
-    "Ride", "Drive", "Motor", "Engine",
+-- ===== BULK ADD WITH DELAYS =====
+local function BulkAddCarsSafe(quantity)
+    print("\n📦 Adding " .. quantity .. " AstonMartin12...")
+    print("Using correct format: {Id = 'AstonMartin12', Type = 'Vehicle'}")
     
-    -- Try with different capitalization
-    "car", "vehicle", "automobile",
-    "CAR", "VEHICLE", "AUTOMOBILE",
+    local successCount = 0
+    local failCount = 0
     
-    -- Game-specific types
-    "Rideable", "Driveable", "Movable",
-    "Transport", "Transportation",
+    -- Create simple status
+    local statusGui = Instance.new("ScreenGui")
+    statusGui.Name = "TradeStatus"
+    statusGui.Parent = Player:WaitForChild("PlayerGui")
     
-    -- Try numeric types
-    "1", "2", "3", "4", "5", "6", "7", "8", "9", "10",
+    local statusFrame = Instance.new("Frame")
+    statusFrame.Size = UDim2.new(0, 200, 0, 80)
+    statusFrame.Position = UDim2.new(1, -210, 0, 10)
+    statusFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+    statusFrame.BackgroundTransparency = 0.3
     
-    -- Try type IDs
-    "Type1", "Type2", "Type3", "TypeCar", "TypeVehicle",
+    local statusText = Instance.new("TextLabel")
+    statusText.Text = "Ready"
+    statusText.Size = UDim2.new(1, -10, 1, -10)
+    statusText.Position = UDim2.new(0, 5, 0, 5)
+    statusText.BackgroundTransparency = 1
+    statusText.TextColor3 = Color3.fromRGB(255, 255, 255)
+    statusText.Font = Enum.Font.Gotham
+    statusText.TextSize = 12
     
-    -- Try category names
-    "CategoryCar", "CategoryVehicle", "Category1",
+    statusText.Parent = statusFrame
+    statusFrame.Parent = statusGui
     
-    -- Try nothing/null
-    "", nil,
-    
-    -- Try boolean
-    true, false,
-    
-    -- Try with spaces
-    "Car Type", "Vehicle Type", "Auto Mobile",
-    
-    -- Try abbreviations
-    "Veh", "Auto", "Ride", "Mov",
-    
-    -- Try plural
-    "Cars", "Vehicles", "Automobiles",
-    
-    -- Try with underscore
-    "Car_Type", "Vehicle_Type", "Auto_Vehicle",
-    
-    -- Try with hyphen
-    "Car-Type", "Vehicle-Type",
-    
-    -- Try property names
-    "PropertyCar", "PropertyVehicle",
-    
-    -- Try class names
-    "ClassCar", "ClassVehicle",
-    
-    -- Try other common game item types
-    "Part", "Model", "Tool", "Weapon", "Item", "Product", "Asset"
-}
-
--- ===== TEST DIFFERENT KEY NAMES =====
-local function TestKeyCombinations()
-    print("\n🔑 TESTING DIFFERENT KEY NAMES...")
-    
-    local keyCombinations = {
-        -- Original
-        {idKey = "ItemId", typeKey = "itemType"},
+    -- Add cars with delays
+    for i = 1, quantity do
+        statusText.Text = "Adding: " .. i .. "/" .. quantity
         
-        -- Different capitalizations
-        {idKey = "itemId", typeKey = "itemType"},
-        {idKey = "itemid", typeKey = "itemtype"},
-        {idKey = "ItemID", typeKey = "ItemType"},
+        print("\n[" .. i .. "/" .. quantity .. "] Adding...")
         
-        -- Different key names
-        {idKey = "id", typeKey = "type"},
-        {idKey = "Id", typeKey = "Type"},
-        {idKey = "ID", typeKey = "TYPE"},
-        
-        {idKey = "name", typeKey = "category"},
-        {idKey = "Name", typeKey = "Category"},
-        
-        {idKey = "item", typeKey = "kind"},
-        {idKey = "Item", typeKey = "Kind"},
-        
-        {idKey = "productId", typeKey = "productType"},
-        {idKey = "ProductId", typeKey = "ProductType"},
-        
-        {idKey = "assetId", typeKey = "assetType"},
-        {idKey = "AssetId", typeKey = "AssetType"}
-    }
-    
-    -- Common type values to test with each key combo
-    local typeValues = {"Car", "Vehicle", "1", "car", "vehicle"}
-    
-    for _, keys in ipairs(keyCombinations) do
-        for _, typeValue in ipairs(typeValues) do
-            local testData = {}
-            testData[keys.idKey] = "AstonMartin12"
-            testData[keys.typeKey] = typeValue
-            
-            print("\n🔧 Testing: " .. keys.idKey .. " + " .. keys.typeKey .. " = '" .. typeValue .. "'")
-            
-            local success, result = pcall(function()
-                return tradingRemote:InvokeServer(testData)
-            end)
-            
-            if success then
-                print("✅ SUCCESS! Format found!")
-                print("Data:", testData)
-                return true, testData
-            end
-        end
-    end
-    
-    return false, nil
-end
-
--- ===== TEST WITHOUT ITEM TYPE =====
-local function TestWithoutItemType()
-    print("\n🎯 TESTING WITHOUT ITEM TYPE...")
-    
-    -- Try just ItemId
-    print("1. Just ItemId string...")
-    local success1, result1 = pcall(function()
-        return tradingRemote:InvokeServer("AstonMartin12")
-    end)
-    
-    if success1 then
-        print("✅ Success with just string!")
-        return true, "AstonMartin12"
-    end
-    
-    -- Try table with only ItemId
-    print("2. Table with only ItemId...")
-    local testData2 = {ItemId = "AstonMartin12"}
-    local success2, result2 = pcall(function()
-        return tradingRemote:InvokeServer(testData2)
-    end)
-    
-    if success2 then
-        print("✅ Success with table!")
-        return true, testData2
-    end
-    
-    return false, nil
-end
-
--- ===== TEST WITH DIFFERENT ITEM ID FORMATS =====
-local function TestDifferentItemIdFormats()
-    print("\n🔍 TESTING DIFFERENT ITEM ID FORMATS...")
-    
-    local itemIdFormats = {
-        "AstonMartin12",
-        "Car-AstonMartin12",
-        "astonmartin12",
-        "ASTONMARTIN12",
-        "Aston Martin 12",
-        "aston_martin_12",
-        "aston-martin-12",
-        
-        -- Try numeric
-        "123456", "1001", "999",
-        
-        -- Try with prefix
-        "item_astonmartin12", "product_astonmartin12",
-        
-        -- Try from your original success
-        "Car-AstonMartin12"  -- From earlier script
-    }
-    
-    for _, itemId in ipairs(itemIdFormats) do
-        print("\n🔄 Testing ItemId: '" .. itemId .. "'")
-        
-        -- Try with itemType = "Car"
-        local testData1 = {ItemId = itemId, itemType = "Car"}
-        local success1 = pcall(function()
-            return tradingRemote:InvokeServer(testData1)
+        local success, result = pcall(function()
+            return tradingRemote:InvokeServer(CORRECT_DATA)
         end)
         
-        if success1 then
-            print("✅ Success with itemType='Car'!")
-            return true, testData1
-        end
-        
-        -- Try with itemType = "Vehicle"
-        local testData2 = {ItemId = itemId, itemType = "Vehicle"}
-        local success2 = pcall(function()
-            return tradingRemote:InvokeServer(testData2)
-        end)
-        
-        if success2 then
-            print("✅ Success with itemType='Vehicle'!")
-            return true, testData2
-        end
-    end
-    
-    return false, nil
-end
-
--- ===== CAPTURE MANUAL CLICK =====
-local function CaptureManualClick()
-    print("\n👀 CAPTURE MANUAL CLICK")
-    print("========================")
-    print("1. I will hook the remote")
-    print("2. YOU click AstonMartin12 in your inventory")
-    print("3. I will capture EXACT format")
-    print("========================")
-    
-    local originalInvoke = tradingRemote.InvokeServer
-    local capturedData = nil
-    
-    tradingRemote.InvokeServer = function(self, ...)
-        local args = {...}
-        capturedData = args[1]
-        
-        print("\n🎯 MANUAL CLICK CAPTURED!")
-        print("Data type:", type(capturedData))
-        
-        if type(capturedData) == "table" then
-            print("📋 Table contents:")
-            for k, v in pairs(capturedData) do
-                print("  " .. tostring(k) .. " = " .. tostring(v))
-            end
-        else
-            print("Value:", capturedData)
-        end
-        
-        return originalInvoke(self, ...)
-    end
-    
-    print("\n✅ Hook installed!")
-    print("Now click AstonMartin12 in your inventory...")
-    print("(Wait for 'CAPTURED' message)")
-    
-    -- Wait for click
-    for i = 1, 30 do
-        task.wait(1)
-        if capturedData then
-            print("\n✅ Format captured successfully!")
-            return capturedData
-        end
-        if i % 5 == 0 then
-            print("Waiting... (" .. i .. "/30)")
-        end
-    end
-    
-    print("\n❌ No click captured")
-    return nil
-end
-
--- ===== MAIN TEST SEQUENCE =====
-print("\n🚀 STARTING COMPREHENSIVE TEST...")
-
-local foundFormat = nil
-
--- Step 1: Test without item type
-print("\n" .. string.rep("=", 50))
-print("STEP 1: Testing without itemType")
-print(string.rep("=", 50))
-
-local success1, format1 = TestWithoutItemType()
-if success1 then
-    foundFormat = format1
-    print("🎉 Found working format (no itemType)!")
-end
-
--- Step 2: Test different ItemId formats
-if not foundFormat then
-    print("\n" .. string.rep("=", 50))
-    print("STEP 2: Testing different ItemId formats")
-    print(string.rep("=", 50))
-    
-    local success2, format2 = TestDifferentItemIdFormats()
-    if success2 then
-        foundFormat = format2
-        print("🎉 Found working ItemId format!")
-    end
-end
-
--- Step 3: Test all item types
-if not foundFormat then
-    print("\n" .. string.rep("=", 50))
-    print("STEP 3: Testing ALL item types")
-    print(string.rep("=", 50))
-    
-    for i, itemType in ipairs(itemTypesToTest) do
-        local success, result, data = TestItemType(itemType)
         if success then
-            foundFormat = data
-            print("\n🎉 FOUND WORKING ITEM TYPE!")
-            print("itemType = '" .. tostring(itemType) .. "'")
-            break
+            successCount = successCount + 1
+            print("✅ Success!")
+        else
+            failCount = failCount + 1
+            local errorMsg = tostring(result)
+            print("❌ Failed:", errorMsg)
+            
+            -- If rate limited, wait longer
+            if errorMsg:find("rate") or errorMsg:find("wait") then
+                print("⚠️ Rate limited, waiting 3 seconds...")
+                task.wait(3)
+            end
         end
         
-        -- Pause every 5 tests
-        if i % 5 == 0 then
-            task.wait(0.5)
-        end
+        -- IMPORTANT: Longer delay to avoid breaking trade UI
+        -- 500-1000ms delay between adds
+        local delay = math.random(500, 1000) / 1000
+        task.wait(delay)
     end
-end
-
--- Step 4: Test key combinations
-if not foundFormat then
+    
+    -- Final status
+    statusText.Text = "✅ Complete!\nSuccess: " .. successCount .. "\nFailed: " .. failCount
+    
+    -- Auto-remove after 5 seconds
+    task.wait(5)
+    statusGui:Destroy()
+    
+    -- Final report
     print("\n" .. string.rep("=", 50))
-    print("STEP 4: Testing different key names")
+    print("📊 FINAL REPORT")
+    print(string.rep("=", 50))
+    print("✅ Successfully added:", successCount)
+    print("❌ Failed:", failCount)
+    print("🎯 Total attempted:", quantity)
+    
+    if successCount + failCount > 0 then
+        local rate = math.floor((successCount / (successCount + failCount)) * 100)
+        print("📈 Success rate:", rate .. "%")
+    end
+    
     print(string.rep("=", 50))
     
-    local success4, format4 = TestKeyCombinations()
-    if success4 then
-        foundFormat = format4
-        print("🎉 Found working key combination!")
-    end
+    return successCount
 end
 
--- Step 5: Capture manual click
-if not foundFormat then
-    print("\n" .. string.rep("=", 50))
-    print("STEP 5: Capturing manual click")
-    print(string.rep("=", 50))
+-- ===== SIMPLE MENU =====
+local function CreateSimpleMenu()
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "TradeBotMenu"
+    gui.Parent = Player:WaitForChild("PlayerGui")
     
-    foundFormat = CaptureManualClick()
-end
-
--- ===== FINAL RESULT =====
-print("\n" .. string.rep("=", 60))
-print("📊 TEST RESULTS")
-print(string.rep("=", 60))
-
-if foundFormat then
-    print("✅ SUCCESS! Found working format!")
-    print("🎯 Use this exact format:")
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 200, 0, 250)
+    frame.Position = UDim2.new(0, 10, 0.5, -125)
+    frame.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+    frame.BackgroundTransparency = 0.2
     
-    if type(foundFormat) == "table" then
-        print("{")
-        for k, v in pairs(foundFormat) do
-            print("  " .. tostring(k) .. " = " .. tostring(v))
-        end
-        print("}")
-    else
-        print('"' .. tostring(foundFormat) .. '"')
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 10)
+    corner.Parent = frame
+    
+    -- Title
+    local title = Instance.new("TextLabel")
+    title.Text = "🚗 Trade Bot"
+    title.Size = UDim2.new(1, 0, 0, 40)
+    title.BackgroundColor3 = Color3.fromRGB(60, 60, 90)
+    title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    title.Font = Enum.Font.GothamBold
+    
+    -- Info
+    local info = Instance.new("TextLabel")
+    info.Text = "Format:\n{Id='AstonMartin12'\nType='Vehicle'}"
+    info.Size = UDim2.new(1, -10, 0, 60)
+    info.Position = UDim2.new(0, 5, 0, 45)
+    info.BackgroundTransparency = 1
+    info.TextColor3 = Color3.fromRGB(180, 220, 255)
+    info.Font = Enum.Font.Gotham
+    info.TextSize = 11
+    
+    -- Button creator
+    local function AddButton(text, y, color, callback)
+        local btn = Instance.new("TextButton")
+        btn.Text = text
+        btn.Size = UDim2.new(1, -20, 0, 35)
+        btn.Position = UDim2.new(0, 10, 0, y)
+        btn.BackgroundColor3 = color
+        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        btn.Font = Enum.Font.Gotham
+        btn.TextSize = 13
+        
+        local btnCorner = Instance.new("UICorner")
+        btnCorner.CornerRadius = UDim.new(0, 6)
+        btnCorner.Parent = btn
+        
+        btn.MouseButton1Click:Connect(callback)
+        return btn
     end
     
-    -- Create simple bot with found format
-    print("\n🚀 CREATING WORKING BOT...")
+    -- Buttons
+    local testBtn = AddButton("🧪 Test Add", 110, Color3.fromRGB(70, 120, 180), function()
+        testBtn.Text = "⏳"
+        task.spawn(function()
+            AddOneCarSafely()
+            task.wait(1)
+            testBtn.Text = "🧪 Test Add"
+        end)
+    end)
     
-    local function CreateWorkingBot(correctData)
-        return function(quantity)
-            print("\n📦 Adding " .. quantity .. " items...")
-            
-            local successCount = 0
-            for i = 1, quantity do
-                print("[" .. i .. "/" .. quantity .. "] Adding...")
-                
-                local success = pcall(function()
-                    if type(correctData) == "table" then
-                        return tradingRemote:InvokeServer(correctData)
-                    else
-                        return tradingRemote:InvokeServer(correctData)
-                    end
-                end)
-                
-                if success then
-                    successCount = successCount + 1
-                    print("✅ Success!")
-                else
-                    print("❌ Failed")
-                end
-                
-                task.wait(0.1)
-            end
-            
-            print("\n✅ Added " .. successCount .. "/" .. quantity .. " successfully!")
-        end
-    end
+    local add5Btn = AddButton("📦 Add 5", 150, Color3.fromRGB(70, 180, 120), function()
+        add5Btn.Text = "⏳"
+        task.spawn(function()
+            BulkAddCarsSafe(5)
+            task.wait(1)
+            add5Btn.Text = "📦 Add 5"
+        end)
+    end)
     
-    local bot = CreateWorkingBot(foundFormat)
+    local add10Btn = AddButton("📦 Add 10", 190, Color3.fromRGB(180, 120, 60), function()
+        add10Btn.Text = "⏳"
+        task.spawn(function()
+            BulkAddCarsSafe(10)
+            task.wait(1)
+            add10Btn.Text = "📦 Add 10"
+        end)
+    end)
     
-    -- Test with 5 items
-    print("\n🧪 Testing with 5 items...")
-    bot(5)
+    -- Close button
+    local closeBtn = Instance.new("TextButton")
+    closeBtn.Text = "✕"
+    closeBtn.Size = UDim2.new(0, 25, 0, 25)
+    closeBtn.Position = UDim2.new(1, -30, 0, 7)
+    closeBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 100)
+    closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    closeBtn.Font = Enum.Font.GothamBold
     
-else
-    print("❌ Could not find working format")
-    print("💡 Suggestions:")
-    print("1. Make sure you're in a trading session")
-    print("2. Make sure AstonMartin12 is in your inventory")
-    print("3. Try clicking it manually first")
-    print("4. Check the exact name in inventory")
+    closeBtn.MouseButton1Click:Connect(function()
+        gui:Destroy()
+    end)
+    
+    -- Parent everything
+    title.Parent = frame
+    info.Parent = frame
+    testBtn.Parent = frame
+    add5Btn.Parent = frame
+    add10Btn.Parent = frame
+    closeBtn.Parent = title
+    frame.Parent = gui
+    
+    return gui
 end
 
-print(string.rep("=", 60))
+-- ===== MAIN =====
+print("\n📋 INSTRUCTIONS:")
+print("1. Menu appears on left side")
+print("2. Click '🧪 Test Add' to test one")
+print("3. If successful, use '📦 Add 5' or '📦 Add 10'")
+print("4. Status appears top-right")
+print("5. IMPORTANT: Wait between adds to avoid UI freeze")
+
+-- Create menu after delay
+task.wait(1)
+CreateSimpleMenu()
+
+print("\n✅ Bot ready! Check left side for menu.")
+print("🎯 Using CORRECT format: {Id = 'AstonMartin12', Type = 'Vehicle'}")
