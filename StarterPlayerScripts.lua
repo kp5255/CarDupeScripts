@@ -1,359 +1,425 @@
--- 🎯 PERFECT TRADE BOT - FOUND WORKING REMOTES
-print("🎯 PERFECT TRADE BOT")
+-- 🔍 ULTIMATE DATA CAPTURER - FIND REAL CAR DATA
+print("🔍 ULTIMATE DATA CAPTURER")
 print("=" .. string.rep("=", 50))
 
--- CONFIGURATION
-local TARGET_CAR = "AstonMartin12"
-
--- Get the trading folder
 local tradingFolder = game:GetService("ReplicatedStorage").Remotes.Services.TradingServiceRemotes
+local capturedData = nil
+local capturedRemote = nil
 
--- THE WORKING REMOTES FOUND:
-print("📋 WORKING REMOTES IDENTIFIED:")
-print("1. SessionSetConfirmation - Returns: true")
-print("2. SessionAddItem - Returns: false (but recognized the car!)")
-print("3. SessionRemoveItem - Returns: false")
-print("4. SessionCancel - Returns: true")
+-- METHOD 1: CAPTURE ALL NETWORK TRAFFIC
+print("\n🎯 CAPTURING ALL TRADING NETWORK CALLS...")
 
--- CREATE THE PERFECT ADD FUNCTION
-local function addCarToTrade()
-    print("➕ Attempting to add car...")
-    
-    -- Try SessionAddItem (most likely for adding items)
-    local sessionAddItem = tradingFolder:FindFirstChild("SessionAddItem")
-    if sessionAddItem and sessionAddItem:IsA("RemoteFunction") then
-        print("  Using SessionAddItem remote...")
+-- Temporarily replace ALL remote methods to capture data
+local originalMethods = {}
+
+for _, remote in pairs(tradingFolder:GetChildren()) do
+    if remote:IsA("RemoteFunction") then
+        -- Capture RemoteFunction
+        local originalInvoke = remote.InvokeServer
+        originalMethods[remote] = originalInvoke
         
-        -- Try different data formats
-        local dataFormats = {
-            TARGET_CAR,  -- Just string
-            {ItemId = TARGET_CAR},
-            {ID = TARGET_CAR},
-            {itemId = TARGET_CAR},
-            {id = TARGET_CAR},
-            {Item = TARGET_CAR},
-            {item = TARGET_CAR}
-        }
-        
-        for i, data in pairs(dataFormats) do
-            print("  Trying format " .. i .. "...")
-            local success, result = pcall(function()
-                return sessionAddItem:InvokeServer(data)
-            end)
+        remote.InvokeServer = function(self, ...)
+            local args = {...}
             
-            if success then
-                print("    ✅ Result: " .. tostring(result))
-                if result == true then
-                    print("    🎉 SUCCESS! Car added!")
-                    return true
-                elseif result == false then
-                    print("    ⚠️ Recognized but returned false")
-                    -- The car was recognized but something prevented adding
+            print("\n" .. string.rep("📡", 30))
+            print("📤 OUTGOING CALL: " .. remote.Name)
+            print("Arguments: " .. #args)
+            
+            for i, arg in ipairs(args) do
+                print("\n  [Argument " .. i .. "]")
+                
+                if type(arg) == "table" then
+                    print("  Type: Table")
+                    print("  Contents:")
+                    
+                    -- Save if it looks like item data
+                    for k, v in pairs(arg) do
+                        print("    " .. tostring(k) .. " = " .. tostring(v))
+                        
+                        -- Check for ANY car-related data
+                        if type(v) == "string" and (v:find("Vehicle") or v:find("Car") or v:find("Aston") or v:find("Martin")) then
+                            print("    🚗 CAR DATA DETECTED!")
+                            if not capturedData then
+                                capturedData = arg
+                                capturedRemote = remote
+                            end
+                        end
+                    end
+                    
+                    -- Also check for item ID patterns
+                    if arg.ItemId or arg.ID or arg.id or arg.itemId then
+                        print("    📍 ITEM ID FOUND!")
+                        if not capturedData then
+                            capturedData = arg
+                            capturedRemote = remote
+                        end
+                    end
+                    
+                elseif type(arg) == "string" then
+                    print("  Type: String")
+                    print('  Value: "' .. arg .. '"')
+                    
+                    -- Check for item ID patterns
+                    if #arg > 5 and (tonumber(arg) or arg:find("%d")) then
+                        print("    🔢 POSSIBLE ITEM ID: " .. arg)
+                        if not capturedData then
+                            capturedData = arg
+                            capturedRemote = remote
+                        end
+                    end
+                else
+                    print("  Type: " .. type(arg))
+                    print("  Value: " .. tostring(arg))
                 end
-            else
-                print("    ❌ Error: " .. tostring(result))
             end
             
-            task.wait(0.2)
-        end
-    end
-    
-    return false
-end
-
--- SET UP TRADE SESSION FIRST
-print("\n🔄 SETTING UP TRADE SESSION...")
-
--- First, we need to start or join a trade session
--- Try to accept an invite or start a trade
-
-local function setupTradeSession()
-    print("Setting up trade environment...")
-    
-    -- Try to accept any pending invites
-    local inviteAccept = tradingFolder:FindFirstChild("InviteAccept")
-    if inviteAccept and inviteAccept:IsA("RemoteFunction") then
-        print("  Checking for invites...")
-        -- Try with empty data or common formats
-        local testData = {"", {}, nil}
-        for _, data in pairs(testData) do
-            pcall(function()
-                inviteAccept:InvokeServer(data)
-            end)
-        end
-    end
-    
-    -- Try to start a session
-    local sessionStart = tradingFolder:FindFirstChild("OnSessionStarted")
-    if sessionStart and sessionStart:IsA("RemoteEvent") then
-        print("  Attempting to signal session start...")
-        pcall(function()
-            sessionStart:FireServer({})
-        end)
-    end
-    
-    -- Confirm the session
-    local sessionConfirm = tradingFolder:FindFirstChild("SessionSetConfirmation")
-    if sessionConfirm and sessionConfirm:IsA("RemoteFunction") then
-        print("  Confirming session...")
-        pcall(function()
-            sessionConfirm:InvokeServer(true)  -- true = confirm
-        end)
-    end
-end
-
--- BULK ADD FUNCTION
-local function bulkAddCars(count)
-    print("\n📦 BULK ADDING " .. count .. " CARS")
-    print("=" .. string.rep("=", 30))
-    
-    local added = 0
-    local failed = 0
-    
-    for i = 1, count do
-        print("\n[" .. i .. "/" .. count .. "]")
-        
-        if addCarToTrade() then
-            added = added + 1
-            print("  ✅ SUCCESS - Car added!")
-        else
-            failed = failed + 1
-            print("  ⚠️ Failed to add car")
+            print(string.rep("📡", 30))
             
-            -- Try alternative method
-            print("  Trying alternative...")
-            local sessionAddItem = tradingFolder:FindFirstChild("SessionAddItem")
-            if sessionAddItem then
-                pcall(function()
-                    -- Try with table containing ItemId
-                    sessionAddItem:InvokeServer({ItemId = TARGET_CAR})
-                    print("  Alternative attempt sent")
-                end)
+            -- Call original
+            return originalInvoke(self, ...)
+        end
+        
+    elseif remote:IsA("RemoteEvent") then
+        -- Capture RemoteEvent
+        local methods = {"FireServer", "Fire"}
+        for _, methodName in pairs(methods) do
+            local originalMethod = remote[methodName]
+            if type(originalMethod) == "function" then
+                originalMethods[remote] = originalMethods[remote] or {}
+                originalMethods[remote][methodName] = originalMethod
+                
+                remote[methodName] = function(self, ...)
+                    local args = {...}
+                    
+                    print("\n" .. string.rep("📡", 30))
+                    print("📤 EVENT FIRED: " .. remote.Name .. " (" .. methodName .. ")")
+                    print("Arguments: " .. #args)
+                    
+                    for i, arg in ipairs(args) do
+                        print("\n  [Argument " .. i .. "]")
+                        print("  Type: " .. type(arg))
+                        
+                        if type(arg) == "table" then
+                            for k, v in pairs(arg) do
+                                print("    " .. tostring(k) .. " = " .. tostring(v))
+                            end
+                        else
+                            print("  Value: " .. tostring(arg))
+                        end
+                    end
+                    
+                    print(string.rep("📡", 30))
+                    
+                    return originalMethod(self, ...)
+                end
             end
         end
-        
-        -- Critical: Wait to prevent rate limiting
-        task.wait(0.5)
     end
-    
-    print("\n" .. string.rep("🎯", 30))
-    print("BULK ADD COMPLETE!")
-    print("Added: " .. added .. " cars")
-    print("Failed: " .. failed .. " attempts")
-    print(string.rep("🎯", 30))
-    
-    return added
 end
 
--- COMPLETE TRADE WORKFLOW
-local function completeTradeWorkflow()
-    print("\n🔄 COMPLETE TRADE WORKFLOW")
-    print("=" .. string.rep("=", 40))
-    
-    -- Step 1: Setup
-    print("1. Setting up trade session...")
-    setupTradeSession()
+print("✅ All trading remotes are now MONITORING!")
+print("\n🎯 NOW: CLICK THE ASTON MARTIN IN YOUR INVENTORY")
+print("I will capture EXACTLY what data is sent")
+
+-- WAIT FOR CLICK
+print("\n" .. string.rep("⏳", 40))
+print("WAITING FOR CAR CLICK...")
+print("You have 30 seconds to click the car")
+print(string.rep("⏳", 40))
+
+for i = 1, 30 do
     task.wait(1)
-    
-    -- Step 2: Add cars
-    print("\n2. Adding cars...")
-    local added = bulkAddCars(5)
-    
-    -- Step 3: Confirm trade
-    print("\n3. Confirming trade...")
-    local sessionConfirm = tradingFolder:FindFirstChild("SessionSetConfirmation")
-    if sessionConfirm then
-        pcall(function()
-            sessionConfirm:InvokeServer(true)  -- Confirm
-            print("  ✅ Trade confirmed!")
-        end)
+    if capturedData then
+        print("\n" .. string.rep("🎉", 40))
+        print("SUCCESS! CAR DATA CAPTURED!")
+        print(string.rep("🎉", 40))
+        break
     end
-    
-    -- Step 4: Update tokens if needed
-    print("\n4. Updating session...")
-    local updateTokens = tradingFolder:FindFirstChild("SessionUpdateTokens")
-    if updateTokens then
-        pcall(function()
-            updateTokens:InvokeServer(1)  -- Try with token count 1
-            print("  ✅ Tokens updated")
-        end)
+    if i % 5 == 0 then
+        print("[🕐 " .. i .. "/30] Still waiting for click...")
     end
-    
-    return added
 end
 
--- CREATE EASY-TO-USE FUNCTIONS
-getgenv().PerfectTrade = {
-    -- Simple add
-    add1 = function() 
-        setupTradeSession()
-        task.wait(0.5)
-        return bulkAddCars(1) 
-    end,
-    
-    -- Bulk add
-    add5 = function() 
-        setupTradeSession()
-        task.wait(0.5)
-        return bulkAddCars(5) 
-    end,
-    
-    add10 = function() 
-        setupTradeSession()
-        task.wait(0.5)
-        return bulkAddCars(10) 
-    end,
-    
-    -- Custom amount
-    add = function(count) 
-        setupTradeSession()
-        task.wait(0.5)
-        return bulkAddCars(count or 5) 
-    end,
-    
-    -- Complete workflow
-    trade = function() 
-        return completeTradeWorkflow() 
-    end,
-    
-    -- Just setup session
-    setup = function() 
-        setupTradeSession() 
-    end,
-    
-    -- Test remote
-    test = function()
-        print("Testing SessionAddItem remote...")
-        local remote = tradingFolder:FindFirstChild("SessionAddItem")
-        if remote then
-            local success, result = pcall(function()
-                return remote:InvokeServer(TARGET_CAR)
-            end)
-            print("Success: " .. tostring(success))
-            print("Result: " .. tostring(result))
-            return success, result
+-- RESTORE ORIGINAL METHODS
+print("\n🧹 Restoring original methods...")
+for remote, method in pairs(originalMethods) do
+    if type(method) == "function" then
+        remote.InvokeServer = method
+    elseif type(method) == "table" then
+        for methodName, originalMethod in pairs(method) do
+            remote[methodName] = originalMethod
         end
-        return false, "Remote not found"
     end
-}
+end
 
--- Display controls
-print("\n" .. string.rep("🎮", 30))
-print("PERFECT TRADE CONTROLS:")
-print(string.rep("🎮", 30))
-print("PerfectTrade.add1()    - Add 1 car")
-print("PerfectTrade.add5()    - Add 5 cars")
-print("PerfectTrade.add10()   - Add 10 cars")
-print("PerfectTrade.add(20)   - Add custom amount")
-print("PerfectTrade.trade()   - Complete trade workflow")
-print("PerfectTrade.setup()   - Setup trade session")
-print("PerfectTrade.test()    - Test the remote")
-print(string.rep("🎮", 30))
+-- RESULTS
+print("\n" .. string.rep("=", 60))
 
--- Auto-run a test
-print("\n🧪 RUNNING AUTO-TEST...")
-task.wait(1)
-
--- First, setup a trade session
-PerfectTrade.setup()
-task.wait(1)
-
--- Then add 3 cars
-PerfectTrade.add(3)
-
-print("\n" .. string.rep("✅", 40))
-print("PERFECT TRADE BOT READY!")
-print(string.rep("✅", 40))
-
--- IMPORTANT TIP ABOUT TRADE SESSIONS
-print("\n💡 IMPORTANT:")
-print("The trade session closes automatically because:")
-print("1. You need someone to trade WITH")
-print("2. Or the game has anti-dupe protection")
-print("3. Try adding cars while in an ACTIVE trade with someone")
-print("\nTo use this bot:")
-print("1. Start a trade with another player")
-print("2. Run PerfectTrade.add5()")
-print("3. The cars should appear in your trade window")
-
--- Create a version for active trades
-print("\n" .. string.rep("🔄", 40))
-print("ACTIVE TRADE VERSION:")
-print(string.rep("🔄", 40))
-
-local activeTradeCode = [[
-    -- 🎯 ACTIVE TRADE BOT
-    -- Use this WHEN you're in an active trade session
+if capturedData then
+    print("🎯 CAPTURED DATA FOUND!")
+    print("Remote: " .. capturedRemote.Name)
+    print("Data type: " .. type(capturedData))
     
-    local tradingFolder = game:GetService("ReplicatedStorage").Remotes.Services.TradingServiceRemotes
-    local TARGET_CAR = "AstonMartin12"
-    
-    function addToActiveTrade(count)
-        count = count or 5
-        print("Adding " .. count .. " cars to active trade...")
+    if type(capturedData) == "table" then
+        print("\n📊 TABLE CONTENTS:")
+        for k, v in pairs(capturedData) do
+            print("  " .. tostring(k) .. " = " .. tostring(v))
+        end
         
-        local sessionAddItem = tradingFolder:WaitForChild("SessionAddItem")
-        local added = 0
+        -- CREATE WORKING BOT WITH REAL DATA
+        print("\n" .. string.rep("🚀", 30))
+        print("CREATING WORKING BOT...")
+        print(string.rep("🚀", 30))
         
-        for i = 1, count do
-            print("[" .. i .. "/" .. count .. "]")
+        local botCode = [[
+            -- 🎯 WORKING TRADE BOT WITH REAL DATA
+            local tradingFolder = game:GetService("ReplicatedStorage").Remotes.Services.TradingServiceRemotes
+            local sessionAddItem = tradingFolder:WaitForChild("SessionAddItem")
             
-            -- Try multiple formats
-            local formats = {
-                TARGET_CAR,
-                {ItemId = TARGET_CAR},
-                {ID = TARGET_CAR},
-                {itemId = TARGET_CAR}
-            }
+            -- EXACT captured data:
+            local carData = ]] .. game:GetService("HttpService"):JSONEncode(capturedData) .. [[
             
-            for _, data in pairs(formats) do
+            print("🎯 Adding car with REAL data...")
+            print("Data: " .. game:GetService("HttpService"):JSONEncode(carData))
+            
+            function addCar()
                 local success, result = pcall(function()
-                    return sessionAddItem:InvokeServer(data)
+                    return sessionAddItem:InvokeServer(carData)
                 end)
                 
                 if success then
-                    print("  Result: " .. tostring(result))
-                    if result == true then
-                        added = added + 1
-                        print("  ✅ Added!")
-                        break
-                    end
+                    print("✅ Result: " .. tostring(result))
+                    return result
+                else
+                    print("❌ Error: " .. tostring(result))
+                    return false
                 end
             end
             
-            task.wait(0.4)
+            function addMultiple(count)
+                local added = 0
+                for i = 1, count do
+                    print("[" .. i .. "/" .. count .. "]")
+                    if addCar() then
+                        added = added + 1
+                    end
+                    task.wait(0.5)
+                end
+                print("🎯 Added " .. added .. "/" .. count)
+                return added
+            end
+            
+            -- Export functions
+            getgenv().RealTrade = {
+                add1 = function() addMultiple(1) end,
+                add5 = function() addMultiple(5) end,
+                add10 = function() addMultiple(10) end,
+                test = addCar,
+                data = carData
+            }
+            
+            print("\n🎮 Use RealTrade.add5() to add cars!")
+            
+            -- Test
+            task.wait(1)
+            RealTrade.test()
+        ]]
+        
+        print("\n" .. string.rep("=", 60))
+        print("🤖 WORKING BOT CODE:")
+        print(string.rep("=", 60))
+        print(botCode)
+        print(string.rep("=", 60))
+        
+        print("\n🚀 EXECUTING BOT...")
+        local success, err = pcall(loadstring, botCode)
+        if not success then
+            print("❌ Bot error: " .. tostring(err))
         end
         
-        print("\n🎯 Added " .. added .. "/" .. count .. " cars")
-        return added
+    else
+        -- String data
+        print("\n📄 STRING DATA: " .. capturedData)
+        
+        local botCode = [[
+            local tradingFolder = game:GetService("ReplicatedStorage").Remotes.Services.TradingServiceRemotes
+            local sessionAddItem = tradingFolder:WaitForChild("SessionAddItem")
+            
+            print("Testing with captured data: " .. ]] .. '"' .. capturedData .. '"' .. [[)
+            
+            for i = 1, 3 do
+                print("Attempt " .. i)
+                local success, result = pcall(function()
+                    return sessionAddItem:InvokeServer(]] .. '"' .. capturedData .. '"' .. [[)
+                end)
+                print("Result: " .. tostring(result))
+                wait(0.5)
+            end
+        ]]
+        
+        print("\n🚀 Testing captured string...")
+        pcall(loadstring, botCode)
     end
     
-    -- Export function
-    getgenv().ActiveTrade = {
-        add = addToActiveTrade,
-        add5 = function() addToActiveTrade(5) end,
-        add10 = function() addToActiveTrade(10) end
-    }
+else
+    print("❌ NO DATA CAPTURED")
     
-    print("🎮 Use ActiveTrade.add5() to add cars!")
-    print("⚠️ Make sure you're IN a trade session!")
+    -- ALTERNATIVE: CHECK INVENTORY FOR REAL ITEM IDS
+    print("\n🔍 CHECKING INVENTORY FOR ITEM DATA...")
     
-    -- Quick test
-    task.wait(1)
-    print("\n🧪 Quick test...")
-    local success, result = pcall(function()
-        return tradingFolder.SessionAddItem:InvokeServer(TARGET_CAR)
-    end)
-    print("Test result: " .. tostring(result))
+    local function findInventoryData()
+        -- Try to find inventory GUI
+        local Player = game:GetService("Players").LocalPlayer
+        local PlayerGui = Player:WaitForChild("PlayerGui")
+        
+        for _, gui in pairs(PlayerGui:GetChildren()) do
+            if gui:IsA("ScreenGui") and gui.Enabled then
+                print("Checking GUI: " .. gui.Name)
+                
+                -- Look for car buttons with attributes
+                for _, button in pairs(gui:GetDescendants()) do
+                    if button:IsA("TextButton") or button:IsA("ImageButton") then
+                        local name = button.Name:lower()
+                        if name:find("aston") or name:find("martin") or name:find("car") then
+                            print("\n🎯 Found car button: " .. button.Name)
+                            
+                            -- Check all attributes
+                            for _, attr in pairs({"ItemId", "ID", "Id", "itemId", "AssetId", "ProductId", "Item", "item"}) do
+                                local value = button:GetAttribute(attr)
+                                if value then
+                                    print("  📍 " .. attr .. ": " .. tostring(value))
+                                    
+                                    -- Test this value
+                                    print("  🧪 Testing this value...")
+                                    local tradingFolder = game:GetService("ReplicatedStorage").Remotes.Services.TradingServiceRemotes
+                                    local sessionAddItem = tradingFolder:WaitForChild("SessionAddItem")
+                                    
+                                    -- Try as string
+                                    pcall(function()
+                                        sessionAddItem:InvokeServer(value)
+                                        print("    ✅ Sent as string")
+                                    end)
+                                    
+                                    -- Try as table
+                                    pcall(function()
+                                        sessionAddItem:InvokeServer({ItemId = value})
+                                        print("    ✅ Sent as table with ItemId")
+                                    end)
+                                    
+                                    task.wait(0.5)
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    
+    pcall(findInventoryData)
+end
+
+-- FINAL: TRY TO GET ITEM ID FROM GAME DATA
+print("\n" .. string.rep("💡", 40))
+print("TRYING TO FIND REAL ITEM ID...")
+print(string.rep("💡", 40))
+
+local finalAttemptCode = [[
+    -- 🕵️ FIND REAL ASTON MARTIN ITEM ID
+    
+    -- Method 1: Search all game data
+    function searchForCarId()
+        local possibleIds = {}
+        
+        -- Check ReplicatedStorage for car data
+        local RS = game:GetService("ReplicatedStorage")
+        for _, obj in pairs(RS:GetDescendants()) do
+            if obj:IsA("StringValue") or obj:IsA("NumberValue") then
+                local name = obj.Name:lower()
+                local value = tostring(obj.Value):lower()
+                
+                if name:find("aston") or name:find("martin") or 
+                   value:find("aston") or value:find("martin") then
+                    table.insert(possibleIds, {
+                        name = obj.Name,
+                        value = obj.Value,
+                        path = obj:GetFullName()
+                    })
+                end
+            end
+        end
+        
+        return possibleIds
+    end
+    
+    -- Method 2: Try common car ID patterns
+    function tryCommonPatterns()
+        print("Trying common car ID patterns...")
+        
+        local patterns = {
+            "AstonMartin12",
+            "astonmartin12",
+            "Aston_Martin_12",
+            "aston_martin_12",
+            "Vehicle_AstonMartin12",
+            "Car_AstonMartin12",
+            "AM12",
+            "am12"
+        }
+        
+        -- Also try numeric IDs (common in games)
+        for i = 1000, 1100 do
+            table.insert(patterns, tostring(i))
+        end
+        
+        for i = 5000, 5100 do
+            table.insert(patterns, tostring(i))
+        end
+        
+        return patterns
+    end
+    
+    -- Test all patterns
+    local tradingFolder = game:GetService("ReplicatedStorage").Remotes.Services.TradingServiceRemotes
+    local sessionAddItem = tradingFolder:WaitForChild("SessionAddItem")
+    
+    print("🔍 Testing common patterns...")
+    
+    local patterns = tryCommonPatterns()
+    for i, pattern in ipairs(patterns) do
+        if i > 50 then break end -- Limit attempts
+        
+        print("Pattern " .. i .. ": " .. pattern)
+        
+        -- Try as string
+        pcall(function()
+            sessionAddItem:InvokeServer(pattern)
+        end)
+        
+        -- Try as table
+        pcall(function()
+            sessionAddItem:InvokeServer({ItemId = pattern})
+        end)
+        
+        pcall(function()
+            sessionAddItem:InvokeServer({ID = pattern})
+        end)
+        
+        task.wait(0.1)
+    end
+    
+    print("🎯 Pattern testing complete!")
 ]]
 
-print("\n💻 ACTIVE TRADE CODE (copy if needed):")
-print(activeTradeCode)
+print("🚀 Running final attempt...")
+pcall(loadstring, finalAttemptCode)
 
--- Run the active trade version too
-print("\n🚀 LOADING ACTIVE TRADE FUNCTIONS...")
-pcall(loadstring, activeTradeCode)
+print("\n" .. string.rep("=", 60))
+print("🔍 DATA CAPTURE COMPLETE")
+print(string.rep("=", 60))
 
-print("\n" .. string.rep("=", 50))
-print("🎯 BOT READY - USE IN ACTIVE TRADES")
-print(string.rep("=", 50))
+print("\n📋 NEXT STEPS:")
+print("1. Click the Aston Martin in your inventory")
+print("2. Look at the CAPTURED DATA above")
+print("3. Share the EXACT data that appears")
+print("4. I'll create the perfect bot with that data")
