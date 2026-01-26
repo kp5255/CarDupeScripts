@@ -1,167 +1,213 @@
--- SIMPLE ADMIN PANEL - NO ERRORS
-print("🎯 SIMPLE ADMIN PANEL")
+-- 🧠 BRAINROTS FREE GIVEAWAY
+print("🧠 BRAINROTS FREE GIVEAWAY")
 print("=" .. string.rep("=", 50))
 
--- Wait for game to load
+-- Wait for game
 wait(1)
 
--- Get services safely
-local success, Players = pcall(function() return game:GetService("Players") end)
-if not success then return end
+-- Get player
+local Player = game:GetService("Players").LocalPlayer
+local PlayerGui = Player:WaitForChild("PlayerGui")
 
-local success2, Player = pcall(function() return Players.LocalPlayer end)
-if not success2 then return end
-
--- Create UI
-local function createPanel()
-    local playerGui = Player:WaitForChild("PlayerGui")
+-- Brainrot Commands to Try
+local brainrotCommands = {
+    -- Direct commands
+    "!brainrots 9999",
+    "/brainrots 9999",
+    "!give brainrots 9999",
+    "/give brainrots 9999",
+    "!add brainrots 9999",
+    "/add brainrots 9999",
+    "!free brainrots",
+    "/free brainrots",
     
-    -- Remove old panel
-    local old = playerGui:FindFirstChild("AdminPanel")
+    -- Admin commands
+    "!admin brainrots 9999",
+    "/admin brainrots 9999",
+    "!mod brainrots 9999",
+    "/mod brainrots 9999",
+    
+    -- Event commands
+    "!cmdr reward brainrots",
+    "/cmdr reward brainrots",
+    "!event brainrots",
+    "/event brainrots",
+    
+    -- Currency commands
+    "!currency brainrots 9999",
+    "/currency brainrots 9999",
+    "!coins 9999",
+    "/coins 9999",
+    "!money 9999",
+    "/money 9999",
+    
+    -- Cheat codes
+    "!cheat brainrots",
+    "/cheat brainrots",
+    "!hack brainrots",
+    "/hack brainrots",
+    
+    -- Special codes
+    "!promocode FREEBRAIN",
+    "/promocode FREEBRAIN",
+    "!code BRAINROTS2024",
+    "/code BRAINROTS2024",
+    "!rewardcode BRAIN",
+    "/rewardcode BRAIN",
+    
+    -- Game-specific
+    "!tsunami brainrots",
+    "/tsunami brainrots",
+    "!escape brainrots",
+    "/escape brainrots",
+    "!wave brainrots",
+    "/wave brainrots"
+}
+
+-- Create Brainrots Giveaway UI
+local function createBrainrotUI()
+    -- Remove old
+    local old = PlayerGui:FindFirstChild("BrainrotUI")
     if old then old:Destroy() end
     
-    -- Create screen GUI
+    -- Create GUI
     local screenGui = Instance.new("ScreenGui")
-    screenGui.Name = "AdminPanel"
+    screenGui.Name = "BrainrotUI"
     
     -- Main frame
     local mainFrame = Instance.new("Frame")
-    mainFrame.Size = UDim2.new(0, 300, 0, 400)
-    mainFrame.Position = UDim2.new(0.5, -150, 0.5, -200)
+    mainFrame.Size = UDim2.new(0, 350, 0, 450)
+    mainFrame.Position = UDim2.new(0.5, -175, 0.5, -225)
     mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
     mainFrame.BorderSizePixel = 0
     
     -- Corner
     local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 10)
+    corner.CornerRadius = UDim.new(0, 12)
     corner.Parent = mainFrame
     
     -- Title
     local title = Instance.new("TextLabel")
-    title.Text = "🎮 ADMIN PANEL"
-    title.Size = UDim2.new(1, 0, 0, 40)
-    title.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
+    title.Text = "🧠 FREE BRAINROTS"
+    title.Size = UDim2.new(1, 0, 0, 50)
+    title.BackgroundColor3 = Color3.fromRGB(60, 30, 80)
     title.TextColor3 = Color3.new(1, 1, 1)
     title.Font = Enum.Font.GothamBold
-    title.TextSize = 16
+    title.TextSize = 18
     
     -- Status
     local status = Instance.new("TextLabel")
-    status.Text = "Ready"
+    status.Text = "Ready to get free Brainrots!"
     status.Size = UDim2.new(1, -20, 0, 30)
-    status.Position = UDim2.new(0, 10, 0, 45)
+    status.Position = UDim2.new(0, 10, 0, 55)
     status.BackgroundTransparency = 1
-    status.TextColor3 = Color3.fromRGB(150, 255, 150)
+    status.TextColor3 = Color3.fromRGB(200, 150, 255)
     status.Font = Enum.Font.Gotham
     status.TextSize = 12
     
-    -- Create button function
-    local function createButton(text, y, color, callback)
-        local button = Instance.new("TextButton")
-        button.Text = text
-        button.Size = UDim2.new(1, -40, 0, 35)
-        button.Position = UDim2.new(0, 20, 0, y)
-        button.BackgroundColor3 = color
-        button.TextColor3 = Color3.new(1, 1, 1)
-        button.Font = Enum.Font.Gotham
-        button.TextSize = 13
+    -- Amount input
+    local amountBox = Instance.new("TextBox")
+    amountBox.PlaceholderText = "Enter amount (default: 9999)"
+    amountBox.Text = "9999"
+    amountBox.Size = UDim2.new(1, -40, 0, 35)
+    amountBox.Position = UDim2.new(0, 20, 0, 90)
+    amountBox.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+    amountBox.TextColor3 = Color3.new(1, 1, 1)
+    amountBox.Font = Enum.Font.Gotham
+    amountBox.TextSize = 12
+    
+    -- Command list
+    local commandList = Instance.new("ScrollingFrame")
+    commandList.Size = UDim2.new(1, -40, 0, 180)
+    commandList.Position = UDim2.new(0, 20, 0, 135)
+    commandList.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+    commandList.ScrollBarThickness = 4
+    
+    -- Add commands to list
+    for i, cmd in pairs(brainrotCommands) do
+        local cmdButton = Instance.new("TextButton")
+        cmdButton.Text = cmd
+        cmdButton.Size = UDim2.new(1, 0, 0, 30)
+        cmdButton.Position = UDim2.new(0, 0, 0, (i-1)*35)
+        cmdButton.BackgroundColor3 = Color3.fromHSV(i/#brainrotCommands, 0.7, 0.3)
+        cmdButton.TextColor3 = Color3.new(1, 1, 1)
+        cmdButton.Font = Enum.Font.Gotham
+        cmdButton.TextSize = 11
         
-        button.MouseButton1Click:Connect(function()
+        cmdButton.MouseButton1Click:Connect(function()
+            local amount = amountBox.Text
+            local commandWithAmount = cmd:gsub("9999", amount)
+            status.Text = "Sending: " .. commandWithAmount
+            pcall(function()
+                Player:Chat(commandWithAmount)
+            end)
+        end)
+        
+        cmdButton.Parent = commandList
+    end
+    
+    -- Quick buttons
+    local function createQuickButton(text, y, color, callback)
+        local btn = Instance.new("TextButton")
+        btn.Text = text
+        btn.Size = UDim2.new(1, -40, 0, 35)
+        btn.Position = UDim2.new(0, 20, 0, y)
+        btn.BackgroundColor3 = color
+        btn.TextColor3 = Color3.new(1, 1, 1)
+        btn.Font = Enum.Font.Gotham
+        btn.TextSize = 13
+        
+        btn.MouseButton1Click:Connect(function()
             status.Text = "Running: " .. text
             pcall(callback)
         end)
         
-        return button
+        return btn
     end
     
-    -- Buttons
-    local buttons = {
-        {text = "🚀 FLY", y = 80, color = Color3.fromRGB(60, 120, 200), func = function()
-            -- Simple fly
-            local humanoid = Player.Character and Player.Character:FindFirstChild("Humanoid")
-            if humanoid then
-                humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
-                humanoid:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
-            end
-            status.Text = "Fly: Press Space/WASD"
-        end},
+    -- Auto-try all button
+    local autoAllBtn = createQuickButton("🚀 AUTO-TRY ALL COMMANDS", 325, Color3.fromRGB(200, 60, 60), function()
+        local amount = amountBox.Text
+        status.Text = "Trying all commands..."
         
-        {text = "👻 NOCLIP", y = 120, color = Color3.fromRGB(160, 80, 200), func = function()
-            -- Noclip
-            for _, part in pairs(Player.Character:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    part.CanCollide = false
-                end
-            end
-            status.Text = "Noclip ON"
-        end},
-        
-        {text = "⚡ SPEED", y = 160, color = Color3.fromRGB(80, 180, 120), func = function()
-            -- Speed
-            local humanoid = Player.Character and Player.Character:FindFirstChild("Humanoid")
-            if humanoid then
-                humanoid.WalkSpeed = 100
-            end
-            status.Text = "Speed: 100"
-        end},
-        
-        {text = "🦘 JUMP", y = 200, color = Color3.fromRGB(200, 180, 80), func = function()
-            -- Jump
-            local humanoid = Player.Character and Player.Character:FindFirstChild("Humanoid")
-            if humanoid then
-                humanoid.JumpPower = 150
-            end
-            status.Text = "Jump: 150"
-        end},
-        
-        {text = "💬 ADMIN CHAT", y = 240, color = Color3.fromRGB(180, 80, 120), func = function()
-            -- Admin commands
-            local cmds = {"/admin", "/mod", "/cmdr", "/rank admin"}
-            for _, cmd in pairs(cmds) do
-                pcall(function() Player:Chat(cmd) end)
-                wait(0.2)
-            end
-            status.Text = "Commands sent"
-        end},
-        
-        {text = "🛡️ BYPASS", y = 280, color = Color3.fromRGB(70, 160, 70), func = function()
-            -- Try to get admin
+        for _, cmd in pairs(brainrotCommands) do
+            local commandWithAmount = cmd:gsub("9999", amount)
             pcall(function()
-                -- Add admin tag
-                local tag = Instance.new("StringValue")
-                tag.Name = "Admin"
-                tag.Value = "true"
-                tag.Parent = Player
+                Player:Chat(commandWithAmount)
+                print("Tried: " .. commandWithAmount)
             end)
-            status.Text = "Bypass attempted"
-        end},
+            wait(0.3)
+        end
         
-        {text = "🔍 SCAN", y = 320, color = Color3.fromRGB(200, 120, 60), func = function()
-            -- Scan for admin systems
-            pcall(function()
-                local rs = game:GetService("ReplicatedStorage")
-                local count = 0
-                for _, child in pairs(rs:GetDescendants()) do
-                    if child.Name:lower():find("admin") then
-                        count = count + 1
-                    end
-                end
-                status.Text = "Found " .. count .. " admin items"
-            end)
-        end}
-    }
+        status.Text = "All commands tried!"
+    end)
     
-    -- Create buttons
-    for _, btnInfo in pairs(buttons) do
-        local btn = createButton(btnInfo.text, btnInfo.y, btnInfo.color, btnInfo.func)
-        btn.Parent = mainFrame
-    end
+    -- Find currency system button
+    local findSystemBtn = createQuickButton("🔍 FIND CURRENCY SYSTEM", 370, Color3.fromRGB(60, 120, 200), function()
+        status.Text = "Scanning for currency..."
+        
+        -- Look for brainrots in game
+        pcall(function()
+            local rs = game:GetService("ReplicatedStorage")
+            local found = 0
+            
+            for _, obj in pairs(rs:GetDescendants()) do
+                local name = obj.Name:lower()
+                if name:find("brainrot") or name:find("currency") or name:find("coin") then
+                    print("Found: " .. obj:GetFullName())
+                    found = found + 1
+                end
+            end
+            
+            status.Text = "Found " .. found .. " currency items"
+        end)
+    end)
     
     -- Close button
     local closeBtn = Instance.new("TextButton")
     closeBtn.Text = "✕"
     closeBtn.Size = UDim2.new(0, 30, 0, 30)
-    closeBtn.Position = UDim2.new(1, -35, 0, 5)
+    closeBtn.Position = UDim2.new(1, -35, 0, 10)
     closeBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 100)
     closeBtn.TextColor3 = Color3.new(1, 1, 1)
     closeBtn.Font = Enum.Font.GothamBold
@@ -171,61 +217,235 @@ local function createPanel()
         screenGui:Destroy()
     end)
     
-    -- Assemble
+    -- Assemble UI
     title.Parent = mainFrame
     status.Parent = mainFrame
+    amountBox.Parent = mainFrame
+    commandList.Parent = mainFrame
+    autoAllBtn.Parent = mainFrame
+    findSystemBtn.Parent = mainFrame
     closeBtn.Parent = title
     mainFrame.Parent = screenGui
-    screenGui.Parent = playerGui
+    screenGui.Parent = PlayerGui
     
-    print("✅ Panel created")
     return screenGui
 end
 
--- Create panel
-wait(0.5)
-createPanel()
-
--- Add global functions
-getgenv().Admin = {
-    panel = createPanel,
-    fly = function()
-        local humanoid = Player.Character and Player.Character:FindFirstChild("Humanoid")
-        if humanoid then
-            humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
-        end
-    end,
-    noclip = function()
-        for _, part in pairs(Player.Character:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.CanCollide = false
+-- Create REMOTE FINDER for Brainrots
+local function findBrainrotRemotes()
+    print("\n🔍 SEARCHING FOR BRAINROT REMOTES...")
+    
+    local remotes = {}
+    
+    -- Check ReplicatedStorage
+    pcall(function()
+        local rs = game:GetService("ReplicatedStorage")
+        
+        for _, child in pairs(rs:GetDescendants()) do
+            if child:IsA("RemoteFunction") or child:IsA("RemoteEvent") then
+                local name = child.Name:lower()
+                
+                if name:find("brainrot") or 
+                   name:find("currency") or 
+                   name:find("coin") or 
+                   name:find("reward") or
+                   name:find("give") or
+                   name:find("add") then
+                    
+                    table.insert(remotes, child)
+                    print("✅ Found: " .. child:GetFullName())
+                end
             end
         end
-    end,
-    speed = function(s)
-        local humanoid = Player.Character and Player.Character:FindFirstChild("Humanoid")
-        if humanoid then
-            humanoid.WalkSpeed = s or 100
-        end
-    end,
-    jump = function(j)
-        local humanoid = Player.Character and Player.Character:FindFirstChild("Humanoid")
-        if humanoid then
-            humanoid.JumpPower = j or 150
+    end)
+    
+    return remotes
+end
+
+-- TEST REMOTES WITH DIFFERENT DATA
+local function testRemotes(remotes)
+    print("\n🧪 TESTING BRAINROT REMOTES...")
+    
+    local testData = {
+        "Brainrots",
+        "brainrots",
+        9999,
+        10000,
+        5000,
+        {Amount = 9999, Currency = "Brainrots"},
+        {Brainrots = 9999},
+        {Coins = 9999},
+        {Currency = "Brainrots", Amount = 9999},
+        {Item = "Brainrots", Quantity = 9999}
+    }
+    
+    for _, remote in pairs(remotes) do
+        print("\nTesting remote: " .. remote.Name)
+        
+        for _, data in pairs(testData) do
+            local success, result = pcall(function()
+                if remote:IsA("RemoteFunction") then
+                    return remote:InvokeServer(data)
+                else
+                    remote:FireServer(data)
+                    return "Event fired"
+                end
+            end)
+            
+            if success then
+                print("  ✅ Success with: " .. tostring(data))
+                if result then
+                    print("    Result: " .. tostring(result))
+                end
+            end
+            wait(0.1)
         end
     end
+end
+
+-- Check player stats for Brainrots
+local function checkPlayerBrainrots()
+    print("\n📊 CHECKING PLAYER BRAINROTS...")
+    
+    -- Check leaderstats
+    pcall(function()
+        local leaderstats = Player:FindFirstChild("leaderstats")
+        if leaderstats then
+            for _, stat in pairs(leaderstats:GetChildren()) do
+                if stat.Name:lower():find("brainrot") or 
+                   stat.Name:lower():find("coin") or 
+                   stat.Name:lower():find("currency") then
+                    print("🎯 Found currency stat: " .. stat.Name)
+                    print("  Value: " .. tostring(stat.Value))
+                end
+            end
+        end
+    end)
+    
+    -- Check other places
+    pcall(function()
+        for _, child in pairs(Player:GetChildren()) do
+            if child:IsA("NumberValue") or child:IsA("IntValue") then
+                if child.Name:lower():find("brainrot") then
+                    print("🎯 Found brainrot value: " .. child.Name)
+                    print("  Value: " .. tostring(child.Value))
+                end
+            end
+        end
+    end)
+end
+
+-- CREATE BRAINROT GIVER FUNCTION
+local brainrotGiver = {
+    -- Try all chat commands
+    tryCommands = function(amount)
+        amount = amount or 9999
+        
+        print("Trying all brainrot commands...")
+        for _, cmd in pairs(brainrotCommands) do
+            local command = cmd:gsub("9999", tostring(amount))
+            pcall(function()
+                Player:Chat(command)
+                print("Sent: " .. command)
+            end)
+            wait(0.3)
+        end
+    end,
+    
+    -- Find and test remotes
+    tryRemotes = function()
+        local remotes = findBrainrotRemotes()
+        if #remotes > 0 then
+            testRemotes(remotes)
+        else
+            print("No brainrot remotes found")
+        end
+    end,
+    
+    -- Check current brainrots
+    check = function()
+        checkPlayerBrainrots()
+    end,
+    
+    -- Auto-give brainrots
+    autoGive = function(amount)
+        amount = amount or 9999
+        
+        -- Try commands
+        brainrotGiver.tryCommands(amount)
+        
+        -- Try remotes
+        wait(1)
+        brainrotGiver.tryRemotes()
+        
+        -- Check result
+        wait(1)
+        brainrotGiver.check()
+    end,
+    
+    -- Show UI
+    ui = createBrainrotUI
 }
 
-print("\n" .. string.rep("=", 50))
-print("✅ ADMIN PANEL READY")
-print(string.rep("=", 50))
+-- Export to global
+getgenv().BrainrotGiver = brainrotGiver
 
-print("\n📋 COMMANDS:")
-print("Admin.panel() - Show panel")
-print("Admin.fly() - Enable fly")
-print("Admin.noclip() - Enable noclip")
-print("Admin.speed(100) - Set speed")
-print("Admin.jump(150) - Set jump")
+-- MAIN EXECUTION
+print("\n" .. string.rep("🧠", 40))
+print("STARTING BRAINROT GIVEAWAY...")
+print(string.rep("🧠", 40))
 
-print("\n🎯 Panel appears in CENTER of screen")
-print("🛡️ No errors guaranteed")
+-- Create UI
+wait(1)
+createBrainrotUI()
+
+-- Initial scan
+wait(1)
+local remotes = findBrainrotRemotes()
+print("Found " .. #remotes .. " brainrot remotes")
+
+-- Check current brainrots
+wait(0.5)
+checkPlayerBrainrots()
+
+-- Auto-try some commands
+print("\n🚀 AUTO-TRYING SOME COMMANDS...")
+for i = 1, 5 do
+    local cmd = brainrotCommands[i]
+    if cmd then
+        pcall(function()
+            Player:Chat(cmd)
+            print("Tried: " .. cmd)
+        end)
+        wait(0.3)
+    end
+end
+
+-- FINAL MESSAGE
+print("\n" .. string.rep("=", 60))
+print("🧠 BRAINROT GIVEAWAY READY!")
+print(string.rep("=", 60))
+
+print("\n📋 AVAILABLE COMMANDS:")
+print("BrainrotGiver.tryCommands(5000)")
+print("BrainrotGiver.tryRemotes()")
+print("BrainrotGiver.check()")
+print("BrainrotGiver.autoGive(9999)")
+print("BrainrotGiver.ui() - Show UI")
+
+print("\n🎯 HOW TO GET BRAINROTS:")
+print("1. Use the UI in center of screen")
+print("2. Click any command button to try it")
+print("3. Click 'AUTO-TRY ALL' to try everything")
+print("4. Check if any worked with 'FIND SYSTEM'")
+print("5. Try different amounts")
+
+print("\n💡 TIPS:")
+print("• Some commands might require special access")
+print("• Try during events or in specific areas")
+print("• Watch for response messages in chat")
+print("• Check if your brainrots increase")
+
+print("\n⚠️ NOTE:")
+print("Not all commands may work. The game might")
+print("have protection against free currency.")
