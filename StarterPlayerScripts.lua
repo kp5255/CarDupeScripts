@@ -1,215 +1,279 @@
--- 🎮 ESCAPE TSUNAMI - CMDER EVENT UNLOCKER
--- Works visually without detection
-
-print("🎮 ESCAPE TSUNAMI CMDER UNLOCKER")
+-- 🔍 COMMAND CENTER CMDER - BRAINROTS EXPLORER
+print("🔍 COMMAND CENTER CMDER EXPLORER")
 print("=" .. string.rep("=", 50))
 
--- SAFE SERVICES
+-- SERVICES
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
-local Lighting = game:GetService("Lighting")
-local TweenService = game:GetService("TweenService")
+local TextChatService = game:GetService("TextChatService")
+local HttpService = game:GetService("HttpService")
 
--- PLAYER SETUP
+-- PLAYER
 local Player = Players.LocalPlayer
 local Character = Player.Character or Player.CharacterAdded:Wait()
-local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
 
--- FIND CMDER EVENT LOCATIONS
-print("\n🔍 SCANNING FOR CMDER EVENTS...")
+-- SCAN FOR COMMAND INTERFACES
+print("\n🔍 SCANNING COMMAND CENTER...")
 
--- Common CMDER event locations in Escape Tsunami
-local eventLocations = {
-    -- Main map locations
-    {Name = "CMD Tower", Position = Vector3.new(100, 50, 0)},
-    {Name = "Secret Bunker", Position = Vector3.new(-200, 25, 150)},
-    {Name = "Helipad", Position = Vector3.new(50, 100, -100)},
-    {Name = "Underground Lab", Position = Vector3.new(0, -50, 0)},
-    {Name = "Radar Station", Position = Vector3.new(300, 75, 200)},
-    {Name = "Command Center", Position = Vector3.new(-150, 60, -200)},
-    {Name = "Satellite Dish", Position = Vector3.new(250, 120, 100)},
-    {Name = "Control Room", Position = Vector3.new(180, 40, -150)},
+-- Look for command terminals in the Command Center
+local commandCenter = Workspace:FindFirstChild("CommandCenter") or 
+                     Workspace:FindFirstChild("CMD") or
+                     Workspace:FindFirstChild("CMDER") or
+                     Workspace:FindFirstChild("ControlCenter")
+
+-- COMMAND PATTERNS FOR BRAINROTS
+local brainrotCommands = {
+    -- Common cheat commands
+    "/give brainrots 1000",
+    "/add brainrots 9999",
+    "/free brainrots",
+    "/reward brainrots",
+    "/currency add brainrots",
+    "/coins add",
+    
+    -- Event commands
+    "/complete cmdr",
+    "/unlock all",
+    "/finish event",
+    "/claim all rewards",
+    
+    -- Admin commands
+    "/admin add brainrots",
+    "/mod add currency",
+    "/dev give rewards"
 }
 
--- CREATE VISUAL MARKERS FOR EVENTS
-print("\n🎯 CREATING VISUAL MARKERS...")
+-- HIDDEN COMMAND TRIGGERS
+print("\n🎯 SEARCHING FOR COMMAND TRIGGERS...")
 
-local markers = {}
-local beams = {}
+-- Look for interactive parts that might accept commands
+local function scanForCommandTriggers()
+    local triggers = {}
+    
+    -- Search in Command Center
+    if commandCenter then
+        print("✅ Found Command Center: " .. commandCenter.Name)
+        
+        for _, obj in pairs(commandCenter:GetDescendants()) do
+            if obj:IsA("BasePart") and (obj.Name:lower():find("terminal") or 
+               obj.Name:lower():find("console") or 
+               obj.Name:lower():find("computer") or
+               obj.Name:lower():find("panel")) then
+                table.insert(triggers, obj)
+                print("  Found terminal: " .. obj.Name)
+            end
+        end
+    end
+    
+    -- Search entire workspace
+    for _, obj in pairs(Workspace:GetDescendants()) do
+        if obj:IsA("BasePart") and obj.Name:lower():find("cmd") then
+            if not table.find(triggers, obj) then
+                table.insert(triggers, obj)
+                print("  Found CMD object: " .. obj.Name)
+            end
+        end
+    end
+    
+    return triggers
+end
 
-local function createMarker(position, name, color)
-    -- Create base part
-    local marker = Instance.new("Part")
-    marker.Name = "CMDER_Marker_" .. name
-    marker.Size = Vector3.new(5, 5, 5)
-    marker.Position = position + Vector3.new(0, 10, 0)
-    marker.Anchored = true
-    marker.CanCollide = false
-    marker.Material = Enum.Material.Neon
-    marker.Color = color
-    marker.Transparency = 0.3
+-- TEST COMMANDS ON TERMINALS
+local function testCommandsOnTerminal(terminal)
+    print("\n🧪 Testing commands on: " .. terminal.Name)
     
-    -- Add special effects
-    local particle = Instance.new("ParticleEmitter")
-    particle.Color = ColorSequence.new(color)
-    particle.Size = NumberSequence.new(1, 3)
-    particle.Transparency = NumberSequence.new(0.3, 0.8)
-    particle.Lifetime = NumberRange.new(2, 4)
-    particle.Rate = 20
-    particle.Speed = NumberRange.new(2, 5)
-    particle.Parent = marker
-    
-    -- Add light
-    local light = Instance.new("PointLight")
-    light.Color = color
-    light.Range = 20
-    light.Brightness = 2
-    light.Parent = marker
-    
-    -- Add text label
-    local billboard = Instance.new("BillboardGui")
-    billboard.Size = UDim2.new(0, 100, 0, 40)
-    billboard.StudsOffset = Vector3.new(0, 8, 0)
-    billboard.AlwaysOnTop = true
-    
-    local label = Instance.new("TextLabel")
-    label.Text = "🎮 " .. name
-    label.Size = UDim2.new(1, 0, 1, 0)
-    label.BackgroundTransparency = 1
-    label.TextColor3 = Color3.new(1, 1, 1)
-    label.TextStrokeTransparency = 0.5
-    label.Font = Enum.Font.GothamBold
-    label.TextSize = 14
-    label.Parent = billboard
-    billboard.Parent = marker
-    
-    -- Create beam to player
-    local beam = Instance.new("Beam")
-    beam.Color = ColorSequence.new(color)
-    beam.Width0 = 0.5
-    beam.Width1 = 0.5
-    beam.FaceCamera = true
-    
-    local attachment0 = Instance.new("Attachment")
-    attachment0.Parent = marker
-    
-    local attachment1 = Instance.new("Attachment")
-    attachment1.Parent = HumanoidRootPart
-    
-    beam.Attachment0 = attachment0
-    beam.Attachment1 = attachment1
-    beam.Parent = Workspace
-    
-    -- Store references
-    markers[name] = marker
-    beams[name] = {beam, attachment0, attachment1}
-    
-    -- Add pulsing animation
-    spawn(function()
-        while marker and marker.Parent do
-            local tween = TweenService:Create(
-                marker,
-                TweenInfo.new(1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, 0, true),
-                {Transparency = 0.7}
-            )
-            tween:Play()
-            tween.Completed:Wait()
+    -- First, try to interact with it
+    pcall(function()
+        local prompt = terminal:FindFirstChildWhichIsA("ProximityPrompt")
+        if prompt then
+            -- Activate the terminal
+            prompt:InputHoldBegin()
+            wait(0.5)
+            prompt:InputHoldEnd()
+            print("  ✅ Activated terminal")
         end
     end)
     
-    marker.Parent = Workspace
-    print("✅ Created marker: " .. name)
-    
-    return marker
-end
-
--- CREATE ALL MARKERS
-for _, event in pairs(eventLocations) do
-    local color = Color3.fromHSV(math.random(), 0.8, 1)
-    createMarker(event.Position, event.Name, color)
-end
-
--- TELEPORT FUNCTION
-print("\n🚀 CREATING TELEPORT SYSTEM...")
-
-local function teleportToEvent(eventName)
-    for _, event in pairs(eventLocations) do
-        if event.Name == eventName then
-            print("Teleporting to: " .. eventName)
+    -- Check for scripts that might handle commands
+    for _, script in pairs(terminal:GetDescendants()) do
+        if script:IsA("Script") or script:IsA("LocalScript") then
+            print("  Found script: " .. script.Name)
             
-            -- Fade out effect
-            local fade = Instance.new("ScreenGui")
-            local frame = Instance.new("Frame")
-            frame.Size = UDim2.new(1, 0, 1, 0)
-            frame.BackgroundColor3 = Color3.new(0, 0, 0)
-            frame.BackgroundTransparency = 1
-            frame.Parent = fade
-            fade.Parent = Player:WaitForChild("PlayerGui")
-            
-            -- Fade in
-            for i = 0, 1, 0.1 do
-                frame.BackgroundTransparency = 1 - i
-                wait(0.02)
-            end
-            
-            -- Teleport
-            Character:SetPrimaryPartCFrame(CFrame.new(event.Position + Vector3.new(0, 5, 0)))
-            
-            -- Fade out
-            for i = 0, 1, 0.1 do
-                frame.BackgroundTransparency = i
-                wait(0.02)
-            end
-            
-            fade:Destroy()
-            return true
+            -- Try to read script source for command patterns
+            pcall(function()
+                local source = script.Source
+                if source and #source > 0 then
+                    -- Look for command patterns in source
+                    if source:lower():find("brainrot") or 
+                       source:lower():find("currency") or 
+                       source:lower():find("reward") then
+                        print("    🔍 Script mentions rewards!")
+                    end
+                    
+                    -- Look for command handlers
+                    if source:lower():find("command") or 
+                       source:lower():find("chat") or 
+                       source:lower():find("input") then
+                        print("    ⌨️  Script handles commands!")
+                    end
+                end
+            end)
         end
     end
-    return false
 end
 
--- CREATE UI FOR EVENT SELECTION
-print("\n🎛️ CREATING CONTROL PANEL...")
+-- SCAN REMOTES FOR REWARD SYSTEMS
+print("\n🔍 SCANNING REWARD SYSTEMS...")
 
-local function createControlPanel()
+local function scanForRewardSystems()
+    local rewardRemotes = {}
+    
+    -- Look in ReplicatedStorage
+    local function searchFolder(folder, path)
+        if not folder then return end
+        
+        for _, obj in pairs(folder:GetChildren()) do
+            local fullPath = path .. "." .. obj.Name
+            
+            -- Check for reward-related names
+            local nameLower = obj.Name:lower()
+            if nameLower:find("brainrot") or 
+               nameLower:find("reward") or 
+               nameLower:find("currency") or 
+               nameLower:find("coin") or
+               nameLower:find("give") or
+               nameLower:find("add") then
+                
+                if obj:IsA("RemoteFunction") or obj:IsA("RemoteEvent") then
+                    table.insert(rewardRemotes, {obj = obj, path = fullPath})
+                    print("  🎯 Found reward remote: " .. obj.Name)
+                end
+            end
+            
+            -- Recursively search
+            searchFolder(obj, fullPath)
+        end
+    end
+    
+    searchFolder(ReplicatedStorage, "ReplicatedStorage")
+    
+    return rewardRemotes
+end
+
+-- TEST REWARD REMOTES
+local function testRewardRemotes(remotes)
+    print("\n🧪 TESTING REWARD REMOTES...")
+    
+    local testData = {
+        "Brainrots",
+        "brainrots",
+        1000,
+        9999,
+        10000,
+        {Amount = 1000, Currency = "Brainrots"},
+        {Brainrots = 1000},
+        {Coins = 9999},
+        {Reward = "Brainrots", Amount = 1000}
+    }
+    
+    for _, remoteInfo in pairs(remotes) do
+        local remote = remoteInfo.obj
+        print("\nTesting: " .. remote.Name .. " (" .. remote.ClassName .. ")")
+        
+        for _, data in pairs(testData) do
+            local success, result = pcall(function()
+                if remote:IsA("RemoteFunction") then
+                    return remote:InvokeServer(data)
+                else
+                    remote:FireServer(data)
+                    return "Event fired"
+                end
+            end)
+            
+            if success then
+                print("  ✅ Success with data: " .. tostring(data))
+                print("    Result: " .. tostring(result))
+            end
+            wait(0.1)
+        end
+    end
+end
+
+-- CHAT COMMAND INTERCEPTOR
+print("\n🎯 SETTING UP CHAT COMMAND INTERCEPTOR...")
+
+local function setupChatInterceptor()
+    -- Hook into chat system
+    local function onChatMessage(message)
+        -- Check if message is a command
+        if message:sub(1, 1) == "/" then
+            print("\n💬 Chat command detected: " .. message)
+            
+            -- Try to execute command
+            local success, result = pcall(function()
+                -- Send to game chat system
+                game:GetService("TextChatService").TextChannels.RBXGeneral:SendAsync(message)
+                return "Command sent"
+            end)
+            
+            if success then
+                print("  ✅ Command sent successfully")
+            else
+                print("  ❌ Failed: " .. tostring(result))
+            end
+        end
+    end
+    
+    -- Hook player chat
+    pcall(function()
+        Player.Chatted:Connect(onChatMessage)
+        print("✅ Chat interceptor active")
+    end)
+    
+    -- Also test sending commands directly
+    return function(command)
+        onChatMessage(command)
+    end
+end
+
+-- CREATE COMMAND TESTER UI
+print("\n🎛️ CREATING COMMAND TESTER UI...")
+
+local function createCommandTester()
     local PlayerGui = Player:WaitForChild("PlayerGui")
     
-    -- Remove existing UI
-    local existing = PlayerGui:FindFirstChild("CMDER_ControlPanel")
+    -- Remove existing
+    local existing = PlayerGui:FindFirstChild("CommandTester")
     if existing then existing:Destroy() end
     
-    -- Create main GUI
+    -- Create GUI
     local ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Name = "CMDER_ControlPanel"
+    ScreenGui.Name = "CommandTester"
     ScreenGui.ResetOnSpawn = false
     
     local MainFrame = Instance.new("Frame")
-    MainFrame.Size = UDim2.new(0, 350, 0, 400)
-    MainFrame.Position = UDim2.new(1, -360, 0.5, -200)
-    MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+    MainFrame.Size = UDim2.new(0, 400, 0, 500)
+    MainFrame.Position = UDim2.new(0.5, -200, 0.5, -250)
+    MainFrame.BackgroundColor3 = Color3.fromRGB(20, 25, 35)
     MainFrame.BackgroundTransparency = 0.1
     
     local UICorner = Instance.new("UICorner")
-    UICorner.CornerRadius = UDim.new(0, 10)
+    UICorner.CornerRadius = UDim.new(0, 12)
     UICorner.Parent = MainFrame
     
     -- Title
     local Title = Instance.new("TextLabel")
-    Title.Text = "🎮 CMDER EVENT UNLOCKER"
+    Title.Text = "🔍 CMDER COMMAND EXPLORER"
     Title.Size = UDim2.new(1, 0, 0, 40)
-    Title.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+    Title.BackgroundColor3 = Color3.fromRGB(40, 50, 70)
     Title.TextColor3 = Color3.new(1, 1, 1)
     Title.Font = Enum.Font.GothamBold
     Title.TextSize = 16
     
-    local TitleCorner = Instance.new("UICorner")
-    TitleCorner.CornerRadius = UDim.new(0, 10)
-    TitleCorner.Parent = Title
-    
     -- Status
     local Status = Instance.new("TextLabel")
-    Status.Text = "✅ Ready - Events: " .. #eventLocations
+    Status.Text = "Ready to explore commands..."
     Status.Size = UDim2.new(1, -20, 0, 30)
     Status.Position = UDim2.new(0, 10, 0, 45)
     Status.BackgroundTransparency = 1
@@ -217,89 +281,114 @@ local function createControlPanel()
     Status.Font = Enum.Font.Gotham
     Status.TextSize = 12
     
-    -- Event list
-    local EventList = Instance.new("ScrollingFrame")
-    EventList.Size = UDim2.new(1, -20, 0, 200)
-    EventList.Position = UDim2.new(0, 10, 0, 80)
-    EventList.BackgroundTransparency = 1
-    EventList.ScrollBarThickness = 4
+    -- Command Input
+    local InputBox = Instance.new("TextBox")
+    InputBox.PlaceholderText = "Enter command (e.g., /give brainrots 1000)"
+    InputBox.Size = UDim2.new(1, -40, 0, 35)
+    InputBox.Position = UDim2.new(0, 20, 0, 80)
+    InputBox.BackgroundColor3 = Color3.fromRGB(30, 35, 45)
+    InputBox.TextColor3 = Color3.new(1, 1, 1)
+    InputBox.Font = Enum.Font.Gotham
+    InputBox.TextSize = 12
     
-    local UIListLayout = Instance.new("UIListLayout")
-    UIListLayout.Padding = UDim.new(0, 5)
-    UIListLayout.Parent = EventList
+    local InputCorner = Instance.new("UICorner")
+    InputCorner.CornerRadius = UDim.new(0, 6)
+    InputCorner.Parent = InputBox
     
-    -- Create event buttons
-    local buttonY = 0
-    for i, event in pairs(eventLocations) do
-        local EventButton = Instance.new("TextButton")
-        EventButton.Text = "🎯 " .. event.Name
-        EventButton.Size = UDim2.new(1, 0, 0, 35)
-        EventButton.BackgroundColor3 = Color3.fromHSV(i/#eventLocations, 0.7, 0.3)
-        EventButton.TextColor3 = Color3.new(1, 1, 1)
-        EventButton.Font = Enum.Font.Gotham
-        EventButton.TextSize = 12
+    -- Quick Command Buttons
+    local quickCommands = {
+        {text = "/give brainrots 1000", color = Color3.fromRGB(60, 180, 80)},
+        {text = "/add coins 9999", color = Color3.fromRGB(180, 120, 60)},
+        {text = "/complete event", color = Color3.fromRGB(70, 140, 200)},
+        {text = "/unlock all", color = Color3.fromRGB(200, 80, 120)},
+        {text = "/claim rewards", color = Color3.fromRGB(160, 80, 200)}
+    }
+    
+    local quickY = 125
+    for i, cmd in pairs(quickCommands) do
+        local QuickButton = Instance.new("TextButton")
+        QuickButton.Text = cmd.text
+        QuickButton.Size = UDim2.new(1, -40, 0, 30)
+        QuickButton.Position = UDim2.new(0, 20, 0, quickY)
+        QuickButton.BackgroundColor3 = cmd.color
+        QuickButton.TextColor3 = Color3.new(1, 1, 1)
+        QuickButton.Font = Enum.Font.Gotham
+        QuickButton.TextSize = 11
         
-        local ButtonCorner = Instance.new("UICorner")
-        ButtonCorner.CornerRadius = UDim.new(0, 6)
-        ButtonCorner.Parent = EventButton
-        
-        EventButton.MouseButton1Click:Connect(function()
-            Status.Text = "🚀 Teleporting to " .. event.Name
-            teleportToEvent(event.Name)
-            Status.Text = "✅ Arrived at " .. event.Name
+        QuickButton.MouseButton1Click:Connect(function()
+            InputBox.Text = cmd.text
+            Status.Text = "Ready: " .. cmd.text
         end)
         
-        EventButton.Parent = EventList
+        quickY = quickY + 35
     end
     
-    -- Control buttons
-    local function createControlButton(text, y, color, callback)
-        local Button = Instance.new("TextButton")
-        Button.Text = text
-        Button.Size = UDim2.new(1, -40, 0, 35)
-        Button.Position = UDim2.new(0, 20, 0, y)
-        Button.BackgroundColor3 = color
-        Button.TextColor3 = Color3.new(1, 1, 1)
-        Button.Font = Enum.Font.Gotham
-        Button.TextSize = 13
-        
-        local ButtonCorner = Instance.new("UICorner")
-        ButtonCorner.CornerRadius = UDim.new(0, 6)
-        ButtonCorner.Parent = Button
-        
-        Button.MouseButton1Click:Connect(callback)
-        return Button
-    end
+    -- Execute Button
+    local ExecuteButton = Instance.new("TextButton")
+    ExecuteButton.Text = "🚀 EXECUTE COMMAND"
+    ExecuteButton.Size = UDim2.new(1, -40, 0, 40)
+    ExecuteButton.Position = UDim2.new(0, 20, 0, quickY + 10)
+    ExecuteButton.BackgroundColor3 = Color3.fromRGB(220, 60, 60)
+    ExecuteButton.TextColor3 = Color3.new(1, 1, 1)
+    ExecuteButton.Font = Enum.Font.GothamBold
+    ExecuteButton.TextSize = 14
     
-    local ToggleMarkers = createControlButton("👁️ TOGGLE MARKERS", 290, Color3.fromRGB(60, 120, 200), function()
-        for name, marker in pairs(markers) do
-            marker.Visible = not marker.Visible
-        end
-        Status.Text = marker.Visible and "✅ Markers Visible" or "👁️ Markers Hidden"
-    end)
-    
-    local ToggleBeams = createControlButton("🔦 TOGGLE BEAMS", 330, Color3.fromRGB(70, 160, 70), function()
-        for name, beamParts in pairs(beams) do
-            beamParts[1].Enabled = not beamParts[1].Enabled
-        end
-        Status.Text = beams[1].Enabled and "✅ Beams Enabled" or "🔦 Beams Disabled"
-    end)
-    
-    local RemoveAll = createControlButton("🗑️ CLEAN UP", 370, Color3.fromRGB(200, 70, 70), function()
-        for name, marker in pairs(markers) do
-            marker:Destroy()
-        end
-        for name, beamParts in pairs(beams) do
-            for _, part in pairs(beamParts) do
-                part:Destroy()
+    ExecuteButton.MouseButton1Click:Connect(function()
+        local command = InputBox.Text
+        if command ~= "" then
+            Status.Text = "Executing: " .. command
+            
+            -- Try to execute via chat
+            pcall(function()
+                Player:Chat(command)
+                Status.Text = "✅ Sent to chat: " .. command
+            end)
+            
+            -- Also try remotes
+            local rewardRemotes = scanForRewardSystems()
+            if #rewardRemotes > 0 then
+                for _, remoteInfo in pairs(rewardRemotes) do
+                    pcall(function()
+                        remoteInfo.obj:InvokeServer(command)
+                        Status.Text = "✅ Sent to remote: " .. remoteInfo.obj.Name
+                    end)
+                end
             end
         end
-        markers = {}
-        beams = {}
-        Status.Text = "✅ Cleaned up all markers"
     end)
     
-    -- Close button
+    -- Scan Button
+    local ScanButton = Instance.new("TextButton")
+    ScanButton.Text = "🔍 SCAN FOR COMMANDS"
+    ScanButton.Size = UDim2.new(1, -40, 0, 35)
+    ScanButton.Position = UDim2.new(0, 20, 1, -100)
+    ScanButton.BackgroundColor3 = Color3.fromRGB(60, 120, 200)
+    ScanButton.TextColor3 = Color3.new(1, 1, 1)
+    ScanButton.Font = Enum.Font.Gotham
+    ScanButton.TextSize = 13
+    
+    ScanButton.MouseButton1Click:Connect(function()
+        Status.Text = "🔍 Scanning..."
+        
+        -- Scan terminals
+        local triggers = scanForCommandTriggers()
+        Status.Text = "Found " .. #triggers .. " terminals"
+        
+        -- Scan reward systems
+        local remotes = scanForRewardSystems()
+        Status.Text = Status.Text .. ", " .. #remotes .. " reward remotes"
+        
+        -- Test them
+        if #triggers > 0 then
+            testCommandsOnTerminal(triggers[1])
+        end
+        
+        if #remotes > 0 then
+            testRewardRemotes(remotes)
+        end
+    end)
+    
+    -- Close Button
     local CloseButton = Instance.new("TextButton")
     CloseButton.Text = "✕"
     CloseButton.Size = UDim2.new(0, 30, 0, 30)
@@ -316,200 +405,178 @@ local function createControlPanel()
     -- Assemble UI
     Title.Parent = MainFrame
     Status.Parent = MainFrame
-    EventList.Parent = MainFrame
-    ToggleMarkers.Parent = MainFrame
-    ToggleBeams.Parent = MainFrame
-    RemoveAll.Parent = MainFrame
+    InputBox.Parent = MainFrame
+    ExecuteButton.Parent = MainFrame
+    ScanButton.Parent = MainFrame
     CloseButton.Parent = Title
     MainFrame.Parent = ScreenGui
     ScreenGui.Parent = PlayerGui
     
-    print("✅ Control Panel created - Check top-right")
+    print("✅ Command Tester UI created - Center screen")
     return ScreenGui
 end
 
--- UNLOCK ALL CMDER EVENTS FUNCTION
-print("\n🔓 UNLOCKING CMDER EVENTS...")
+-- MEMORY SCANNER FOR HIDDEN COMMANDS
+print("\n🧠 MEMORY SCANNER ACTIVATED...")
 
-local function unlockAllCMDER()
-    print("Attempting to unlock all CMDER events...")
+local function memoryScanForBrainrots()
+    print("Scanning game memory for Brainrot references...")
     
-    -- Method 1: Check for event triggers in game
-    local eventTriggers = Workspace:FindFirstChild("Events") or 
-                         Workspace:FindFirstChild("CMDER") or
-                         Workspace:FindFirstChild("Triggers")
+    -- Look for Brainrot values in game state
+    local foundValues = {}
     
-    if eventTriggers then
-        print("Found event system: " .. eventTriggers.Name)
-        
-        -- Try to activate all child triggers
-        for _, trigger in pairs(eventTriggers:GetDescendants()) do
-            if trigger:IsA("BasePart") and trigger.Name:lower():find("event") then
-                pcall(function()
-                    -- Fire proximity prompts
-                    local prompt = trigger:FindFirstChildWhichIsA("ProximityPrompt")
-                    if prompt then
-                        prompt:InputHoldBegin()
-                        wait(0.1)
-                        prompt:InputHoldEnd()
-                        print("✅ Activated: " .. trigger.Name)
-                    end
-                end)
+    -- Check player stats
+    pcall(function()
+        local leaderstats = Player:FindFirstChild("leaderstats")
+        if leaderstats then
+            for _, stat in pairs(leaderstats:GetChildren()) do
+                if stat.Name:lower():find("brainrot") or 
+                   stat.Name:lower():find("coin") or 
+                   stat.Name:lower():find("currency") then
+                    print("🎯 Found currency stat: " .. stat.Name)
+                    print("  Current value: " .. tostring(stat.Value))
+                    table.insert(foundValues, stat)
+                end
             end
         end
-    end
+    end)
     
-    -- Method 2: Check ReplicatedStorage for event data
-    local eventData = ReplicatedStorage:FindFirstChild("Events") or 
-                     ReplicatedStorage:FindFirstChild("GameData") or
-                     ReplicatedStorage:FindFirstChild("CMDER")
-    
-    if eventData then
-        print("Found event data in ReplicatedStorage")
-        
-        -- Try to modify event states
-        for _, obj in pairs(eventData:GetDescendants()) do
-            if obj:IsA("BoolValue") and obj.Name:lower():find("unlock") then
-                pcall(function()
-                    obj.Value = true
-                    print("✅ Unlocked: " .. obj.Name)
-                end)
-            end
-            
-            if obj:IsA("NumberValue") and obj.Name:lower():find("progress") then
-                pcall(function()
-                    obj.Value = 100
-                    print("✅ Maxed progress: " .. obj.Name)
-                end)
-            end
-        end
-    end
-    
-    -- Method 3: Fire relevant remotes
-    local remotes = ReplicatedStorage:FindFirstChild("Remotes") or 
-                   ReplicatedStorage:FindFirstChild("Events") or
-                   ReplicatedStorage:FindFirstChild("Functions")
-    
-    if remotes then
-        print("Found remote system")
-        
-        -- Try common event unlocking remotes
-        local remoteNames = {
-            "UnlockEvent", "CompleteEvent", "StartEvent",
-            "CMDER_Unlock", "EventComplete", "GetReward"
-        }
-        
-        for _, remoteName in pairs(remoteNames) do
-            local remote = remotes:FindFirstChild(remoteName, true)
-            if remote then
-                pcall(function()
-                    if remote:IsA("RemoteFunction") then
-                        remote:InvokeServer()
-                        print("✅ Called: " .. remote.Name)
-                    elseif remote:IsA("RemoteEvent") then
-                        remote:FireServer()
-                        print("✅ Fired: " .. remote.Name)
-                    end
-                end)
-            end
-        end
-    end
-    
-    print("🎮 Attempted to unlock all CMDER events")
-end
-
--- AUTO-TRIGGER EVENTS NEAR PLAYER
-local function autoTriggerEvents()
-    spawn(function()
-        while wait(5) do
-            -- Check for event triggers near player
-            for _, part in pairs(Workspace:GetChildren()) do
-                if part:IsA("BasePart") and part.Name:lower():find("event") then
-                    local distance = (HumanoidRootPart.Position - part.Position).Magnitude
-                    if distance < 50 then
-                        -- Try to trigger
+    -- Check Data Stores (via remotes)
+    local function checkDataStoreRemotes()
+        local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+        if remotes then
+            for _, remote in pairs(remotes:GetDescendants()) do
+                if remote:IsA("RemoteFunction") then
+                    local nameLower = remote.Name:lower()
+                    if nameLower:find("data") or nameLower:find("save") or nameLower:find("load") then
+                        print("📊 Data remote: " .. remote.Name)
+                        
+                        -- Try to get data
                         pcall(function()
-                            local prompt = part:FindFirstChildWhichIsA("ProximityPrompt")
-                            if prompt then
-                                prompt:InputHoldBegin()
-                                wait(0.5)
-                                prompt:InputHoldEnd()
-                                print("✅ Auto-triggered nearby event")
+                            local data = remote:InvokeServer()
+                            if data and type(data) == "table" then
+                                for key, value in pairs(data) do
+                                    if tostring(key):lower():find("brainrot") then
+                                        print("  🎯 Found Brainrots in data: " .. tostring(value))
+                                    end
+                                end
                             end
                         end)
                     end
                 end
             end
         end
-    end)
+    end
+    
+    checkDataStoreRemotes()
+    
+    return foundValues
 end
 
 -- MAIN EXECUTION
 print("\n" .. string.rep("🚀", 40))
-print("INITIALIZING CMDER UNLOCKER...")
+print("STARTING COMMAND CENTER EXPLORER...")
 print(string.rep("🚀", 40))
 
--- Create visual markers
-print("✅ Created " .. #eventLocations .. " event markers")
+-- Create UI
+createCommandTester()
 
--- Create control panel
-createControlPanel()
+-- Setup chat interceptor
+local sendCommand = setupChatInterceptor()
 
--- Start auto-trigger
-autoTriggerEvents()
+-- Initial scan
+task.wait(1)
+print("\n🔍 INITIAL SCAN...")
 
--- Attempt to unlock events
-task.wait(2)
-unlockAllCMDER()
+local terminals = scanForCommandTriggers()
+print("Found " .. #terminals .. " command terminals")
+
+local rewardRemotes = scanForRewardSystems()
+print("Found " .. #rewardRemotes .. " reward remotes")
+
+-- Test first terminal
+if #terminals > 0 then
+    testCommandsOnTerminal(terminals[1])
+end
+
+-- Memory scan
+task.wait(1)
+memoryScanForBrainrots()
 
 -- EXPORT FUNCTIONS
-getgenv().CMDER = {
-    -- Teleport functions
-    tp = teleportToEvent,
-    tpTower = function() teleportToEvent("CMD Tower") end,
-    tpBunker = function() teleportToEvent("Secret Bunker") end,
-    tpHelipad = function() teleportToEvent("Helipad") end,
+getgenv().CMDERCommands = {
+    -- Command execution
+    exec = sendCommand or function(cmd) Player:Chat(cmd) end,
+    giveBrainrots = function(amount)
+        local cmd = "/give brainrots " .. (amount or 1000)
+        Player:Chat(cmd)
+    end,
     
-    -- Event functions
-    unlock = unlockAllCMDER,
-    trigger = autoTriggerEvents,
+    -- Scanning
+    scan = function()
+        terminals = scanForCommandTriggers()
+        rewardRemotes = scanForRewardSystems()
+        return #terminals, #rewardRemotes
+    end,
     
-    -- UI functions
-    ui = createControlPanel,
-    clear = function()
-        for name, marker in pairs(markers) do marker:Destroy() end
-        for name, beamParts in pairs(beams) do
-            for _, part in pairs(beamParts) do part:Destroy() end
+    -- Testing
+    testTerminal = function(index)
+        if terminals[index] then
+            testCommandsOnTerminal(terminals[index])
         end
-        markers = {}
-        beams = {}
-    end
+    end,
+    
+    testRemotes = function()
+        testRewardRemotes(rewardRemotes)
+    end,
+    
+    -- UI
+    ui = createCommandTester,
+    
+    -- Memory
+    memoryScan = memoryScanForBrainrots
 }
+
+-- AUTO-TEST COMMON COMMANDS
+print("\n🧪 AUTO-TESTING COMMON COMMANDS...")
+
+task.wait(2)
+for _, command in pairs(brainrotCommands) do
+    print("Testing: " .. command)
+    pcall(function()
+        Player:Chat(command)
+    end)
+    wait(0.5)
+end
 
 -- FINAL MESSAGE
 print("\n" .. string.rep("=", 60))
-print("🎮 CMDER UNLOCKER READY!")
+print("🔍 CMDER COMMAND EXPLORER READY!")
 print(string.rep("=", 60))
 
-print("\n📋 AVAILABLE COMMANDS:")
-print("CMDER.tpTower()      - Teleport to CMD Tower")
-print("CMDER.tpBunker()     - Teleport to Secret Bunker")
-print("CMDER.unlock()       - Unlock all CMDER events")
-print("CMDER.ui()           - Show control panel")
-print("CMDER.clear()        - Remove all markers")
+print("\n📋 AVAILABLE FUNCTIONS:")
+print("CMDERCommands.exec('/give brainrots 1000')")
+print("CMDERCommands.giveBrainrots(5000)")
+print("CMDERCommands.scan() - Find terminals & remotes")
+print("CMDERCommands.testRemotes() - Test reward remotes")
+print("CMDERCommands.ui() - Show command tester")
+print("CMDERCommands.memoryScan() - Scan for Brainrot values")
 
-print("\n🎯 FEATURES:")
-print("1. Visual markers for all CMDER events")
-print("2. Teleport to any event location")
-print("3. Auto-trigger nearby events")
-print("4. Attempt to unlock all events")
-print("5. Control panel in top-right corner")
+print("\n🎯 COMMAND TESTER UI:")
+print("• Center of screen")
+print("• Enter commands in text box")
+print("• Quick buttons for common commands")
+print("• Scan button to find systems")
 
-print("\n💡 TIPS:")
-print("• Markers are VISUAL ONLY - won't get you banned")
-print("• Use teleport to quickly reach events")
-print("• Control panel lets you toggle visibility")
-print("• Script auto-triggers events near you")
+print("\n💡 TIPS FOR FINDING COMMANDS:")
+print("1. Try typing /help or /commands in chat")
+print("2. Look for terminals with ProximityPrompts")
+print("3. Check the Scripts in Command Center objects")
+print("4. Try common admin/cheat commands")
+print("5. Watch for any response messages")
 
-print("\n✅ UI appears in TOP-RIGHT corner")
-print("✅ Markers visible in-game with beams")
+print("\n⚠️ REMEMBER:")
+print("• Not all commands will work")
+print("• Some may require admin privileges")
+print("• Game may have anti-cheat for commands")
+print("• Use the scanner to find what works")
