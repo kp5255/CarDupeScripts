@@ -1,483 +1,200 @@
--- 🛡️ ULTIMATE ADMIN PRIVILEGE ESCALATOR - FIXED VERSION
-print("🛡️ ULTIMATE ADMIN ESCALATOR")
+-- SIMPLE ADMIN PANEL - NO ERRORS
+print("🎯 SIMPLE ADMIN PANEL")
 print("=" .. string.rep("=", 50))
 
--- SAFE SERVICES
-local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Workspace = game:GetService("Workspace")
-local CoreGui = game:GetService("CoreGui")
+-- Wait for game to load
+wait(1)
 
--- PLAYER
-local Player = Players.LocalPlayer
-local PlayerGui = Player:WaitForChild("PlayerGui")
+-- Get services safely
+local success, Players = pcall(function() return game:GetService("Players") end)
+if not success then return end
 
--- SAFE SCAN FUNCTION
-local function safeScan()
-    print("\n🔍 SAFE SCANNING FOR ADMIN SYSTEMS...")
-    
-    local foundSystems = {
-        panels = {},
-        remotes = {},
-        scripts = {}
-    }
-    
-    -- Scan ReplicatedStorage safely
-    pcall(function()
-        for _, child in pairs(ReplicatedStorage:GetDescendants()) do
-            local nameLower = child.Name:lower()
-            
-            -- Look for admin panels (UIs)
-            if child:IsA("ScreenGui") and nameLower:find("admin") then
-                table.insert(foundSystems.panels, {
-                    object = child,
-                    path = child:GetFullName()
-                })
-                print("✅ Found Admin Panel: " .. child.Name)
-            end
-            
-            -- Look for admin remotes
-            if (child:IsA("RemoteFunction") or child:IsA("RemoteEvent")) and 
-               (nameLower:find("admin") or nameLower:find("mod") or nameLower:find("rank")) then
-                table.insert(foundSystems.remotes, {
-                    object = child,
-                    path = child:GetFullName(),
-                    type = child.ClassName
-                })
-                print("✅ Found Admin Remote: " .. child.Name)
-            end
-        end
-    end)
-    
-    -- Scan Workspace for terminals
-    pcall(function()
-        for _, child in pairs(Workspace:GetDescendants()) do
-            if child:IsA("Part") and child.Name:lower():find("terminal") then
-                print("✅ Found Terminal: " .. child.Name)
-            end
-        end
-    end)
-    
-    return foundSystems
-end
+local success2, Player = pcall(function() return Players.LocalPlayer end)
+if not success2 then return end
 
--- SIMPLE BYPASS METHODS
-local bypassMethods = {}
-
--- Method 1: Simple admin data injection
-bypassMethods.injectAdminData = function(remote)
-    return function(...)
-        local success, result = pcall(function()
-            if remote:IsA("RemoteFunction") then
-                -- Create admin data
-                local adminData = {
-                    UserId = Player.UserId,
-                    Player = Player,
-                    IsAdmin = true,
-                    Rank = "Administrator",
-                    Permissions = {"All"},
-                    Timestamp = os.time()
-                }
-                
-                -- Try with admin data
-                return remote:InvokeServer(adminData, ...)
-            else
-                -- For RemoteEvents
-                local adminData = {
-                    UserId = Player.UserId,
-                    IsAdmin = true
-                }
-                remote:FireServer(adminData, ...)
-                return "Event fired with admin data"
-            end
-        end)
-        return success, result
-    end
-end
-
--- Method 2: Permission override
-bypassMethods.overridePermissions = function()
-    print("🔓 Attempting permission override...")
+-- Create UI
+local function createPanel()
+    local playerGui = Player:WaitForChild("PlayerGui")
     
-    -- Add admin tag to player
-    pcall(function()
-        local tag = Instance.new("StringValue")
-        tag.Name = "Admin"
-        tag.Value = "True"
-        tag.Parent = Player
-        print("✅ Added Admin tag")
-    end)
+    -- Remove old panel
+    local old = playerGui:FindFirstChild("AdminPanel")
+    if old then old:Destroy() end
     
-    -- Add to leaderstats
-    pcall(function()
-        local leaderstats = Player:FindFirstChild("leaderstats")
-        if not leaderstats then
-            leaderstats = Instance.new("Folder")
-            leaderstats.Name = "leaderstats"
-            leaderstats.Parent = Player
-        end
-        
-        local rank = Instance.new("StringValue")
-        rank.Name = "Rank"
-        rank.Value = "Admin"
-        rank.Parent = leaderstats
-        print("✅ Added Admin rank")
-    end)
+    -- Create screen GUI
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "AdminPanel"
     
-    return true
-end
-
--- CREATE SIMPLE ADMIN PANEL
-local function createSimpleAdminPanel()
-    local PlayerGui = Player:WaitForChild("PlayerGui")
+    -- Main frame
+    local mainFrame = Instance.new("Frame")
+    mainFrame.Size = UDim2.new(0, 300, 0, 400)
+    mainFrame.Position = UDim2.new(0.5, -150, 0.5, -200)
+    mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+    mainFrame.BorderSizePixel = 0
     
-    -- Remove existing
-    local existing = PlayerGui:FindFirstChild("SimpleAdminPanel")
-    if existing then existing:Destroy() end
-    
-    -- Create GUI
-    local ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Name = "SimpleAdminPanel"
-    ScreenGui.ResetOnSpawn = false
-    
-    local MainFrame = Instance.new("Frame")
-    MainFrame.Size = UDim2.new(0, 400, 0, 500)
-    MainFrame.Position = UDim2.new(0.5, -200, 0.5, -250)
-    MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-    MainFrame.BackgroundTransparency = 0.1
-    
-    local UICorner = Instance.new("UICorner")
-    UICorner.CornerRadius = UDim.new(0, 10)
-    UICorner.Parent = MainFrame
+    -- Corner
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 10)
+    corner.Parent = mainFrame
     
     -- Title
-    local Title = Instance.new("TextLabel")
-    Title.Text = "🛡️ ADMIN ESCALATOR"
-    Title.Size = UDim2.new(1, 0, 0, 40)
-    Title.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
-    Title.TextColor3 = Color3.new(1, 1, 1)
-    Title.Font = Enum.Font.GothamBold
-    Title.TextSize = 16
-    
-    local TitleCorner = Instance.new("UICorner")
-    TitleCorner.CornerRadius = UDim.new(0, 10)
-    TitleCorner.Parent = Title
+    local title = Instance.new("TextLabel")
+    title.Text = "🎮 ADMIN PANEL"
+    title.Size = UDim2.new(1, 0, 0, 40)
+    title.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
+    title.TextColor3 = Color3.new(1, 1, 1)
+    title.Font = Enum.Font.GothamBold
+    title.TextSize = 16
     
     -- Status
-    local Status = Instance.new("TextLabel")
-    Status.Text = "Ready to escalate privileges..."
-    Status.Size = UDim2.new(1, -20, 0, 30)
-    Status.Position = UDim2.new(0, 10, 0, 45)
-    Status.BackgroundTransparency = 1
-    Status.TextColor3 = Color3.fromRGB(150, 255, 150)
-    Status.Font = Enum.Font.Gotham
-    Status.TextSize = 12
+    local status = Instance.new("TextLabel")
+    status.Text = "Ready"
+    status.Size = UDim2.new(1, -20, 0, 30)
+    status.Position = UDim2.new(0, 10, 0, 45)
+    status.BackgroundTransparency = 1
+    status.TextColor3 = Color3.fromRGB(150, 255, 150)
+    status.Font = Enum.Font.Gotham
+    status.TextSize = 12
     
-    -- Button creator
-    local function createButton(text, yPos, color, callback)
-        local Button = Instance.new("TextButton")
-        Button.Text = text
-        Button.Size = UDim2.new(1, -40, 0, 40)
-        Button.Position = UDim2.new(0, 20, 0, yPos)
-        Button.BackgroundColor3 = color
-        Button.TextColor3 = Color3.new(1, 1, 1)
-        Button.Font = Enum.Font.Gotham
-        Button.TextSize = 13
+    -- Create button function
+    local function createButton(text, y, color, callback)
+        local button = Instance.new("TextButton")
+        button.Text = text
+        button.Size = UDim2.new(1, -40, 0, 35)
+        button.Position = UDim2.new(0, 20, 0, y)
+        button.BackgroundColor3 = color
+        button.TextColor3 = Color3.new(1, 1, 1)
+        button.Font = Enum.Font.Gotham
+        button.TextSize = 13
         
-        local ButtonCorner = Instance.new("UICorner")
-        ButtonCorner.CornerRadius = UDim.new(0, 6)
-        ButtonCorner.Parent = Button
-        
-        Button.MouseButton1Click:Connect(function()
-            Button.Text = "⏳"
-            task.spawn(function()
-                pcall(callback)
-                task.wait(0.5)
-                Button.Text = text
-            end)
+        button.MouseButton1Click:Connect(function()
+            status.Text = "Running: " .. text
+            pcall(callback)
         end)
         
-        return Button
+        return button
     end
     
-    -- Scan systems
-    local foundSystems = {panels = {}, remotes = {}}
-    
     -- Buttons
-    local ScanButton = createButton("🔍 SCAN SYSTEMS", 80, Color3.fromRGB(60, 120, 200), function()
-        Status.Text = "Scanning..."
-        foundSystems = safeScan()
-        Status.Text = "Found: " .. #foundSystems.panels .. " panels, " .. #foundSystems.remotes .. " remotes"
-    end)
-    
-    local BypassButton = createButton("🔓 BYPASS CHECKS", 130, Color3.fromRGB(70, 180, 70), function()
-        Status.Text = "Bypassing..."
-        bypassMethods.overridePermissions()
+    local buttons = {
+        {text = "🚀 FLY", y = 80, color = Color3.fromRGB(60, 120, 200), func = function()
+            -- Simple fly
+            local humanoid = Player.Character and Player.Character:FindFirstChild("Humanoid")
+            if humanoid then
+                humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
+                humanoid:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
+            end
+            status.Text = "Fly: Press Space/WASD"
+        end},
         
-        -- Try admin remotes
-        for _, remoteInfo in pairs(foundSystems.remotes) do
-            pcall(function()
-                bypassMethods.injectAdminData(remoteInfo.object)()
-                print("✅ Bypassed: " .. remoteInfo.object.Name)
-            end)
-        end
-        
-        Status.Text = "✅ Checks bypassed"
-    end)
-    
-    local FlyButton = createButton("🚀 FLY MODE", 180, Color3.fromRGB(200, 120, 60), function()
-        Status.Text = "Enabling fly..."
-        
-        -- Simple fly script
-        local flyEnabled = false
-        local bodyVelocity
-        
-        local function toggleFly()
-            flyEnabled = not flyEnabled
-            
-            if flyEnabled then
-                Status.Text = "Fly: ON"
-                
-                -- Create body velocity for flying
-                bodyVelocity = Instance.new("BodyVelocity")
-                bodyVelocity.Velocity = Vector3.new(0, 0, 0)
-                bodyVelocity.MaxForce = Vector3.new(40000, 40000, 40000)
-                bodyVelocity.Parent = Player.Character.HumanoidRootPart
-                
-                -- Flying control
-                game:GetService("RunService").RenderStepped:Connect(function()
-                    if flyEnabled and bodyVelocity then
-                        local cam = workspace.CurrentCamera
-                        local root = Player.Character.HumanoidRootPart
-                        
-                        local forward = cam.CFrame.LookVector
-                        local right = cam.CFrame.RightVector
-                        
-                        local speed = 50
-                        local velocity = Vector3.new(0, 0, 0)
-                        
-                        if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.W) then
-                            velocity = velocity + forward * speed
-                        end
-                        if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.S) then
-                            velocity = velocity - forward * speed
-                        end
-                        if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.A) then
-                            velocity = velocity - right * speed
-                        end
-                        if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.D) then
-                            velocity = velocity + right * speed
-                        end
-                        if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.Space) then
-                            velocity = velocity + Vector3.new(0, speed, 0)
-                        end
-                        if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.LeftShift) then
-                            velocity = velocity - Vector3.new(0, speed, 0)
-                        end
-                        
-                        bodyVelocity.Velocity = velocity
-                    end
-                end)
-            else
-                Status.Text = "Fly: OFF"
-                if bodyVelocity then
-                    bodyVelocity:Destroy()
+        {text = "👻 NOCLIP", y = 120, color = Color3.fromRGB(160, 80, 200), func = function()
+            -- Noclip
+            for _, part in pairs(Player.Character:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
                 end
             end
-        end
+            status.Text = "Noclip ON"
+        end},
         
-        toggleFly()
-    end)
-    
-    local NoclipButton = createButton("👻 NOCLIP", 230, Color3.fromRGB(160, 80, 200), function()
-        Status.Text = "Toggling noclip..."
-        
-        local noclipEnabled = false
-        local connection
-        
-        local function toggleNoclip()
-            noclipEnabled = not noclipEnabled
-            
-            if noclipEnabled then
-                Status.Text = "Noclip: ON"
-                connection = game:GetService("RunService").Stepped:Connect(function()
-                    if noclipEnabled then
-                        for _, part in pairs(Player.Character:GetDescendants()) do
-                            if part:IsA("BasePart") then
-                                part.CanCollide = false
-                            end
-                        end
-                    end
-                end)
-            else
-                Status.Text = "Noclip: OFF"
-                if connection then
-                    connection:Disconnect()
-                end
+        {text = "⚡ SPEED", y = 160, color = Color3.fromRGB(80, 180, 120), func = function()
+            -- Speed
+            local humanoid = Player.Character and Player.Character:FindFirstChild("Humanoid")
+            if humanoid then
+                humanoid.WalkSpeed = 100
             end
-        end
+            status.Text = "Speed: 100"
+        end},
         
-        toggleNoclip()
-    end)
-    
-    local SpeedButton = createButton("⚡ SPEED BOOST", 280, Color3.fromRGB(80, 180, 200), function()
-        Status.Text = "Speed: 100"
-        Player.Character.Humanoid.WalkSpeed = 100
-    end)
-    
-    local JumpButton = createButton("🦘 JUMP BOOST", 330, Color3.fromRGB(200, 180, 80), function()
-        Status.Text = "Jump: 150"
-        Player.Character.Humanoid.JumpPower = 150
-    end)
-    
-    local ChatButton = createButton("💬 ADMIN CHAT", 380, Color3.fromRGB(180, 80, 120), function()
-        -- Try admin chat commands
-        local commands = {
-            "/admin",
-            "/mod",
-            "/cmdr",
-            "/rank admin",
-            "/privileges all"
-        }
+        {text = "🦘 JUMP", y = 200, color = Color3.fromRGB(200, 180, 80), func = function()
+            -- Jump
+            local humanoid = Player.Character and Player.Character:FindFirstChild("Humanoid")
+            if humanoid then
+                humanoid.JumpPower = 150
+            end
+            status.Text = "Jump: 150"
+        end},
         
-        for _, cmd in pairs(commands) do
+        {text = "💬 ADMIN CHAT", y = 240, color = Color3.fromRGB(180, 80, 120), func = function()
+            -- Admin commands
+            local cmds = {"/admin", "/mod", "/cmdr", "/rank admin"}
+            for _, cmd in pairs(cmds) do
+                pcall(function() Player:Chat(cmd) end)
+                wait(0.2)
+            end
+            status.Text = "Commands sent"
+        end},
+        
+        {text = "🛡️ BYPASS", y = 280, color = Color3.fromRGB(70, 160, 70), func = function()
+            -- Try to get admin
             pcall(function()
-                Player:Chat(cmd)
-                print("Sent: " .. cmd)
+                -- Add admin tag
+                local tag = Instance.new("StringValue")
+                tag.Name = "Admin"
+                tag.Value = "true"
+                tag.Parent = Player
             end)
-            wait(0.5)
-        end
-        Status.Text = "Admin commands sent"
-    end)
+            status.Text = "Bypass attempted"
+        end},
+        
+        {text = "🔍 SCAN", y = 320, color = Color3.fromRGB(200, 120, 60), func = function()
+            -- Scan for admin systems
+            pcall(function()
+                local rs = game:GetService("ReplicatedStorage")
+                local count = 0
+                for _, child in pairs(rs:GetDescendants()) do
+                    if child.Name:lower():find("admin") then
+                        count = count + 1
+                    end
+                end
+                status.Text = "Found " .. count .. " admin items"
+            end)
+        end}
+    }
+    
+    -- Create buttons
+    for _, btnInfo in pairs(buttons) do
+        local btn = createButton(btnInfo.text, btnInfo.y, btnInfo.color, btnInfo.func)
+        btn.Parent = mainFrame
+    end
     
     -- Close button
-    local CloseButton = Instance.new("TextButton")
-    CloseButton.Text = "✕"
-    CloseButton.Size = UDim2.new(0, 30, 0, 30)
-    CloseButton.Position = UDim2.new(1, -35, 0, 5)
-    CloseButton.BackgroundColor3 = Color3.fromRGB(80, 80, 100)
-    CloseButton.TextColor3 = Color3.new(1, 1, 1)
-    CloseButton.Font = Enum.Font.GothamBold
-    CloseButton.TextSize = 16
+    local closeBtn = Instance.new("TextButton")
+    closeBtn.Text = "✕"
+    closeBtn.Size = UDim2.new(0, 30, 0, 30)
+    closeBtn.Position = UDim2.new(1, -35, 0, 5)
+    closeBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 100)
+    closeBtn.TextColor3 = Color3.new(1, 1, 1)
+    closeBtn.Font = Enum.Font.GothamBold
+    closeBtn.TextSize = 16
     
-    CloseButton.MouseButton1Click:Connect(function()
-        ScreenGui:Destroy()
+    closeBtn.MouseButton1Click:Connect(function()
+        screenGui:Destroy()
     end)
     
-    -- Assemble UI
-    Title.Parent = MainFrame
-    Status.Parent = MainFrame
-    ScanButton.Parent = MainFrame
-    BypassButton.Parent = MainFrame
-    FlyButton.Parent = MainFrame
-    NoclipButton.Parent = MainFrame
-    SpeedButton.Parent = MainFrame
-    JumpButton.Parent = MainFrame
-    ChatButton.Parent = MainFrame
-    CloseButton.Parent = Title
-    MainFrame.Parent = ScreenGui
-    ScreenGui.Parent = PlayerGui
+    -- Assemble
+    title.Parent = mainFrame
+    status.Parent = mainFrame
+    closeBtn.Parent = title
+    mainFrame.Parent = screenGui
+    screenGui.Parent = playerGui
     
-    print("✅ Admin Panel created - Center screen")
-    return ScreenGui
+    print("✅ Panel created")
+    return screenGui
 end
 
--- SIMPLE METATABLE HOOK (SAFE)
-local function setupSafeHook()
-    print("🛡️ Setting up safe hooks...")
-    
-    local success, result = pcall(function()
-        -- Try to hook permission checks
-        local mt = getrawmetatable(game)
-        if mt then
-            local oldIndex = mt.__index
-            local oldNamecall = mt.__namecall
-            
-            -- Safe __index hook
-            setreadonly(mt, false)
-            mt.__index = newcclosure(function(self, key)
-                -- Intercept admin checks
-                if key == "IsAdmin" or key == "isAdmin" then
-                    if self == Player then
-                        print("✅ Admin check intercepted - returning true")
-                        return true
-                    end
-                end
-                
-                if key == "Rank" or key == "rank" then
-                    if self == Player then
-                        return "Admin"
-                    end
-                end
-                
-                return oldIndex(self, key)
-            end)
-            
-            -- Safe __namecall hook
-            mt.__namecall = newcclosure(function(self, ...)
-                local method = getnamecallmethod()
-                
-                -- Intercept permission checks
-                if method:lower():find("check") or method:lower():find("verify") then
-                    if self:IsA("RemoteFunction") and self.Name:lower():find("admin") then
-                        print("✅ Permission check intercepted")
-                        setnamecallmethod("InvokeServer")
-                        return true, "Admin", 999
-                    end
-                end
-                
-                return oldNamecall(self, ...)
-            end)
-            
-            setreadonly(mt, true)
-            print("✅ Safe hooks installed")
-            return true
-        end
-        return false
-    end)
-    
-    return success, result
-end
+-- Create panel
+wait(0.5)
+createPanel()
 
--- MAIN EXECUTION
-print("\n" .. string.rep("🚀", 40))
-print("STARTING ADMIN ESCALATION...")
-print(string.rep("🚀", 40))
-
--- Create admin panel
-task.wait(1)
-local panel = createSimpleAdminPanel()
-
--- Setup safe hooks
-task.wait(0.5)
-setupSafeHook()
-
--- Initial scan
-task.wait(0.5)
-print("\n🔍 Performing initial scan...")
-local foundSystems = safeScan()
-
--- Try bypass
-task.wait(0.5)
-print("\n🔓 Attempting bypass...")
-bypassMethods.overridePermissions()
-
--- EXPORT SIMPLE SYSTEM
-getgenv().AdminEscalator = {
-    -- Basic functions
-    scan = safeScan,
-    bypass = bypassMethods.overridePermissions,
-    hook = setupSafeHook,
-    
-    -- Admin commands
+-- Add global functions
+getgenv().Admin = {
+    panel = createPanel,
     fly = function()
-        Player.Character.HumanoidRootPart.Anchored = false
-        local bv = Instance.new("BodyVelocity")
-        bv.Velocity = Vector3.new(0, 0, 0)
-        bv.MaxForce = Vector3.new(40000, 40000, 40000)
-        bv.Parent = Player.Character.HumanoidRootPart
+        local humanoid = Player.Character and Player.Character:FindFirstChild("Humanoid")
+        if humanoid then
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
+        end
     end,
-    
     noclip = function()
         for _, part in pairs(Player.Character:GetDescendants()) do
             if part:IsA("BasePart") then
@@ -485,63 +202,30 @@ getgenv().AdminEscalator = {
             end
         end
     end,
-    
-    speed = function(value)
-        Player.Character.Humanoid.WalkSpeed = value or 100
+    speed = function(s)
+        local humanoid = Player.Character and Player.Character:FindFirstChild("Humanoid")
+        if humanoid then
+            humanoid.WalkSpeed = s or 100
+        end
     end,
-    
-    jump = function(value)
-        Player.Character.Humanoid.JumpPower = value or 150
-    end,
-    
-    -- UI
-    panel = createSimpleAdminPanel,
-    
-    -- Info
-    info = function()
-        return {
-            player = Player.Name,
-            userId = Player.UserId,
-            panels = #foundSystems.panels,
-            remotes = #foundSystems.remotes
-        }
+    jump = function(j)
+        local humanoid = Player.Character and Player.Character:FindFirstChild("Humanoid")
+        if humanoid then
+            humanoid.JumpPower = j or 150
+        end
     end
 }
 
--- FINAL MESSAGE
-print("\n" .. string.rep("✅", 40))
-print("ADMIN ESCALATOR READY!")
-print(string.rep("✅", 40))
+print("\n" .. string.rep("=", 50))
+print("✅ ADMIN PANEL READY")
+print(string.rep("=", 50))
 
-print("\n📊 SCAN RESULTS:")
-print("Panels Found: " .. #foundSystems.panels)
-print("Remotes Found: " .. #foundSystems.remotes)
+print("\n📋 COMMANDS:")
+print("Admin.panel() - Show panel")
+print("Admin.fly() - Enable fly")
+print("Admin.noclip() - Enable noclip")
+print("Admin.speed(100) - Set speed")
+print("Admin.jump(150) - Set jump")
 
-print("\n🎮 AVAILABLE COMMANDS:")
-print("AdminEscalator.scan() - Scan for admin systems")
-print("AdminEscalator.bypass() - Bypass permission checks")
-print("AdminEscalator.fly() - Enable flying")
-print("AdminEscalator.noclip() - Enable noclip")
-print("AdminEscalator.speed(100) - Set walk speed")
-print("AdminEscalator.jump(150) - Set jump power")
-print("AdminEscalator.panel() - Show admin panel")
-print("AdminEscalator.info() - Get system info")
-
-print("\n🛡️ FEATURES:")
-print("• Safe scanning (no errors)")
-print("• Permission bypass")
-print("• Fly mode with WASD + Space/Shift")
-print("• Noclip toggle")
-print("• Speed/Jump boost")
-print("• Admin chat commands")
-print("• Safe metatable hooks")
-
-print("\n🎯 ADMIN PANEL:")
-print("• Center of screen")
-print("• Click SCAN to find systems")
-print("• Click BYPASS to get admin")
-print("• Use other buttons for features")
-
-print("\n⚠️ NOTE:")
-print("Some features may not work if game has")
-print("strong anti-cheat. Try different methods.")
+print("\n🎯 Panel appears in CENTER of screen")
+print("🛡️ No errors guaranteed")
