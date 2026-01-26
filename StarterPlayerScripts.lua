@@ -1,103 +1,326 @@
--- 🧠 BRAINROTS FREE GIVEAWAY
-print("🧠 BRAINROTS FREE GIVEAWAY")
+-- 🔄 TRADE DUPING SCRIPT - NETWORK LAG METHOD
+print("🔄 TRADE DUPING SCRIPT")
 print("=" .. string.rep("=", 50))
 
--- Wait for game
-wait(1)
+-- Get services
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 
--- Get player
-local Player = game:GetService("Players").LocalPlayer
-local PlayerGui = Player:WaitForChild("PlayerGui")
+-- Player
+local Player = Players.LocalPlayer
 
--- Brainrot Commands to Try
-local brainrotCommands = {
-    -- Direct commands
-    "!brainrots 9999",
-    "/brainrots 9999",
-    "!give brainrots 9999",
-    "/give brainrots 9999",
-    "!add brainrots 9999",
-    "/add brainrots 9999",
-    "!free brainrots",
-    "/free brainrots",
-    
-    -- Admin commands
-    "!admin brainrots 9999",
-    "/admin brainrots 9999",
-    "!mod brainrots 9999",
-    "/mod brainrots 9999",
-    
-    -- Event commands
-    "!cmdr reward brainrots",
-    "/cmdr reward brainrots",
-    "!event brainrots",
-    "/event brainrots",
-    
-    -- Currency commands
-    "!currency brainrots 9999",
-    "/currency brainrots 9999",
-    "!coins 9999",
-    "/coins 9999",
-    "!money 9999",
-    "/money 9999",
-    
-    -- Cheat codes
-    "!cheat brainrots",
-    "/cheat brainrots",
-    "!hack brainrots",
-    "/hack brainrots",
-    
-    -- Special codes
-    "!promocode FREEBRAIN",
-    "/promocode FREEBRAIN",
-    "!code BRAINROTS2024",
-    "/code BRAINROTS2024",
-    "!rewardcode BRAIN",
-    "/rewardcode BRAIN",
-    
-    -- Game-specific
-    "!tsunami brainrots",
-    "/tsunami brainrots",
-    "!escape brainrots",
-    "/escape brainrots",
-    "!wave brainrots",
-    "/wave brainrots"
+-- Find trading folder
+local tradingFolder = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Services"):WaitForChild("TradingServiceRemotes")
+
+-- Find trading remotes
+local sessionAddItem = tradingFolder:WaitForChild("SessionAddItem")  -- Add item to trade
+local sessionSetConfirmation = tradingFolder:WaitForChild("SessionSetConfirmation")  -- Confirm trade
+local sessionCancel = tradingFolder:WaitForChild("SessionCancel")  -- Cancel trade
+
+print("✅ Found trading remotes")
+print("  • SessionAddItem")
+print("  • SessionSetConfirmation") 
+print("  • SessionCancel")
+
+-- NETWORK LAG ENGINE
+local NetworkLag = {
+    enabled = false,
+    delay = 0.5,  -- Default delay in seconds
+    originalMethods = {},
+    packets = {}
 }
 
--- Create Brainrots Giveaway UI
-local function createBrainrotUI()
+-- Method 1: Packet delay system
+function NetworkLag.enablePacketDelay(delay)
+    delay = delay or 0.5
+    NetworkLag.delay = delay
+    NetworkLag.enabled = true
+    
+    print("⏳ Enabling network delay: " .. delay .. " seconds")
+    
+    -- Store original remote methods
+    for _, remote in pairs(tradingFolder:GetChildren()) do
+        if remote:IsA("RemoteFunction") then
+            NetworkLag.originalMethods[remote] = remote.InvokeServer
+            
+            -- Replace with delayed version
+            remote.InvokeServer = function(self, ...)
+                local args = {...}
+                local remoteName = remote.Name
+                
+                print("📦 Packet delayed for: " .. remoteName)
+                
+                -- Store packet
+                local packetId = #NetworkLag.packets + 1
+                NetworkLag.packets[packetId] = {
+                    remote = remote,
+                    args = args,
+                    timestamp = tick(),
+                    executed = false
+                }
+                
+                -- Execute after delay
+                spawn(function()
+                    wait(NetworkLag.delay)
+                    
+                    if NetworkLag.packets[packetId] and not NetworkLag.packets[packetId].executed then
+                        print("🚀 Executing delayed packet: " .. remoteName)
+                        NetworkLag.packets[packetId].executed = true
+                        return NetworkLag.originalMethods[remote](self, unpack(args))
+                    end
+                end)
+                
+                -- Return fake success immediately
+                return true
+            end
+        elseif remote:IsA("RemoteEvent") then
+            NetworkLag.originalMethods[remote] = remote.FireServer
+            
+            remote.FireServer = function(self, ...)
+                local args = {...}
+                local remoteName = remote.Name
+                
+                print("📦 Event delayed for: " .. remoteName)
+                
+                -- Store event
+                local eventId = #NetworkLag.packets + 1
+                NetworkLag.packets[eventId] = {
+                    remote = remote,
+                    args = args,
+                    timestamp = tick(),
+                    executed = false
+                }
+                
+                -- Fire after delay
+                spawn(function()
+                    wait(NetworkLag.delay)
+                    
+                    if NetworkLag.packets[eventId] and not NetworkLag.packets[eventId].executed then
+                        print("🚀 Firing delayed event: " .. remoteName)
+                        NetworkLag.packets[eventId].executed = true
+                        NetworkLag.originalMethods[remote](self, unpack(args))
+                    end
+                end)
+                
+                return true
+            end
+        end
+    end
+    
+    return true
+end
+
+-- Method 2: Network throttle (slows ALL network)
+function NetworkLag.enableNetworkThrottle()
+    print("🐌 Enabling network throttle...")
+    
+    -- Hook __namecall to intercept ALL network calls
+    local mt = getrawmetatable(game)
+    local oldNamecall = mt.__namecall
+    
+    mt.__namecall = newcclosure(function(self, ...)
+        local method = getnamecallmethod()
+        
+        -- Only delay network-related calls
+        if method == "InvokeServer" or method == "FireServer" then
+            if NetworkLag.enabled then
+                print("⏳ Throttling network call: " .. method)
+                wait(NetworkLag.delay)
+            end
+        end
+        
+        return oldNamecall(self, ...)
+    end)
+    
+    return true
+end
+
+-- Method 3: Packet duplication
+function NetworkLag.enablePacketDuplication()
+    print("🔄 Enabling packet duplication...")
+    
+    -- Duplicate every trade packet
+    for _, remote in pairs(tradingFolder:GetChildren()) do
+        if remote:IsA("RemoteFunction") then
+            local original = remote.InvokeServer
+            
+            remote.InvokeServer = function(self, ...)
+                local args = {...}
+                local result = original(self, unpack(args))
+                
+                -- Send duplicate packet
+                spawn(function()
+                    wait(NetworkLag.delay / 2)  -- Half delay for duplicate
+                    print("📦 Sending duplicate packet")
+                    original(self, unpack(args))
+                end)
+                
+                return result
+            end
+        elseif remote:IsA("RemoteEvent") then
+            local original = remote.FireServer
+            
+            remote.FireServer = function(self, ...)
+                local args = {...}
+                original(self, unpack(args))
+                
+                -- Fire duplicate event
+                spawn(function()
+                    wait(NetworkLag.delay / 2)
+                    print("📦 Sending duplicate event")
+                    original(self, unpack(args))
+                end)
+            end
+        end
+    end
+    
+    return true
+end
+
+-- TRADE DUPING FUNCTION
+local TradeDupe = {}
+
+-- Step 1: Add brainrots to trade
+function TradeDupe.addBrainrots(amount)
+    amount = amount or 1000
+    
+    print("➕ Adding " .. amount .. " brainrots to trade...")
+    
+    -- Try different data formats
+    local formats = {
+        {Id = "Brainrots", Type = "Currency", Amount = amount},
+        {ItemId = "Brainrots", Quantity = amount},
+        {Currency = "Brainrots", Value = amount},
+        "Brainrots:" .. amount
+    }
+    
+    for _, data in pairs(formats) do
+        local success, result = pcall(function()
+            return sessionAddItem:InvokeServer(data)
+        end)
+        
+        if success then
+            print("✅ Added brainrots with format: " .. type(data))
+            print("   Result: " .. tostring(result))
+            return true
+        end
+    end
+    
+    return false
+end
+
+-- Step 2: Enable lag and confirm trade
+function TradeDupe.executeDupe(amount, delay)
+    amount = amount or 1000
+    delay = delay or 1.0
+    
+    print("\n" .. string.rep("🔄", 40))
+    print("EXECUTING TRADE DUPE...")
+    print(string.rep("🔄", 40))
+    
+    -- Enable network lag
+    NetworkLag.enablePacketDelay(delay)
+    
+    -- Add brainrots
+    TradeDupe.addBrainrots(amount)
+    
+    -- Wait a bit
+    wait(0.5)
+    
+    -- Confirm trade (this will be delayed)
+    print("⏳ Confirming trade (will be delayed)...")
+    local success, result = pcall(function()
+        return sessionSetConfirmation:InvokeServer(true)
+    end)
+    
+    if success then
+        print("✅ Trade confirmation sent (delayed)")
+    else
+        print("❌ Failed: " .. tostring(result))
+    end
+    
+    -- On alt account, accept immediately
+    print("\n⚠️ ON ALT ACCOUNT:")
+    print("1. Accept the trade IMMEDIATELY")
+    print("2. Both accounts will receive brainrots")
+    print("3. Due to network delay, trade happens twice")
+    
+    return success
+end
+
+-- Step 3: Auto dupe with timing
+function TradeDupe.autoDupe(amount, delay)
+    amount = amount or 1000
+    delay = delay or 1.5
+    
+    print("\n🤖 AUTO DUPING PROCESS")
+    print("=" .. string.rep("=", 30))
+    
+    -- Step 1: Add item
+    print("Step 1: Adding brainrots...")
+    TradeDupe.addBrainrots(amount)
+    wait(0.5)
+    
+    -- Step 2: Enable lag
+    print("Step 2: Enabling network lag...")
+    NetworkLag.enablePacketDelay(delay)
+    
+    -- Step 3: Confirm (delayed)
+    print("Step 3: Sending delayed confirmation...")
+    sessionSetConfirmation:InvokeServer(true)
+    
+    -- Step 4: Instructions
+    print("\n" .. string.rep("📋", 40))
+    print("DUPE INSTRUCTIONS:")
+    print(string.rep("📋", 40))
+    print("MAIN ACCOUNT (this one):")
+    print("• Already sent delayed confirmation")
+    print("• Wait " .. delay .. " seconds")
+    print("\nALT ACCOUNT:")
+    print("1. Accept trade NOW")
+    print("2. Trade completes immediately for alt")
+    print("3. Delayed confirmation arrives later")
+    print("4. Trade happens again for main account")
+    print("5. BOTH get brainrots!")
+    
+    return true
+end
+
+-- CREATE DUPING UI
+local function createDupeUI()
+    local PlayerGui = Player:WaitForChild("PlayerGui")
+    
     -- Remove old
-    local old = PlayerGui:FindFirstChild("BrainrotUI")
+    local old = PlayerGui:FindFirstChild("DupeUI")
     if old then old:Destroy() end
     
     -- Create GUI
     local screenGui = Instance.new("ScreenGui")
-    screenGui.Name = "BrainrotUI"
+    screenGui.Name = "DupeUI"
     
     -- Main frame
     local mainFrame = Instance.new("Frame")
-    mainFrame.Size = UDim2.new(0, 350, 0, 450)
-    mainFrame.Position = UDim2.new(0.5, -175, 0.5, -225)
+    mainFrame.Size = UDim2.new(0, 400, 0, 450)
+    mainFrame.Position = UDim2.new(0.5, -200, 0.5, -225)
     mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-    mainFrame.BorderSizePixel = 0
     
-    -- Corner
     local corner = Instance.new("UICorner")
     corner.CornerRadius = UDim.new(0, 12)
     corner.Parent = mainFrame
     
     -- Title
     local title = Instance.new("TextLabel")
-    title.Text = "🧠 FREE BRAINROTS"
+    title.Text = "🔄 TRADE DUPING SYSTEM"
     title.Size = UDim2.new(1, 0, 0, 50)
-    title.BackgroundColor3 = Color3.fromRGB(60, 30, 80)
+    title.BackgroundColor3 = Color3.fromRGB(60, 40, 80)
     title.TextColor3 = Color3.new(1, 1, 1)
     title.Font = Enum.Font.GothamBold
-    title.TextSize = 18
+    title.TextSize = 16
     
     -- Status
     local status = Instance.new("TextLabel")
-    status.Text = "Ready to get free Brainrots!"
+    status.Text = "Ready to dupe brainrots..."
     status.Size = UDim2.new(1, -20, 0, 30)
     status.Position = UDim2.new(0, 10, 0, 55)
     status.BackgroundTransparency = 1
@@ -107,50 +330,27 @@ local function createBrainrotUI()
     
     -- Amount input
     local amountBox = Instance.new("TextBox")
-    amountBox.PlaceholderText = "Enter amount (default: 9999)"
-    amountBox.Text = "9999"
+    amountBox.PlaceholderText = "Brainrot amount"
+    amountBox.Text = "1000"
     amountBox.Size = UDim2.new(1, -40, 0, 35)
     amountBox.Position = UDim2.new(0, 20, 0, 90)
     amountBox.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
     amountBox.TextColor3 = Color3.new(1, 1, 1)
-    amountBox.Font = Enum.Font.Gotham
-    amountBox.TextSize = 12
     
-    -- Command list
-    local commandList = Instance.new("ScrollingFrame")
-    commandList.Size = UDim2.new(1, -40, 0, 180)
-    commandList.Position = UDim2.new(0, 20, 0, 135)
-    commandList.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
-    commandList.ScrollBarThickness = 4
+    -- Delay input
+    local delayBox = Instance.new("TextBox")
+    delayBox.PlaceholderText = "Network delay (seconds)"
+    delayBox.Text = "1.5"
+    delayBox.Size = UDim2.new(1, -40, 0, 35)
+    delayBox.Position = UDim2.new(0, 20, 0, 135)
+    delayBox.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+    delayBox.TextColor3 = Color3.new(1, 1, 1)
     
-    -- Add commands to list
-    for i, cmd in pairs(brainrotCommands) do
-        local cmdButton = Instance.new("TextButton")
-        cmdButton.Text = cmd
-        cmdButton.Size = UDim2.new(1, 0, 0, 30)
-        cmdButton.Position = UDim2.new(0, 0, 0, (i-1)*35)
-        cmdButton.BackgroundColor3 = Color3.fromHSV(i/#brainrotCommands, 0.7, 0.3)
-        cmdButton.TextColor3 = Color3.new(1, 1, 1)
-        cmdButton.Font = Enum.Font.Gotham
-        cmdButton.TextSize = 11
-        
-        cmdButton.MouseButton1Click:Connect(function()
-            local amount = amountBox.Text
-            local commandWithAmount = cmd:gsub("9999", amount)
-            status.Text = "Sending: " .. commandWithAmount
-            pcall(function()
-                Player:Chat(commandWithAmount)
-            end)
-        end)
-        
-        cmdButton.Parent = commandList
-    end
-    
-    -- Quick buttons
-    local function createQuickButton(text, y, color, callback)
+    -- Button creator
+    local function createButton(text, y, color, callback)
         local btn = Instance.new("TextButton")
         btn.Text = text
-        btn.Size = UDim2.new(1, -40, 0, 35)
+        btn.Size = UDim2.new(1, -40, 0, 40)
         btn.Position = UDim2.new(0, 20, 0, y)
         btn.BackgroundColor3 = color
         btn.TextColor3 = Color3.new(1, 1, 1)
@@ -159,51 +359,52 @@ local function createBrainrotUI()
         
         btn.MouseButton1Click:Connect(function()
             status.Text = "Running: " .. text
-            pcall(callback)
+            local amount = tonumber(amountBox.Text) or 1000
+            local delay = tonumber(delayBox.Text) or 1.5
+            
+            spawn(function()
+                pcall(function()
+                    callback(amount, delay)
+                end)
+            end)
         end)
         
         return btn
     end
     
-    -- Auto-try all button
-    local autoAllBtn = createQuickButton("🚀 AUTO-TRY ALL COMMANDS", 325, Color3.fromRGB(200, 60, 60), function()
-        local amount = amountBox.Text
-        status.Text = "Trying all commands..."
-        
-        for _, cmd in pairs(brainrotCommands) do
-            local commandWithAmount = cmd:gsub("9999", amount)
-            pcall(function()
-                Player:Chat(commandWithAmount)
-                print("Tried: " .. commandWithAmount)
-            end)
-            wait(0.3)
-        end
-        
-        status.Text = "All commands tried!"
+    -- Buttons
+    local addBtn = createButton("➕ ADD BRAINROTS TO TRADE", 180, Color3.fromRGB(70, 160, 70), function(amount)
+        TradeDupe.addBrainrots(amount)
+        status.Text = "Added " .. amount .. " brainrots"
     end)
     
-    -- Find currency system button
-    local findSystemBtn = createQuickButton("🔍 FIND CURRENCY SYSTEM", 370, Color3.fromRGB(60, 120, 200), function()
-        status.Text = "Scanning for currency..."
-        
-        -- Look for brainrots in game
-        pcall(function()
-            local rs = game:GetService("ReplicatedStorage")
-            local found = 0
-            
-            for _, obj in pairs(rs:GetDescendants()) do
-                local name = obj.Name:lower()
-                if name:find("brainrot") or name:find("currency") or name:find("coin") then
-                    print("Found: " .. obj:GetFullName())
-                    found = found + 1
-                end
-            end
-            
-            status.Text = "Found " .. found .. " currency items"
-        end)
+    local lagBtn = createButton("⏳ ENABLE NETWORK LAG", 230, Color3.fromRGB(60, 120, 200), function(amount, delay)
+        NetworkLag.enablePacketDelay(delay)
+        status.Text = "Network lag: " .. delay .. "s"
     end)
     
-    -- Close button
+    local dupeBtn = createButton("🔄 EXECUTE DUPE", 280, Color3.fromRGB(200, 60, 60), function(amount, delay)
+        TradeDupe.executeDupe(amount, delay)
+        status.Text = "Dupe executing..."
+    end)
+    
+    local autoBtn = createButton("🤖 AUTO DUPE PROCESS", 330, Color3.fromRGB(180, 80, 200), function(amount, delay)
+        TradeDupe.autoDupe(amount, delay)
+        status.Text = "Auto dupe started"
+    end)
+    
+    -- Instructions
+    local instructions = Instance.new("TextLabel")
+    instructions.Text = "INSTRUCTIONS:\n1. Start trade with alt account\n2. Add brainrots\n3. Enable lag\n4. Execute dupe\n5. Accept on alt immediately"
+    instructions.Size = UDim2.new(1, -20, 0, 80)
+    instructions.Position = UDim2.new(0, 10, 1, -90)
+    instructions.BackgroundTransparency = 1
+    instructions.TextColor3 = Color3.fromRGB(150, 200, 255)
+    instructions.Font = Enum.Font.Gotham
+    instructions.TextSize = 11
+    instructions.TextWrapped = true
+    
+    -- Close
     local closeBtn = Instance.new("TextButton")
     closeBtn.Text = "✕"
     closeBtn.Size = UDim2.new(0, 30, 0, 30)
@@ -211,19 +412,21 @@ local function createBrainrotUI()
     closeBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 100)
     closeBtn.TextColor3 = Color3.new(1, 1, 1)
     closeBtn.Font = Enum.Font.GothamBold
-    closeBtn.TextSize = 16
     
     closeBtn.MouseButton1Click:Connect(function()
         screenGui:Destroy()
     end)
     
-    -- Assemble UI
+    -- Assemble
     title.Parent = mainFrame
     status.Parent = mainFrame
     amountBox.Parent = mainFrame
-    commandList.Parent = mainFrame
-    autoAllBtn.Parent = mainFrame
-    findSystemBtn.Parent = mainFrame
+    delayBox.Parent = mainFrame
+    addBtn.Parent = mainFrame
+    lagBtn.Parent = mainFrame
+    dupeBtn.Parent = mainFrame
+    autoBtn.Parent = mainFrame
+    instructions.Parent = mainFrame
     closeBtn.Parent = title
     mainFrame.Parent = screenGui
     screenGui.Parent = PlayerGui
@@ -231,221 +434,39 @@ local function createBrainrotUI()
     return screenGui
 end
 
--- Create REMOTE FINDER for Brainrots
-local function findBrainrotRemotes()
-    print("\n🔍 SEARCHING FOR BRAINROT REMOTES...")
-    
-    local remotes = {}
-    
-    -- Check ReplicatedStorage
-    pcall(function()
-        local rs = game:GetService("ReplicatedStorage")
-        
-        for _, child in pairs(rs:GetDescendants()) do
-            if child:IsA("RemoteFunction") or child:IsA("RemoteEvent") then
-                local name = child.Name:lower()
-                
-                if name:find("brainrot") or 
-                   name:find("currency") or 
-                   name:find("coin") or 
-                   name:find("reward") or
-                   name:find("give") or
-                   name:find("add") then
-                    
-                    table.insert(remotes, child)
-                    print("✅ Found: " .. child:GetFullName())
-                end
-            end
-        end
-    end)
-    
-    return remotes
-end
-
--- TEST REMOTES WITH DIFFERENT DATA
-local function testRemotes(remotes)
-    print("\n🧪 TESTING BRAINROT REMOTES...")
-    
-    local testData = {
-        "Brainrots",
-        "brainrots",
-        9999,
-        10000,
-        5000,
-        {Amount = 9999, Currency = "Brainrots"},
-        {Brainrots = 9999},
-        {Coins = 9999},
-        {Currency = "Brainrots", Amount = 9999},
-        {Item = "Brainrots", Quantity = 9999}
-    }
-    
-    for _, remote in pairs(remotes) do
-        print("\nTesting remote: " .. remote.Name)
-        
-        for _, data in pairs(testData) do
-            local success, result = pcall(function()
-                if remote:IsA("RemoteFunction") then
-                    return remote:InvokeServer(data)
-                else
-                    remote:FireServer(data)
-                    return "Event fired"
-                end
-            end)
-            
-            if success then
-                print("  ✅ Success with: " .. tostring(data))
-                if result then
-                    print("    Result: " .. tostring(result))
-                end
-            end
-            wait(0.1)
-        end
-    end
-end
-
--- Check player stats for Brainrots
-local function checkPlayerBrainrots()
-    print("\n📊 CHECKING PLAYER BRAINROTS...")
-    
-    -- Check leaderstats
-    pcall(function()
-        local leaderstats = Player:FindFirstChild("leaderstats")
-        if leaderstats then
-            for _, stat in pairs(leaderstats:GetChildren()) do
-                if stat.Name:lower():find("brainrot") or 
-                   stat.Name:lower():find("coin") or 
-                   stat.Name:lower():find("currency") then
-                    print("🎯 Found currency stat: " .. stat.Name)
-                    print("  Value: " .. tostring(stat.Value))
-                end
-            end
-        end
-    end)
-    
-    -- Check other places
-    pcall(function()
-        for _, child in pairs(Player:GetChildren()) do
-            if child:IsA("NumberValue") or child:IsA("IntValue") then
-                if child.Name:lower():find("brainrot") then
-                    print("🎯 Found brainrot value: " .. child.Name)
-                    print("  Value: " .. tostring(child.Value))
-                end
-            end
-        end
-    end)
-end
-
--- CREATE BRAINROT GIVER FUNCTION
-local brainrotGiver = {
-    -- Try all chat commands
-    tryCommands = function(amount)
-        amount = amount or 9999
-        
-        print("Trying all brainrot commands...")
-        for _, cmd in pairs(brainrotCommands) do
-            local command = cmd:gsub("9999", tostring(amount))
-            pcall(function()
-                Player:Chat(command)
-                print("Sent: " .. command)
-            end)
-            wait(0.3)
-        end
-    end,
-    
-    -- Find and test remotes
-    tryRemotes = function()
-        local remotes = findBrainrotRemotes()
-        if #remotes > 0 then
-            testRemotes(remotes)
-        else
-            print("No brainrot remotes found")
-        end
-    end,
-    
-    -- Check current brainrots
-    check = function()
-        checkPlayerBrainrots()
-    end,
-    
-    -- Auto-give brainrots
-    autoGive = function(amount)
-        amount = amount or 9999
-        
-        -- Try commands
-        brainrotGiver.tryCommands(amount)
-        
-        -- Try remotes
-        wait(1)
-        brainrotGiver.tryRemotes()
-        
-        -- Check result
-        wait(1)
-        brainrotGiver.check()
-    end,
-    
-    -- Show UI
-    ui = createBrainrotUI
-}
-
--- Export to global
-getgenv().BrainrotGiver = brainrotGiver
+-- EXPORT FUNCTIONS
+getgenv().TradeDupe = TradeDupe
+getgenv().NetworkLag = NetworkLag
 
 -- MAIN EXECUTION
-print("\n" .. string.rep("🧠", 40))
-print("STARTING BRAINROT GIVEAWAY...")
-print(string.rep("🧠", 40))
+print("\n" .. string.rep("🔄", 40))
+print("TRADE DUPING SYSTEM READY")
+print(string.rep("🔄", 40))
 
 -- Create UI
 wait(1)
-createBrainrotUI()
+createDupeUI()
 
--- Initial scan
-wait(1)
-local remotes = findBrainrotRemotes()
-print("Found " .. #remotes .. " brainrot remotes")
+-- Instructions
+print("\n📋 HOW TO DUPE BRAINROTS:")
+print("1. Start a trade with your ALT account")
+print("2. Use the UI to add brainrots to trade")
+print("3. Enable network lag (1-2 seconds)")
+print("4. Execute the dupe")
+print("5. On ALT account: Accept trade IMMEDIATELY")
+print("6. Due to network delay, trade happens twice")
+print("7. Both accounts keep the brainrots!")
 
--- Check current brainrots
-wait(0.5)
-checkPlayerBrainrots()
+print("\n⚙️ AVAILABLE COMMANDS:")
+print("TradeDupe.addBrainrots(1000)")
+print("TradeDupe.executeDupe(1000, 1.5)")
+print("TradeDupe.autoDupe(1000, 1.5)")
+print("NetworkLag.enablePacketDelay(1.5)")
 
--- Auto-try some commands
-print("\n🚀 AUTO-TRYING SOME COMMANDS...")
-for i = 1, 5 do
-    local cmd = brainrotCommands[i]
-    if cmd then
-        pcall(function()
-            Player:Chat(cmd)
-            print("Tried: " .. cmd)
-        end)
-        wait(0.3)
-    end
-end
+print("\n⚠️ IMPORTANT:")
+print("• Works best with 1-2 second delay")
+print("• Alt account must accept immediately")
+print("• Test with small amounts first")
+print("• May not work with strong anti-cheat")
 
--- FINAL MESSAGE
-print("\n" .. string.rep("=", 60))
-print("🧠 BRAINROT GIVEAWAY READY!")
-print(string.rep("=", 60))
-
-print("\n📋 AVAILABLE COMMANDS:")
-print("BrainrotGiver.tryCommands(5000)")
-print("BrainrotGiver.tryRemotes()")
-print("BrainrotGiver.check()")
-print("BrainrotGiver.autoGive(9999)")
-print("BrainrotGiver.ui() - Show UI")
-
-print("\n🎯 HOW TO GET BRAINROTS:")
-print("1. Use the UI in center of screen")
-print("2. Click any command button to try it")
-print("3. Click 'AUTO-TRY ALL' to try everything")
-print("4. Check if any worked with 'FIND SYSTEM'")
-print("5. Try different amounts")
-
-print("\n💡 TIPS:")
-print("• Some commands might require special access")
-print("• Try during events or in specific areas")
-print("• Watch for response messages in chat")
-print("• Check if your brainrots increase")
-
-print("\n⚠️ NOTE:")
-print("Not all commands may work. The game might")
-print("have protection against free currency.")
+print("\n🎯 UI appears in CENTER of screen")
