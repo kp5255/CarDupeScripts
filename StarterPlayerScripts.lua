@@ -1,472 +1,1346 @@
--- 🔄 TRADE DUPING SCRIPT - NETWORK LAG METHOD
-print("🔄 TRADE DUPING SCRIPT")
-print("=" .. string.rep("=", 50))
+--[[
+    ADVANCED CLIENT INSTRUMENTATION / REMOTE-SPY DETECTOR
+    =====================================================
 
--- Get services
+    Authorized security research / private sandbox use.
+
+    Architecture:
+        Environment
+             |
+        +----+----------------------+
+        |                           |
+    Capability                  Integrity
+      checks                      checks
+        |                           |
+        +------------+--------------+
+                     |
+              Behavioral signals
+                     |
+              Evidence engine
+                     |
+              Confidence score
+                     |
+              Incident report
+
+    IMPORTANT:
+      This is a heuristic client-side detector.
+      It is NOT a replacement for server-side validation.
+]]
+
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local HttpService = game:GetService("HttpService")
 
--- Player
-local Player = Players.LocalPlayer
+local LocalPlayer = Players.LocalPlayer
 
--- Find trading folder
-local tradingFolder = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Services"):WaitForChild("TradingServiceRemotes")
+--==================================================
+-- CONFIGURATION
+--==================================================
 
--- Find trading remotes
-local sessionAddItem = tradingFolder:WaitForChild("SessionAddItem")  -- Add item to trade
-local sessionSetConfirmation = tradingFolder:WaitForChild("SessionSetConfirmation")  -- Confirm trade
-local sessionCancel = tradingFolder:WaitForChild("SessionCancel")  -- Cancel trade
+local CONFIG = {
 
-print("✅ Found trading remotes")
-print("  • SessionAddItem")
-print("  • SessionSetConfirmation") 
-print("  • SessionCancel")
+    -- General
+    VERBOSE = true,
+    PERIODIC_SCAN = true,
 
--- NETWORK LAG ENGINE
-local NetworkLag = {
-    enabled = false,
-    delay = 0.5,  -- Default delay in seconds
-    originalMethods = {},
-    packets = {}
+    -- Scan scheduling
+    LIGHT_SCAN_INTERVAL = 3,
+    DEEP_SCAN_INTERVAL = 15,
+
+    -- Detection
+    DETECTION_THRESHOLD = 10,
+    HIGH_CONFIDENCE_THRESHOLD = 14,
+
+    -- Avoid repeatedly counting identical evidence
+    DUPLICATE_SUPPRESS = true,
+
+    -- Features
+    SCAN_ENVIRONMENT = true,
+    SCAN_GLOBALS = true,
+    SCAN_DEBUG = true,
+    SCAN_REMOTES = true,
+    SCAN_CONNECTIONS = true,
+    SCAN_REGISTRY = true,
+    SCAN_GC = true,
+    CHECK_METAMETHODS = true,
+
+    -- Expensive scans
+    ENABLE_DEEP_SCANS = true,
+
+    -- Incident history
+    MAX_INCIDENTS = 20,
+    MAX_EVIDENCE = 100,
+
+    -- Optional response
+    AUTO_KICK = false,
+
+    -- Signature matching
+    SIGNATURE_MATCHING = true,
 }
 
--- Method 1: Packet delay system
-function NetworkLag.enablePacketDelay(delay)
-    delay = delay or 0.5
-    NetworkLag.delay = delay
-    NetworkLag.enabled = true
-    
-    print("⏳ Enabling network delay: " .. delay .. " seconds")
-    
-    -- Store original remote methods
-    for _, remote in pairs(tradingFolder:GetChildren()) do
-        if remote:IsA("RemoteFunction") then
-            NetworkLag.originalMethods[remote] = remote.InvokeServer
-            
-            -- Replace with delayed version
-            remote.InvokeServer = function(self, ...)
-                local args = {...}
-                local remoteName = remote.Name
-                
-                print("📦 Packet delayed for: " .. remoteName)
-                
-                -- Store packet
-                local packetId = #NetworkLag.packets + 1
-                NetworkLag.packets[packetId] = {
-                    remote = remote,
-                    args = args,
-                    timestamp = tick(),
-                    executed = false
-                }
-                
-                -- Execute after delay
-                spawn(function()
-                    wait(NetworkLag.delay)
-                    
-                    if NetworkLag.packets[packetId] and not NetworkLag.packets[packetId].executed then
-                        print("🚀 Executing delayed packet: " .. remoteName)
-                        NetworkLag.packets[packetId].executed = true
-                        return NetworkLag.originalMethods[remote](self, unpack(args))
-                    end
-                end)
-                
-                -- Return fake success immediately
-                return true
-            end
-        elseif remote:IsA("RemoteEvent") then
-            NetworkLag.originalMethods[remote] = remote.FireServer
-            
-            remote.FireServer = function(self, ...)
-                local args = {...}
-                local remoteName = remote.Name
-                
-                print("📦 Event delayed for: " .. remoteName)
-                
-                -- Store event
-                local eventId = #NetworkLag.packets + 1
-                NetworkLag.packets[eventId] = {
-                    remote = remote,
-                    args = args,
-                    timestamp = tick(),
-                    executed = false
-                }
-                
-                -- Fire after delay
-                spawn(function()
-                    wait(NetworkLag.delay)
-                    
-                    if NetworkLag.packets[eventId] and not NetworkLag.packets[eventId].executed then
-                        print("🚀 Firing delayed event: " .. remoteName)
-                        NetworkLag.packets[eventId].executed = true
-                        NetworkLag.originalMethods[remote](self, unpack(args))
-                    end
-                end)
-                
-                return true
-            end
-        end
+--==================================================
+-- STATE
+--==================================================
+
+local State = {
+    started = os.clock(),
+
+    detected = false,
+    confidence = "LOW",
+
+    score = 0,
+
+    scans = {
+        light = 0,
+        deep = 0,
+        failed = 0,
+    },
+
+    evidence = {},
+    reasons = {},
+    incidents = {},
+
+    baseline = nil,
+    currentProfile = nil,
+
+    remoteInventory = {
+        events = {},
+        functions = {},
+    },
+
+    statistics = {
+        capabilityCount = 0,
+        suspiciousGlobals = 0,
+        signatureMatches = 0,
+        remoteCount = 0,
+    },
+}
+
+--==================================================
+-- LOGGING
+--==================================================
+
+local PREFIX = "[ADV-ANTI-SPY]"
+
+local function log(...)
+    if CONFIG.VERBOSE then
+        print(PREFIX, ...)
     end
-    
-    return true
 end
 
--- Method 2: Network throttle (slows ALL network)
-function NetworkLag.enableNetworkThrottle()
-    print("🐌 Enabling network throttle...")
-    
-    -- Hook __namecall to intercept ALL network calls
-    local mt = getrawmetatable(game)
-    local oldNamecall = mt.__namecall
-    
-    mt.__namecall = newcclosure(function(self, ...)
-        local method = getnamecallmethod()
-        
-        -- Only delay network-related calls
-        if method == "InvokeServer" or method == "FireServer" then
-            if NetworkLag.enabled then
-                print("⏳ Throttling network call: " .. method)
-                wait(NetworkLag.delay)
-            end
-        end
-        
-        return oldNamecall(self, ...)
-    end)
-    
-    return true
+local function warnLog(...)
+    warn(PREFIX, ...)
 end
 
--- Method 3: Packet duplication
-function NetworkLag.enablePacketDuplication()
-    print("🔄 Enabling packet duplication...")
-    
-    -- Duplicate every trade packet
-    for _, remote in pairs(tradingFolder:GetChildren()) do
-        if remote:IsA("RemoteFunction") then
-            local original = remote.InvokeServer
-            
-            remote.InvokeServer = function(self, ...)
-                local args = {...}
-                local result = original(self, unpack(args))
-                
-                -- Send duplicate packet
-                spawn(function()
-                    wait(NetworkLag.delay / 2)  -- Half delay for duplicate
-                    print("📦 Sending duplicate packet")
-                    original(self, unpack(args))
-                end)
-                
-                return result
-            end
-        elseif remote:IsA("RemoteEvent") then
-            local original = remote.FireServer
-            
-            remote.FireServer = function(self, ...)
-                local args = {...}
-                original(self, unpack(args))
-                
-                -- Fire duplicate event
-                spawn(function()
-                    wait(NetworkLag.delay / 2)
-                    print("📦 Sending duplicate event")
-                    original(self, unpack(args))
-                end)
-            end
-        end
+--==================================================
+-- SAFE HELPERS
+--==================================================
+
+local function safeCall(fn, ...)
+    local ok, result = pcall(fn, ...)
+    if ok then
+        return true, result
     end
-    
-    return true
+
+    State.scans.failed += 1
+
+    return false, nil
 end
 
--- TRADE DUPING FUNCTION
-local TradeDupe = {}
+local function safeType(value)
+    local ok, result = pcall(type, value)
 
--- Step 1: Add brainrots to trade
-function TradeDupe.addBrainrots(amount)
-    amount = amount or 1000
-    
-    print("➕ Adding " .. amount .. " brainrots to trade...")
-    
-    -- Try different data formats
-    local formats = {
-        {Id = "Brainrots", Type = "Currency", Amount = amount},
-        {ItemId = "Brainrots", Quantity = amount},
-        {Currency = "Brainrots", Value = amount},
-        "Brainrots:" .. amount
+    if ok then
+        return result
+    end
+
+    return "unknown"
+end
+
+local function safeString(value)
+    local ok, result = pcall(tostring, value)
+
+    if ok then
+        return result
+    end
+
+    return "<unprintable>"
+end
+
+local function getEnvironment()
+    if type(getfenv) ~= "function" then
+        return nil
+    end
+
+    local ok, env = safeCall(getfenv, 0)
+
+    if ok and type(env) == "table" then
+        return env
+    end
+
+    return nil
+end
+
+--==================================================
+-- SIGNATURE DATABASE
+--==================================================
+
+local SIGNATURES = {
+
+    "simplespy",
+    "remotespy",
+    "hydroxide",
+    "cobalt",
+    "darkspy",
+    "sunspy",
+    "utopia",
+    "spy.lua",
+}
+
+local SUSPICIOUS_GLOBALS = {
+
+    "RemoteSpy",
+    "SimpleSpy",
+    "RemoteEventSpy",
+    "Hydroxide",
+    "Cobalt",
+    "DarkSpy",
+    "SunSpy",
+    "Utopia",
+}
+
+local EXECUTOR_APIS = {
+
+    "getrawmetatable",
+    "hookmetamethod",
+    "hookfunction",
+    "getconnections",
+    "getgc",
+    "getreg",
+    "checkcaller",
+    "getrenv",
+    "getgenv",
+    "identifyexecutor",
+    "isexecutorclosure",
+    "getcallingscript",
+    "getsenv",
+    "gethui",
+}
+
+--==================================================
+-- SIGNATURE MATCHING
+--==================================================
+
+local function containsSignature(value)
+    if type(value) ~= "string" then
+        return nil
+    end
+
+    local lowered = value:lower()
+
+    for _, signature in ipairs(SIGNATURES) do
+
+        if lowered:find(signature, 1, true) then
+            return signature
+        end
+
+    end
+
+    return nil
+end
+
+--==================================================
+-- EVIDENCE ENGINE
+--==================================================
+
+local function addEvidence(
+    id,
+    description,
+    points,
+    category
+)
+
+    if State.detected then
+        return
+    end
+
+    if CONFIG.DUPLICATE_SUPPRESS
+        and State.evidence[id] ~= nil
+    then
+        return
+    end
+
+    State.evidence[id] = {
+        points = points,
+        category = category or "unknown",
+        description = description,
+        timestamp = os.clock(),
     }
-    
-    for _, data in pairs(formats) do
-        local success, result = pcall(function()
-            return sessionAddItem:InvokeServer(data)
-        end)
-        
-        if success then
-            print("✅ Added brainrots with format: " .. type(data))
-            print("   Result: " .. tostring(result))
-            return true
+
+    State.score += points
+
+    table.insert(
+        State.reasons,
+        description
+    )
+
+    if #State.reasons > CONFIG.MAX_EVIDENCE then
+        table.remove(State.reasons, 1)
+    end
+
+    warnLog(
+        string.format(
+            "[+%d] [%s] %s | score=%d",
+            points,
+            category or "unknown",
+            description,
+            State.score
+        )
+    )
+
+    if State.score >= CONFIG.HIGH_CONFIDENCE_THRESHOLD then
+        State.confidence = "HIGH"
+
+    elseif State.score >= CONFIG.DETECTION_THRESHOLD then
+        State.confidence = "MEDIUM"
+
+    elseif State.score >= 4 then
+        State.confidence = "LOW-MEDIUM"
+    end
+
+    if State.score >= CONFIG.DETECTION_THRESHOLD then
+
+        State.detected = true
+
+        local incident = {
+            id = HttpService:GenerateGUID(false),
+            timestamp = os.clock(),
+            score = State.score,
+            confidence = State.confidence,
+            reasons = table.clone(State.reasons),
+        }
+
+        table.insert(
+            State.incidents,
+            incident
+        )
+
+        if #State.incidents > CONFIG.MAX_INCIDENTS then
+            table.remove(State.incidents, 1)
         end
-    end
-    
-    return false
-end
 
--- Step 2: Enable lag and confirm trade
-function TradeDupe.executeDupe(amount, delay)
-    amount = amount or 1000
-    delay = delay or 1.0
-    
-    print("\n" .. string.rep("🔄", 40))
-    print("EXECUTING TRADE DUPE...")
-    print(string.rep("🔄", 40))
-    
-    -- Enable network lag
-    NetworkLag.enablePacketDelay(delay)
-    
-    -- Add brainrots
-    TradeDupe.addBrainrots(amount)
-    
-    -- Wait a bit
-    wait(0.5)
-    
-    -- Confirm trade (this will be delayed)
-    print("⏳ Confirming trade (will be delayed)...")
-    local success, result = pcall(function()
-        return sessionSetConfirmation:InvokeServer(true)
-    end)
-    
-    if success then
-        print("✅ Trade confirmation sent (delayed)")
-    else
-        print("❌ Failed: " .. tostring(result))
-    end
-    
-    -- On alt account, accept immediately
-    print("\n⚠️ ON ALT ACCOUNT:")
-    print("1. Accept the trade IMMEDIATELY")
-    print("2. Both accounts will receive brainrots")
-    print("3. Due to network delay, trade happens twice")
-    
-    return success
-end
+        warn("==============================================")
+        warn(" ADVANCED CLIENT INSTRUMENTATION DETECTED")
+        warn("==============================================")
+        warn("Incident:", incident.id)
+        warn("Score:", State.score)
+        warn("Confidence:", State.confidence)
 
--- Step 3: Auto dupe with timing
-function TradeDupe.autoDupe(amount, delay)
-    amount = amount or 1000
-    delay = delay or 1.5
-    
-    print("\n🤖 AUTO DUPING PROCESS")
-    print("=" .. string.rep("=", 30))
-    
-    -- Step 1: Add item
-    print("Step 1: Adding brainrots...")
-    TradeDupe.addBrainrots(amount)
-    wait(0.5)
-    
-    -- Step 2: Enable lag
-    print("Step 2: Enabling network lag...")
-    NetworkLag.enablePacketDelay(delay)
-    
-    -- Step 3: Confirm (delayed)
-    print("Step 3: Sending delayed confirmation...")
-    sessionSetConfirmation:InvokeServer(true)
-    
-    -- Step 4: Instructions
-    print("\n" .. string.rep("📋", 40))
-    print("DUPE INSTRUCTIONS:")
-    print(string.rep("📋", 40))
-    print("MAIN ACCOUNT (this one):")
-    print("• Already sent delayed confirmation")
-    print("• Wait " .. delay .. " seconds")
-    print("\nALT ACCOUNT:")
-    print("1. Accept trade NOW")
-    print("2. Trade completes immediately for alt")
-    print("3. Delayed confirmation arrives later")
-    print("4. Trade happens again for main account")
-    print("5. BOTH get brainrots!")
-    
-    return true
-end
+        for index, reason in ipairs(State.reasons) do
+            warn(
+                string.format(
+                    "[%d] %s",
+                    index,
+                    reason
+                )
+            )
+        end
 
--- CREATE DUPING UI
-local function createDupeUI()
-    local PlayerGui = Player:WaitForChild("PlayerGui")
-    
-    -- Remove old
-    local old = PlayerGui:FindFirstChild("DupeUI")
-    if old then old:Destroy() end
-    
-    -- Create GUI
-    local screenGui = Instance.new("ScreenGui")
-    screenGui.Name = "DupeUI"
-    
-    -- Main frame
-    local mainFrame = Instance.new("Frame")
-    mainFrame.Size = UDim2.new(0, 400, 0, 450)
-    mainFrame.Position = UDim2.new(0.5, -200, 0.5, -225)
-    mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-    
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 12)
-    corner.Parent = mainFrame
-    
-    -- Title
-    local title = Instance.new("TextLabel")
-    title.Text = "🔄 TRADE DUPING SYSTEM"
-    title.Size = UDim2.new(1, 0, 0, 50)
-    title.BackgroundColor3 = Color3.fromRGB(60, 40, 80)
-    title.TextColor3 = Color3.new(1, 1, 1)
-    title.Font = Enum.Font.GothamBold
-    title.TextSize = 16
-    
-    -- Status
-    local status = Instance.new("TextLabel")
-    status.Text = "Ready to dupe brainrots..."
-    status.Size = UDim2.new(1, -20, 0, 30)
-    status.Position = UDim2.new(0, 10, 0, 55)
-    status.BackgroundTransparency = 1
-    status.TextColor3 = Color3.fromRGB(200, 150, 255)
-    status.Font = Enum.Font.Gotham
-    status.TextSize = 12
-    
-    -- Amount input
-    local amountBox = Instance.new("TextBox")
-    amountBox.PlaceholderText = "Brainrot amount"
-    amountBox.Text = "1000"
-    amountBox.Size = UDim2.new(1, -40, 0, 35)
-    amountBox.Position = UDim2.new(0, 20, 0, 90)
-    amountBox.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
-    amountBox.TextColor3 = Color3.new(1, 1, 1)
-    
-    -- Delay input
-    local delayBox = Instance.new("TextBox")
-    delayBox.PlaceholderText = "Network delay (seconds)"
-    delayBox.Text = "1.5"
-    delayBox.Size = UDim2.new(1, -40, 0, 35)
-    delayBox.Position = UDim2.new(0, 20, 0, 135)
-    delayBox.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
-    delayBox.TextColor3 = Color3.new(1, 1, 1)
-    
-    -- Button creator
-    local function createButton(text, y, color, callback)
-        local btn = Instance.new("TextButton")
-        btn.Text = text
-        btn.Size = UDim2.new(1, -40, 0, 40)
-        btn.Position = UDim2.new(0, 20, 0, y)
-        btn.BackgroundColor3 = color
-        btn.TextColor3 = Color3.new(1, 1, 1)
-        btn.Font = Enum.Font.Gotham
-        btn.TextSize = 13
-        
-        btn.MouseButton1Click:Connect(function()
-            status.Text = "Running: " .. text
-            local amount = tonumber(amountBox.Text) or 1000
-            local delay = tonumber(delayBox.Text) or 1.5
-            
-            spawn(function()
+        warn("==============================================")
+
+        if CONFIG.AUTO_KICK
+            and LocalPlayer
+        then
+
+            task.defer(function()
+
                 pcall(function()
-                    callback(amount, delay)
+
+                    LocalPlayer:Kick(
+                        "Unauthorized client instrumentation detected."
+                    )
+
                 end)
+
             end)
-        end)
-        
-        return btn
+
+        end
+
     end
-    
-    -- Buttons
-    local addBtn = createButton("➕ ADD BRAINROTS TO TRADE", 180, Color3.fromRGB(70, 160, 70), function(amount)
-        TradeDupe.addBrainrots(amount)
-        status.Text = "Added " .. amount .. " brainrots"
-    end)
-    
-    local lagBtn = createButton("⏳ ENABLE NETWORK LAG", 230, Color3.fromRGB(60, 120, 200), function(amount, delay)
-        NetworkLag.enablePacketDelay(delay)
-        status.Text = "Network lag: " .. delay .. "s"
-    end)
-    
-    local dupeBtn = createButton("🔄 EXECUTE DUPE", 280, Color3.fromRGB(200, 60, 60), function(amount, delay)
-        TradeDupe.executeDupe(amount, delay)
-        status.Text = "Dupe executing..."
-    end)
-    
-    local autoBtn = createButton("🤖 AUTO DUPE PROCESS", 330, Color3.fromRGB(180, 80, 200), function(amount, delay)
-        TradeDupe.autoDupe(amount, delay)
-        status.Text = "Auto dupe started"
-    end)
-    
-    -- Instructions
-    local instructions = Instance.new("TextLabel")
-    instructions.Text = "INSTRUCTIONS:\n1. Start trade with alt account\n2. Add brainrots\n3. Enable lag\n4. Execute dupe\n5. Accept on alt immediately"
-    instructions.Size = UDim2.new(1, -20, 0, 80)
-    instructions.Position = UDim2.new(0, 10, 1, -90)
-    instructions.BackgroundTransparency = 1
-    instructions.TextColor3 = Color3.fromRGB(150, 200, 255)
-    instructions.Font = Enum.Font.Gotham
-    instructions.TextSize = 11
-    instructions.TextWrapped = true
-    
-    -- Close
-    local closeBtn = Instance.new("TextButton")
-    closeBtn.Text = "✕"
-    closeBtn.Size = UDim2.new(0, 30, 0, 30)
-    closeBtn.Position = UDim2.new(1, -35, 0, 10)
-    closeBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 100)
-    closeBtn.TextColor3 = Color3.new(1, 1, 1)
-    closeBtn.Font = Enum.Font.GothamBold
-    
-    closeBtn.MouseButton1Click:Connect(function()
-        screenGui:Destroy()
-    end)
-    
-    -- Assemble
-    title.Parent = mainFrame
-    status.Parent = mainFrame
-    amountBox.Parent = mainFrame
-    delayBox.Parent = mainFrame
-    addBtn.Parent = mainFrame
-    lagBtn.Parent = mainFrame
-    dupeBtn.Parent = mainFrame
-    autoBtn.Parent = mainFrame
-    instructions.Parent = mainFrame
-    closeBtn.Parent = title
-    mainFrame.Parent = screenGui
-    screenGui.Parent = PlayerGui
-    
-    return screenGui
 end
 
--- EXPORT FUNCTIONS
-getgenv().TradeDupe = TradeDupe
-getgenv().NetworkLag = NetworkLag
+--==================================================
+-- ENVIRONMENT CAPABILITY SCAN
+--==================================================
 
--- MAIN EXECUTION
-print("\n" .. string.rep("🔄", 40))
-print("TRADE DUPING SYSTEM READY")
-print(string.rep("🔄", 40))
+local function scanCapabilities()
 
--- Create UI
-wait(1)
-createDupeUI()
+    if not CONFIG.SCAN_ENVIRONMENT then
+        return {}
+    end
 
--- Instructions
-print("\n📋 HOW TO DUPE BRAINROTS:")
-print("1. Start a trade with your ALT account")
-print("2. Use the UI to add brainrots to trade")
-print("3. Enable network lag (1-2 seconds)")
-print("4. Execute the dupe")
-print("5. On ALT account: Accept trade IMMEDIATELY")
-print("6. Due to network delay, trade happens twice")
-print("7. Both accounts keep the brainrots!")
+    local env = getEnvironment()
 
-print("\n⚙️ AVAILABLE COMMANDS:")
-print("TradeDupe.addBrainrots(1000)")
-print("TradeDupe.executeDupe(1000, 1.5)")
-print("TradeDupe.autoDupe(1000, 1.5)")
-print("NetworkLag.enablePacketDelay(1.5)")
+    if not env then
+        return {}
+    end
 
-print("\n⚠️ IMPORTANT:")
-print("• Works best with 1-2 second delay")
-print("• Alt account must accept immediately")
-print("• Test with small amounts first")
-print("• May not work with strong anti-cheat")
+    local capabilities = {}
 
-print("\n🎯 UI appears in CENTER of screen")
+    for _, name in ipairs(EXECUTOR_APIS) do
+
+        local ok, value = safeCall(function()
+            return env[name]
+        end)
+
+        if ok and safeType(value) == "function" then
+
+            capabilities[name] = true
+
+        end
+
+    end
+
+    local count = 0
+
+    for _ in pairs(capabilities) do
+        count += 1
+    end
+
+    State.statistics.capabilityCount = count
+
+    -- Capability clusters are stronger than one isolated API.
+    if count >= 3 then
+
+        addEvidence(
+            "capability_cluster_3",
+            string.format(
+                "%d instrumentation/executor capabilities exposed",
+                count
+            ),
+            2,
+            "environment"
+        )
+
+    end
+
+    if count >= 6 then
+
+        addEvidence(
+            "capability_cluster_6",
+            string.format(
+                "large instrumentation capability cluster exposed (%d)",
+                count
+            ),
+            2,
+            "environment"
+        )
+
+    end
+
+    -- Executor identity
+    if capabilities.identifyexecutor then
+
+        local ok, identity = safeCall(
+            env.identifyexecutor
+        )
+
+        if ok and identity then
+
+            addEvidence(
+                "executor_identity",
+                "executor identity exposed: "
+                    .. safeString(identity),
+                3,
+                "environment"
+            )
+
+        end
+
+    end
+
+    return capabilities
+end
+
+--==================================================
+-- GLOBAL SCAN
+--==================================================
+
+local function scanGlobals()
+
+    if not CONFIG.SCAN_GLOBALS then
+        return {}
+    end
+
+    local env = getEnvironment()
+
+    if not env then
+        return {}
+    end
+
+    local found = {}
+
+    for _, name in ipairs(SUSPICIOUS_GLOBALS) do
+
+        local ok, value = safeCall(function()
+            return env[name]
+        end)
+
+        if ok and value ~= nil then
+
+            found[name] = safeType(value)
+
+            State.statistics.suspiciousGlobals += 1
+
+            addEvidence(
+                "global_" .. name,
+                "known instrumentation global detected: "
+                    .. name,
+                5,
+                "signature"
+            )
+
+        end
+
+    end
+
+    return found
+end
+
+--==================================================
+-- DEBUG ENVIRONMENT
+--==================================================
+
+local function scanDebug()
+
+    if not CONFIG.SCAN_DEBUG then
+        return {}
+    end
+
+    local result = {
+        debugAvailable = type(debug) == "table",
+        getinfo = false,
+        traceback = false,
+        getupvalue = false,
+    }
+
+    if type(debug) ~= "table" then
+        return result
+    end
+
+    result.getinfo =
+        type(debug.getinfo) == "function"
+
+    result.traceback =
+        type(debug.traceback) == "function"
+
+    result.getupvalue =
+        type(debug.getupvalue) == "function"
+
+    return result
+end
+
+--==================================================
+-- REMOTE INVENTORY
+--==================================================
+
+local function scanRemotes()
+
+    if not CONFIG.SCAN_REMOTES then
+        return
+    end
+
+    local events = {}
+    local functions = {}
+
+    local ok, descendants = safeCall(
+        function()
+            return ReplicatedStorage:GetDescendants()
+        end
+    )
+
+    if not ok then
+        return
+    end
+
+    for _, object in ipairs(descendants) do
+
+        if object:IsA("RemoteEvent") then
+
+            table.insert(
+                events,
+                object:GetFullName()
+            )
+
+        elseif object:IsA("RemoteFunction") then
+
+            table.insert(
+                functions,
+                object:GetFullName()
+            )
+
+        end
+
+    end
+
+    State.remoteInventory.events = events
+    State.remoteInventory.functions = functions
+
+    State.statistics.remoteCount =
+        #events + #functions
+
+    log(
+        string.format(
+            "Remote inventory: %d events / %d functions",
+            #events,
+            #functions
+        )
+    )
+end
+
+--==================================================
+-- GLOBAL STRING / SIGNATURE SCAN
+--==================================================
+
+local function scanRegistry()
+
+    if not CONFIG.SCAN_REGISTRY then
+        return
+    end
+
+    local env = getEnvironment()
+
+    if not env then
+        return
+    end
+
+    local getregFn = env.getreg
+
+    if safeType(getregFn) ~= "function" then
+        return
+    end
+
+    local ok, registry = safeCall(getregFn)
+
+    if not ok or type(registry) ~= "table" then
+        return
+    end
+
+    local matches = {}
+
+    for _, value in pairs(registry) do
+
+        if type(value) == "string" then
+
+            local signature =
+                containsSignature(value)
+
+            if signature then
+
+                matches[signature] =
+                    (matches[signature] or 0) + 1
+
+            end
+
+        end
+
+    end
+
+    local total = 0
+
+    for signature, count in pairs(matches) do
+
+        total += count
+
+        if count >= 2 then
+
+            State.statistics.signatureMatches += 1
+
+            addEvidence(
+                "registry_" .. signature,
+                string.format(
+                    "registry contains repeated '%s' signature",
+                    signature
+                ),
+                3,
+                "registry"
+            )
+
+        end
+
+    end
+
+    if total >= 5 then
+
+        addEvidence(
+            "registry_signature_cluster",
+            string.format(
+                "multiple instrumentation signatures found in registry (%d)",
+                total
+            ),
+            2,
+            "registry"
+        )
+
+    end
+end
+
+--==================================================
+-- GC SIGNATURE SCAN
+--==================================================
+
+local function scanGC()
+
+    if not CONFIG.SCAN_GC then
+        return
+    end
+
+    local env = getEnvironment()
+
+    if not env then
+        return
+    end
+
+    local getgcFn = env.getgc
+
+    if safeType(getgcFn) ~= "function" then
+        return
+    end
+
+    local ok, objects =
+        safeCall(getgcFn, true)
+
+    if not ok or type(objects) ~= "table" then
+        return
+    end
+
+    local signatures = {}
+
+    for _, object in pairs(objects) do
+
+        if type(object) == "string" then
+
+            local signature =
+                containsSignature(object)
+
+            if signature then
+
+                signatures[signature] =
+                    (signatures[signature] or 0) + 1
+
+            end
+
+        end
+
+    end
+
+    for signature, count in pairs(signatures) do
+
+        if count >= 2 then
+
+            State.statistics.signatureMatches += 1
+
+            addEvidence(
+                "gc_" .. signature,
+                string.format(
+                    "GC contains repeated '%s' signature",
+                    signature
+                ),
+                3,
+                "gc"
+            )
+
+        end
+
+    end
+end
+
+--==================================================
+-- CONNECTION SCAN
+--==================================================
+
+local function scanConnections()
+
+    if not CONFIG.SCAN_CONNECTIONS then
+        return
+    end
+
+    local env = getEnvironment()
+
+    if not env then
+        return
+    end
+
+    local getconnectionsFn =
+        env.getconnections
+
+    if safeType(getconnectionsFn)
+        ~= "function"
+    then
+        return
+    end
+
+    local descendants = game:GetDescendants()
+
+    local inspected = 0
+    local signatureMatches = 0
+
+    for _, instance in ipairs(descendants) do
+
+        if State.detected then
+            return
+        end
+
+        if instance:IsA("RemoteEvent") then
+
+            local ok, connections =
+                safeCall(
+                    getconnectionsFn,
+                    instance.OnClientEvent
+                )
+
+            if ok and type(connections) == "table" then
+
+                inspected += #connections
+
+                for _, connection in ipairs(connections) do
+
+                    if type(connection) == "table" then
+
+                        local callback =
+                            connection.Function
+
+                        if safeType(callback)
+                            == "function"
+                        then
+
+                            if type(debug) == "table"
+                                and type(debug.getinfo)
+                                    == "function"
+                            then
+
+                                local infoOk, info =
+                                    safeCall(
+                                        debug.getinfo,
+                                        callback,
+                                        "S"
+                                    )
+
+                                if infoOk
+                                    and type(info)
+                                        == "table"
+                                then
+
+                                    local source =
+                                        info.source
+
+                                    local signature =
+                                        containsSignature(
+                                            source
+                                        )
+
+                                    if signature then
+
+                                        signatureMatches += 1
+
+                                        addEvidence(
+                                            "connection_"
+                                                .. signature,
+                                            "known instrumentation signature in event connection: "
+                                                .. instance:GetFullName(),
+                                            5,
+                                            "connection"
+                                        )
+
+                                    end
+
+                                end
+
+                            end
+
+                        end
+
+                    end
+
+                end
+
+            end
+
+        end
+
+    end
+
+    log(
+        string.format(
+            "Connections inspected: %d | signatures: %d",
+            inspected,
+            signatureMatches
+        )
+    )
+end
+
+--==================================================
+-- METAMETHOD CHECK
+--==================================================
+
+local function scanMetamethods()
+
+    if not CONFIG.CHECK_METAMETHODS then
+        return
+    end
+
+    local env = getEnvironment()
+
+    if not env then
+        return
+    end
+
+    local getraw =
+        env.getrawmetatable
+
+    if safeType(getraw) ~= "function" then
+        return
+    end
+
+    local ok, mt =
+        safeCall(
+            getraw,
+            game
+        )
+
+    if not ok or type(mt) ~= "table" then
+        return
+    end
+
+    local namecall =
+        rawget(mt, "__namecall")
+
+    if safeType(namecall)
+        ~= "function"
+    then
+        return
+    end
+
+    if type(debug) ~= "table"
+        or type(debug.getinfo)
+            ~= "function"
+    then
+        return
+    end
+
+    local infoOk, info =
+        safeCall(
+            debug.getinfo,
+            namecall,
+            "S"
+        )
+
+    if not infoOk
+        or type(info) ~= "table"
+    then
+        return
+    end
+
+    local source = info.source
+
+    local signature =
+        containsSignature(source)
+
+    if signature then
+
+        State.statistics.signatureMatches += 1
+
+        addEvidence(
+            "namecall_" .. signature,
+            "known instrumentation signature associated with __namecall: "
+                .. signature,
+            5,
+            "metamethod"
+        )
+
+    end
+end
+
+--==================================================
+-- PROFILE
+--==================================================
+
+local function collectProfile()
+
+    return {
+        timestamp = os.clock(),
+
+        capabilities =
+            scanCapabilities(),
+
+        globals =
+            scanGlobals(),
+
+        debug =
+            scanDebug(),
+
+        remotes = {
+            events =
+                #State.remoteInventory.events,
+
+            functions =
+                #State.remoteInventory.functions,
+        },
+    }
+end
+
+--==================================================
+-- PROFILE DELTA
+--==================================================
+
+local function compareProfiles(old, new)
+
+    if not old then
+        return
+    end
+
+    local oldCaps =
+        old.capabilities or {}
+
+    local newCaps =
+        new.capabilities or {}
+
+    for name, enabled in pairs(newCaps) do
+
+        if enabled
+            and not oldCaps[name]
+        then
+
+            addEvidence(
+                "capability_appeared_" .. name,
+                "new instrumentation capability appeared after baseline: "
+                    .. name,
+                2,
+                "delta"
+            )
+
+        end
+
+    end
+
+    local oldGlobals =
+        old.globals or {}
+
+    local newGlobals =
+        new.globals or {}
+
+    for name in pairs(newGlobals) do
+
+        if oldGlobals[name] == nil then
+
+            addEvidence(
+                "global_appeared_" .. name,
+                "new suspicious global appeared after baseline: "
+                    .. name,
+                4,
+                "delta"
+            )
+
+        end
+
+    end
+
+end
+
+--==================================================
+-- DEEP SCAN
+--==================================================
+
+local function runDeepScan()
+
+    if State.detected then
+        return
+    end
+
+    State.scans.deep += 1
+
+    log(
+        "Starting deep scan #"
+            .. State.scans.deep
+    )
+
+    local previous =
+        State.currentProfile
+
+    local current =
+        collectProfile()
+
+    compareProfiles(
+        previous,
+        current
+    )
+
+    State.currentProfile =
+        current
+
+    State.baseline =
+        State.baseline or current
+end
+
+--==================================================
+-- LIGHT SCAN
+--==================================================
+
+local function runLightScan()
+
+    if State.detected then
+        return
+    end
+
+    State.scans.light += 1
+
+    local profile = {
+        timestamp = os.clock(),
+        capabilities =
+            scanCapabilities(),
+        globals =
+            scanGlobals(),
+    }
+
+    compareProfiles(
+        State.currentProfile,
+        profile
+    )
+
+    State.currentProfile =
+        profile
+end
+
+--==================================================
+-- FULL INITIAL SCAN
+--==================================================
+
+local function runInitialScan()
+
+    log("Starting initial security scan.")
+
+    scanCapabilities()
+    scanGlobals()
+    scanDebug()
+    scanRemotes()
+    scanMetamethods()
+
+    if CONFIG.ENABLE_DEEP_SCANS then
+        scanRegistry()
+        scanGC()
+        scanConnections()
+    end
+
+    State.currentProfile =
+        collectProfile()
+
+    State.baseline =
+        State.currentProfile
+
+    log(
+        string.format(
+            "Initial scan complete | score=%d | confidence=%s",
+            State.score,
+            State.confidence
+        )
+    )
+end
+
+--==================================================
+-- REPORT
+--==================================================
+
+local function getReport()
+
+    local evidence = {}
+
+    for id, data in pairs(State.evidence) do
+
+        evidence[id] = {
+            points = data.points,
+            category = data.category,
+            description = data.description,
+            timestamp = data.timestamp,
+        }
+
+    end
+
+    return {
+        detected = State.detected,
+
+        score = State.score,
+
+        confidence =
+            State.confidence,
+
+        scans = table.clone(
+            State.scans
+        ),
+
+        statistics =
+            table.clone(
+                State.statistics
+            ),
+
+        evidence = evidence,
+
+        reasons =
+            table.clone(
+                State.reasons
+            ),
+
+        remoteInventory = {
+            events =
+                table.clone(
+                    State.remoteInventory.events
+                ),
+
+            functions =
+                table.clone(
+                    State.remoteInventory.functions
+                ),
+        },
+
+        incidents =
+            table.clone(
+                State.incidents
+            ),
+    }
+end
+
+--==================================================
+-- PUBLIC API
+--==================================================
+
+_G.__AdvancedSecurityDetector = {
+
+    IsDetected = function()
+        return State.detected
+    end,
+
+    GetScore = function()
+        return State.score
+    end,
+
+    GetConfidence = function()
+        return State.confidence
+    end,
+
+    GetReasons = function()
+        return table.clone(
+            State.reasons
+        )
+    end,
+
+    GetEvidence = function()
+        return table.clone(
+            State.evidence
+        )
+    end,
+
+    GetReport = function()
+        return getReport()
+    end,
+
+    GetRemoteInventory = function()
+        return {
+            events =
+                table.clone(
+                    State.remoteInventory.events
+                ),
+
+            functions =
+                table.clone(
+                    State.remoteInventory.functions
+                ),
+        }
+    end,
+
+    Rescan = function()
+        if not State.detected then
+            runDeepScan()
+        end
+    end,
+}
+
+--==================================================
+-- START
+--==================================================
+
+log("==============================================")
+log(" ADVANCED SECURITY DETECTOR")
+log(" Starting...")
+log("==============================================")
+
+runInitialScan()
+
+if CONFIG.PERIODIC_SCAN then
+
+    task.spawn(function()
+
+        local deepTimer = 0
+
+        while not State.detected do
+
+            task.wait(
+                CONFIG.LIGHT_SCAN_INTERVAL
+            )
+
+            if State.detected then
+                break
+            end
+
+            runLightScan()
+
+            deepTimer +=
+                CONFIG.LIGHT_SCAN_INTERVAL
+
+            if CONFIG.ENABLE_DEEP_SCANS
+                and deepTimer
+                    >= CONFIG.DEEP_SCAN_INTERVAL
+            then
+
+                deepTimer = 0
+
+                runDeepScan()
+
+            end
+
+        end
+
+    end)
+
+end
+
+task.defer(function()
+
+    task.wait(1)
+
+    if State.detected then
+
+        warn(
+            string.format(
+                "%s DETECTED | score=%d | confidence=%s",
+                PREFIX,
+                State.score,
+                State.confidence
+            )
+        )
+
+    else
+
+        print(
+            string.format(
+                "%s No strong evidence | score=%d | confidence=%s",
+                PREFIX,
+                State.score,
+                State.confidence
+            )
+        )
+
+    end
+
+end)
+
+return State
