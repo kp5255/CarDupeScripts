@@ -1,1148 +1,342 @@
 --[[
-    ADVANCED CLIENT INSTRUMENTATION / REMOTE-SPY DETECTOR
-    =====================================================
+    BLACK-BOX ROBLOX SECURITY RECON
+    =================================
+    Authorized/private testing only.
 
-    Authorized security research / private sandbox use.
+    Goal:
+      Start with ZERO knowledge of the game's implementation.
 
-    Architecture:
-        Environment
-             |
-        +----+----------------------+
-        |                           |
-    Capability                  Integrity
-      checks                      checks
-        |                           |
-        +------------+--------------+
-                     |
-              Behavioral signals
-                     |
-              Evidence engine
-                     |
-              Confidence score
-                     |
-              Incident report
+    It:
+      • inventories RemoteEvents/RemoteFunctions
+      • categorizes likely game systems
+      • detects newly-created/removed remotes
+      • records object metadata
+      • creates a searchable report
+      • periodically rescans
 
-    IMPORTANT:
-      This is a heuristic client-side detector.
-      It is NOT a replacement for server-side validation.
+    It does NOT automatically invoke arbitrary remotes.
 ]]
 
-local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
-local HttpService = game:GetService("HttpService")
+local Players = game:GetService("Players")
 
 local LocalPlayer = Players.LocalPlayer
 
---==================================================
--- CONFIGURATION
---==================================================
-
 local CONFIG = {
-
-    -- General
+    SCAN_INTERVAL = 5,
     VERBOSE = true,
-    PERIODIC_SCAN = true,
-
-    -- Scan scheduling
-    LIGHT_SCAN_INTERVAL = 3,
-    DEEP_SCAN_INTERVAL = 15,
-
-    -- Detection
-    DETECTION_THRESHOLD = 10,
-    HIGH_CONFIDENCE_THRESHOLD = 14,
-
-    -- Avoid repeatedly counting identical evidence
-    DUPLICATE_SUPPRESS = true,
-
-    -- Features
-    SCAN_ENVIRONMENT = true,
-    SCAN_GLOBALS = true,
-    SCAN_DEBUG = true,
-    SCAN_REMOTES = true,
-    SCAN_CONNECTIONS = true,
-    SCAN_REGISTRY = true,
-    SCAN_GC = true,
-    CHECK_METAMETHODS = true,
-
-    -- Expensive scans
-    ENABLE_DEEP_SCANS = true,
-
-    -- Incident history
-    MAX_INCIDENTS = 20,
-    MAX_EVIDENCE = 100,
-
-    -- Optional response
-    AUTO_KICK = false,
-
-    -- Signature matching
-    SIGNATURE_MATCHING = true,
+    SHOW_ALL = true,
+    MAX_RESULTS = 2000,
 }
-
---==================================================
--- STATE
---==================================================
 
 local State = {
     started = os.clock(),
+    scanCount = 0,
 
-    detected = false,
-    confidence = "LOW",
+    remotes = {},
+    previous = {},
 
-    score = 0,
-
-    scans = {
-        light = 0,
-        deep = 0,
-        failed = 0,
+    categories = {
+        vehicle = {},
+        trade = {},
+        inventory = {},
+        purchase = {},
+        reward = {},
+        currency = {},
+        player = {},
+        unknown = {},
     },
 
-    evidence = {},
-    reasons = {},
-    incidents = {},
-
-    baseline = nil,
-    currentProfile = nil,
-
-    remoteInventory = {
-        events = {},
-        functions = {},
-    },
-
-    statistics = {
-        capabilityCount = 0,
-        suspiciousGlobals = 0,
-        signatureMatches = 0,
-        remoteCount = 0,
-    },
+    changes = {},
 }
 
 --==================================================
 -- LOGGING
 --==================================================
 
-local PREFIX = "[ADV-ANTI-SPY]"
-
 local function log(...)
     if CONFIG.VERBOSE then
-        print(PREFIX, ...)
+        print("[BLACKBOX]", ...)
     end
 end
 
 local function warnLog(...)
-    warn(PREFIX, ...)
+    warn("[BLACKBOX]", ...)
 end
 
 --==================================================
--- SAFE HELPERS
+-- CLASSIFICATION
 --==================================================
 
-local function safeCall(fn, ...)
-    local ok, result = pcall(fn, ...)
-    if ok then
-        return true, result
-    end
+local CATEGORY_WORDS = {
+    vehicle = {
+        "vehicle",
+        "car",
+        "garage",
+        "spawn",
+        "drive",
+        "dealership",
+        "dealer",
+    },
 
-    State.scans.failed += 1
+    trade = {
+        "trade",
+        "exchange",
+        "offer",
+        "accept",
+        "decline",
+    },
 
-    return false, nil
-end
+    inventory = {
+        "inventory",
+        "item",
+        "owned",
+        "storage",
+        "collection",
+    },
 
-local function safeType(value)
-    local ok, result = pcall(type, value)
+    purchase = {
+        "buy",
+        "purchase",
+        "checkout",
+        "shop",
+        "price",
+    },
 
-    if ok then
-        return result
+    reward = {
+        "reward",
+        "claim",
+        "gift",
+        "daily",
+        "bonus",
+        "crate",
+    },
+
+    currency = {
+        "cash",
+        "money",
+        "coin",
+        "currency",
+        "token",
+        "diamond",
+    },
+
+    player = {
+        "player",
+        "character",
+        "profile",
+        "data",
+        "save",
+        "load",
+    },
+}
+
+local function classify(name, path)
+
+    local text =
+        (name .. " " .. path):lower()
+
+    for category, words in pairs(CATEGORY_WORDS) do
+
+        for _, word in ipairs(words) do
+
+            if text:find(word, 1, true) then
+                return category
+            end
+
+        end
+
     end
 
     return "unknown"
 end
 
-local function safeString(value)
-    local ok, result = pcall(tostring, value)
-
-    if ok then
-        return result
-    end
-
-    return "<unprintable>"
-end
-
-local function getEnvironment()
-    if type(getfenv) ~= "function" then
-        return nil
-    end
-
-    local ok, env = safeCall(getfenv, 0)
-
-    if ok and type(env) == "table" then
-        return env
-    end
-
-    return nil
-end
-
 --==================================================
--- SIGNATURE DATABASE
+-- REMOTE DESCRIPTION
 --==================================================
 
-local SIGNATURES = {
+local function describe(instance)
 
-    "simplespy",
-    "remotespy",
-    "hydroxide",
-    "cobalt",
-    "darkspy",
-    "sunspy",
-    "utopia",
-    "spy.lua",
-}
+    local className = instance.ClassName
+    local path = instance:GetFullName()
 
-local SUSPICIOUS_GLOBALS = {
+    return {
+        name = instance.Name,
+        class = className,
+        path = path,
 
-    "RemoteSpy",
-    "SimpleSpy",
-    "RemoteEventSpy",
-    "Hydroxide",
-    "Cobalt",
-    "DarkSpy",
-    "SunSpy",
-    "Utopia",
-}
+        category =
+            classify(
+                instance.Name,
+                path
+            ),
 
-local EXECUTOR_APIS = {
-
-    "getrawmetatable",
-    "hookmetamethod",
-    "hookfunction",
-    "getconnections",
-    "getgc",
-    "getreg",
-    "checkcaller",
-    "getrenv",
-    "getgenv",
-    "identifyexecutor",
-    "isexecutorclosure",
-    "getcallingscript",
-    "getsenv",
-    "gethui",
-}
-
---==================================================
--- SIGNATURE MATCHING
---==================================================
-
-local function containsSignature(value)
-    if type(value) ~= "string" then
-        return nil
-    end
-
-    local lowered = value:lower()
-
-    for _, signature in ipairs(SIGNATURES) do
-
-        if lowered:find(signature, 1, true) then
-            return signature
-        end
-
-    end
-
-    return nil
-end
-
---==================================================
--- EVIDENCE ENGINE
---==================================================
-
-local function addEvidence(
-    id,
-    description,
-    points,
-    category
-)
-
-    if State.detected then
-        return
-    end
-
-    if CONFIG.DUPLICATE_SUPPRESS
-        and State.evidence[id] ~= nil
-    then
-        return
-    end
-
-    State.evidence[id] = {
-        points = points,
-        category = category or "unknown",
-        description = description,
-        timestamp = os.clock(),
+        parent =
+            instance.Parent
+                and instance.Parent:GetFullName()
+                or "nil",
     }
-
-    State.score += points
-
-    table.insert(
-        State.reasons,
-        description
-    )
-
-    if #State.reasons > CONFIG.MAX_EVIDENCE then
-        table.remove(State.reasons, 1)
-    end
-
-    warnLog(
-        string.format(
-            "[+%d] [%s] %s | score=%d",
-            points,
-            category or "unknown",
-            description,
-            State.score
-        )
-    )
-
-    if State.score >= CONFIG.HIGH_CONFIDENCE_THRESHOLD then
-        State.confidence = "HIGH"
-
-    elseif State.score >= CONFIG.DETECTION_THRESHOLD then
-        State.confidence = "MEDIUM"
-
-    elseif State.score >= 4 then
-        State.confidence = "LOW-MEDIUM"
-    end
-
-    if State.score >= CONFIG.DETECTION_THRESHOLD then
-
-        State.detected = true
-
-        local incident = {
-            id = HttpService:GenerateGUID(false),
-            timestamp = os.clock(),
-            score = State.score,
-            confidence = State.confidence,
-            reasons = table.clone(State.reasons),
-        }
-
-        table.insert(
-            State.incidents,
-            incident
-        )
-
-        if #State.incidents > CONFIG.MAX_INCIDENTS then
-            table.remove(State.incidents, 1)
-        end
-
-        warn("==============================================")
-        warn(" ADVANCED CLIENT INSTRUMENTATION DETECTED")
-        warn("==============================================")
-        warn("Incident:", incident.id)
-        warn("Score:", State.score)
-        warn("Confidence:", State.confidence)
-
-        for index, reason in ipairs(State.reasons) do
-            warn(
-                string.format(
-                    "[%d] %s",
-                    index,
-                    reason
-                )
-            )
-        end
-
-        warn("==============================================")
-
-        if CONFIG.AUTO_KICK
-            and LocalPlayer
-        then
-
-            task.defer(function()
-
-                pcall(function()
-
-                    LocalPlayer:Kick(
-                        "Unauthorized client instrumentation detected."
-                    )
-
-                end)
-
-            end)
-
-        end
-
-    end
 end
 
 --==================================================
--- ENVIRONMENT CAPABILITY SCAN
+-- SNAPSHOT
 --==================================================
 
-local function scanCapabilities()
+local function makeSnapshot()
 
-    if not CONFIG.SCAN_ENVIRONMENT then
-        return {}
-    end
+    local snapshot = {}
 
-    local env = getEnvironment()
-
-    if not env then
-        return {}
-    end
-
-    local capabilities = {}
-
-    for _, name in ipairs(EXECUTOR_APIS) do
-
-        local ok, value = safeCall(function()
-            return env[name]
-        end)
-
-        if ok and safeType(value) == "function" then
-
-            capabilities[name] = true
-
-        end
-
-    end
+    local descendants =
+        ReplicatedStorage:GetDescendants()
 
     local count = 0
 
-    for _ in pairs(capabilities) do
-        count += 1
-    end
-
-    State.statistics.capabilityCount = count
-
-    -- Capability clusters are stronger than one isolated API.
-    if count >= 3 then
-
-        addEvidence(
-            "capability_cluster_3",
-            string.format(
-                "%d instrumentation/executor capabilities exposed",
-                count
-            ),
-            2,
-            "environment"
-        )
-
-    end
-
-    if count >= 6 then
-
-        addEvidence(
-            "capability_cluster_6",
-            string.format(
-                "large instrumentation capability cluster exposed (%d)",
-                count
-            ),
-            2,
-            "environment"
-        )
-
-    end
-
-    -- Executor identity
-    if capabilities.identifyexecutor then
-
-        local ok, identity = safeCall(
-            env.identifyexecutor
-        )
-
-        if ok and identity then
-
-            addEvidence(
-                "executor_identity",
-                "executor identity exposed: "
-                    .. safeString(identity),
-                3,
-                "environment"
-            )
-
-        end
-
-    end
-
-    return capabilities
-end
-
---==================================================
--- GLOBAL SCAN
---==================================================
-
-local function scanGlobals()
-
-    if not CONFIG.SCAN_GLOBALS then
-        return {}
-    end
-
-    local env = getEnvironment()
-
-    if not env then
-        return {}
-    end
-
-    local found = {}
-
-    for _, name in ipairs(SUSPICIOUS_GLOBALS) do
-
-        local ok, value = safeCall(function()
-            return env[name]
-        end)
-
-        if ok and value ~= nil then
-
-            found[name] = safeType(value)
-
-            State.statistics.suspiciousGlobals += 1
-
-            addEvidence(
-                "global_" .. name,
-                "known instrumentation global detected: "
-                    .. name,
-                5,
-                "signature"
-            )
-
-        end
-
-    end
-
-    return found
-end
-
---==================================================
--- DEBUG ENVIRONMENT
---==================================================
-
-local function scanDebug()
-
-    if not CONFIG.SCAN_DEBUG then
-        return {}
-    end
-
-    local result = {
-        debugAvailable = type(debug) == "table",
-        getinfo = false,
-        traceback = false,
-        getupvalue = false,
-    }
-
-    if type(debug) ~= "table" then
-        return result
-    end
-
-    result.getinfo =
-        type(debug.getinfo) == "function"
-
-    result.traceback =
-        type(debug.traceback) == "function"
-
-    result.getupvalue =
-        type(debug.getupvalue) == "function"
-
-    return result
-end
-
---==================================================
--- REMOTE INVENTORY
---==================================================
-
-local function scanRemotes()
-
-    if not CONFIG.SCAN_REMOTES then
-        return
-    end
-
-    local events = {}
-    local functions = {}
-
-    local ok, descendants = safeCall(
-        function()
-            return ReplicatedStorage:GetDescendants()
-        end
-    )
-
-    if not ok then
-        return
-    end
-
     for _, object in ipairs(descendants) do
 
-        if object:IsA("RemoteEvent") then
+        if object:IsA("RemoteEvent")
+            or object:IsA("RemoteFunction")
+        then
 
-            table.insert(
-                events,
-                object:GetFullName()
-            )
-
-        elseif object:IsA("RemoteFunction") then
-
-            table.insert(
-                functions,
-                object:GetFullName()
-            )
-
-        end
-
-    end
-
-    State.remoteInventory.events = events
-    State.remoteInventory.functions = functions
-
-    State.statistics.remoteCount =
-        #events + #functions
-
-    log(
-        string.format(
-            "Remote inventory: %d events / %d functions",
-            #events,
-            #functions
-        )
-    )
-end
-
---==================================================
--- GLOBAL STRING / SIGNATURE SCAN
---==================================================
-
-local function scanRegistry()
-
-    if not CONFIG.SCAN_REGISTRY then
-        return
-    end
-
-    local env = getEnvironment()
-
-    if not env then
-        return
-    end
-
-    local getregFn = env.getreg
-
-    if safeType(getregFn) ~= "function" then
-        return
-    end
-
-    local ok, registry = safeCall(getregFn)
-
-    if not ok or type(registry) ~= "table" then
-        return
-    end
-
-    local matches = {}
-
-    for _, value in pairs(registry) do
-
-        if type(value) == "string" then
-
-            local signature =
-                containsSignature(value)
-
-            if signature then
-
-                matches[signature] =
-                    (matches[signature] or 0) + 1
-
+            if count >= CONFIG.MAX_RESULTS then
+                break
             end
 
+            local info =
+                describe(object)
+
+            snapshot[info.path] = info
+
+            count += 1
         end
 
     end
 
-    local total = 0
-
-    for signature, count in pairs(matches) do
-
-        total += count
-
-        if count >= 2 then
-
-            State.statistics.signatureMatches += 1
-
-            addEvidence(
-                "registry_" .. signature,
-                string.format(
-                    "registry contains repeated '%s' signature",
-                    signature
-                ),
-                3,
-                "registry"
-            )
-
-        end
-
-    end
-
-    if total >= 5 then
-
-        addEvidence(
-            "registry_signature_cluster",
-            string.format(
-                "multiple instrumentation signatures found in registry (%d)",
-                total
-            ),
-            2,
-            "registry"
-        )
-
-    end
+    return snapshot
 end
 
 --==================================================
--- GC SIGNATURE SCAN
+-- CHANGE DETECTION
 --==================================================
 
-local function scanGC()
-
-    if not CONFIG.SCAN_GC then
-        return
-    end
-
-    local env = getEnvironment()
-
-    if not env then
-        return
-    end
-
-    local getgcFn = env.getgc
-
-    if safeType(getgcFn) ~= "function" then
-        return
-    end
-
-    local ok, objects =
-        safeCall(getgcFn, true)
-
-    if not ok or type(objects) ~= "table" then
-        return
-    end
-
-    local signatures = {}
-
-    for _, object in pairs(objects) do
-
-        if type(object) == "string" then
-
-            local signature =
-                containsSignature(object)
-
-            if signature then
-
-                signatures[signature] =
-                    (signatures[signature] or 0) + 1
-
-            end
-
-        end
-
-    end
-
-    for signature, count in pairs(signatures) do
-
-        if count >= 2 then
-
-            State.statistics.signatureMatches += 1
-
-            addEvidence(
-                "gc_" .. signature,
-                string.format(
-                    "GC contains repeated '%s' signature",
-                    signature
-                ),
-                3,
-                "gc"
-            )
-
-        end
-
-    end
-end
-
---==================================================
--- CONNECTION SCAN
---==================================================
-
-local function scanConnections()
-
-    if not CONFIG.SCAN_CONNECTIONS then
-        return
-    end
-
-    local env = getEnvironment()
-
-    if not env then
-        return
-    end
-
-    local getconnectionsFn =
-        env.getconnections
-
-    if safeType(getconnectionsFn)
-        ~= "function"
-    then
-        return
-    end
-
-    local descendants = game:GetDescendants()
-
-    local inspected = 0
-    local signatureMatches = 0
-
-    for _, instance in ipairs(descendants) do
-
-        if State.detected then
-            return
-        end
-
-        if instance:IsA("RemoteEvent") then
-
-            local ok, connections =
-                safeCall(
-                    getconnectionsFn,
-                    instance.OnClientEvent
-                )
-
-            if ok and type(connections) == "table" then
-
-                inspected += #connections
-
-                for _, connection in ipairs(connections) do
-
-                    if type(connection) == "table" then
-
-                        local callback =
-                            connection.Function
-
-                        if safeType(callback)
-                            == "function"
-                        then
-
-                            if type(debug) == "table"
-                                and type(debug.getinfo)
-                                    == "function"
-                            then
-
-                                local infoOk, info =
-                                    safeCall(
-                                        debug.getinfo,
-                                        callback,
-                                        "S"
-                                    )
-
-                                if infoOk
-                                    and type(info)
-                                        == "table"
-                                then
-
-                                    local source =
-                                        info.source
-
-                                    local signature =
-                                        containsSignature(
-                                            source
-                                        )
-
-                                    if signature then
-
-                                        signatureMatches += 1
-
-                                        addEvidence(
-                                            "connection_"
-                                                .. signature,
-                                            "known instrumentation signature in event connection: "
-                                                .. instance:GetFullName(),
-                                            5,
-                                            "connection"
-                                        )
-
-                                    end
-
-                                end
-
-                            end
-
-                        end
-
-                    end
-
-                end
-
-            end
-
-        end
-
-    end
-
-    log(
-        string.format(
-            "Connections inspected: %d | signatures: %d",
-            inspected,
-            signatureMatches
-        )
-    )
-end
-
---==================================================
--- METAMETHOD CHECK
---==================================================
-
-local function scanMetamethods()
-
-    if not CONFIG.CHECK_METAMETHODS then
-        return
-    end
-
-    local env = getEnvironment()
-
-    if not env then
-        return
-    end
-
-    local getraw =
-        env.getrawmetatable
-
-    if safeType(getraw) ~= "function" then
-        return
-    end
-
-    local ok, mt =
-        safeCall(
-            getraw,
-            game
-        )
-
-    if not ok or type(mt) ~= "table" then
-        return
-    end
-
-    local namecall =
-        rawget(mt, "__namecall")
-
-    if safeType(namecall)
-        ~= "function"
-    then
-        return
-    end
-
-    if type(debug) ~= "table"
-        or type(debug.getinfo)
-            ~= "function"
-    then
-        return
-    end
-
-    local infoOk, info =
-        safeCall(
-            debug.getinfo,
-            namecall,
-            "S"
-        )
-
-    if not infoOk
-        or type(info) ~= "table"
-    then
-        return
-    end
-
-    local source = info.source
-
-    local signature =
-        containsSignature(source)
-
-    if signature then
-
-        State.statistics.signatureMatches += 1
-
-        addEvidence(
-            "namecall_" .. signature,
-            "known instrumentation signature associated with __namecall: "
-                .. signature,
-            5,
-            "metamethod"
-        )
-
-    end
-end
-
---==================================================
--- PROFILE
---==================================================
-
-local function collectProfile()
-
-    return {
-        timestamp = os.clock(),
-
-        capabilities =
-            scanCapabilities(),
-
-        globals =
-            scanGlobals(),
-
-        debug =
-            scanDebug(),
-
-        remotes = {
-            events =
-                #State.remoteInventory.events,
-
-            functions =
-                #State.remoteInventory.functions,
-        },
-    }
-end
-
---==================================================
--- PROFILE DELTA
---==================================================
-
-local function compareProfiles(old, new)
+local function compareSnapshots(old, new)
 
     if not old then
         return
     end
 
-    local oldCaps =
-        old.capabilities or {}
+    for path, info in pairs(new) do
 
-    local newCaps =
-        new.capabilities or {}
+        if not old[path] then
 
-    for name, enabled in pairs(newCaps) do
+            table.insert(
+                State.changes,
+                {
+                    type = "ADDED",
+                    time = os.clock(),
+                    remote = info,
+                }
+            )
 
-        if enabled
-            and not oldCaps[name]
-        then
-
-            addEvidence(
-                "capability_appeared_" .. name,
-                "new instrumentation capability appeared after baseline: "
-                    .. name,
-                2,
-                "delta"
+            log(
+                "NEW REMOTE:",
+                info.class,
+                info.path
             )
 
         end
 
     end
 
-    local oldGlobals =
-        old.globals or {}
+    for path, info in pairs(old) do
 
-    local newGlobals =
-        new.globals or {}
+        if not new[path] then
 
-    for name in pairs(newGlobals) do
+            table.insert(
+                State.changes,
+                {
+                    type = "REMOVED",
+                    time = os.clock(),
+                    remote = info,
+                }
+            )
 
-        if oldGlobals[name] == nil then
-
-            addEvidence(
-                "global_appeared_" .. name,
-                "new suspicious global appeared after baseline: "
-                    .. name,
-                4,
-                "delta"
+            log(
+                "REMOVED REMOTE:",
+                info.class,
+                info.path
             )
 
         end
 
     end
-
 end
 
 --==================================================
--- DEEP SCAN
+-- REBUILD CATEGORIES
 --==================================================
 
-local function runDeepScan()
+local function rebuildCategories()
 
-    if State.detected then
-        return
+    for category in pairs(State.categories) do
+        table.clear(
+            State.categories[category]
+        )
     end
 
-    State.scans.deep += 1
+    for _, remote in pairs(State.remotes) do
 
-    log(
-        "Starting deep scan #"
-            .. State.scans.deep
-    )
+        local category =
+            remote.category
 
-    local previous =
-        State.currentProfile
+        if not State.categories[category] then
+            category = "unknown"
+        end
 
-    local current =
-        collectProfile()
+        table.insert(
+            State.categories[category],
+            remote
+        )
 
-    compareProfiles(
-        previous,
-        current
-    )
-
-    State.currentProfile =
-        current
-
-    State.baseline =
-        State.baseline or current
+    end
 end
 
 --==================================================
--- LIGHT SCAN
+-- SCAN
 --==================================================
 
-local function runLightScan()
+local function scan()
 
-    if State.detected then
-        return
-    end
+    State.scanCount += 1
 
-    State.scans.light += 1
+    local snapshot =
+        makeSnapshot()
 
-    local profile = {
-        timestamp = os.clock(),
-        capabilities =
-            scanCapabilities(),
-        globals =
-            scanGlobals(),
-    }
-
-    compareProfiles(
-        State.currentProfile,
-        profile
+    compareSnapshots(
+        State.previous,
+        snapshot
     )
 
-    State.currentProfile =
-        profile
-end
+    State.remotes =
+        snapshot
 
---==================================================
--- FULL INITIAL SCAN
---==================================================
+    State.previous =
+        snapshot
 
-local function runInitialScan()
-
-    log("Starting initial security scan.")
-
-    scanCapabilities()
-    scanGlobals()
-    scanDebug()
-    scanRemotes()
-    scanMetamethods()
-
-    if CONFIG.ENABLE_DEEP_SCANS then
-        scanRegistry()
-        scanGC()
-        scanConnections()
-    end
-
-    State.currentProfile =
-        collectProfile()
-
-    State.baseline =
-        State.currentProfile
+    rebuildCategories()
 
     log(
         string.format(
-            "Initial scan complete | score=%d | confidence=%s",
-            State.score,
-            State.confidence
+            "Scan #%d | %d remotes",
+            State.scanCount,
+            #(
+                (function()
+                    local n = 0
+                    for _ in pairs(snapshot) do
+                        n += 1
+                    end
+                    return {n}
+                end)()
+            )
         )
     )
 end
@@ -1151,116 +345,162 @@ end
 -- REPORT
 --==================================================
 
-local function getReport()
+local function printCategory(category)
 
-    local evidence = {}
+    local list =
+        State.categories[category]
 
-    for id, data in pairs(State.evidence) do
+    if not list or #list == 0 then
+        return
+    end
 
-        evidence[id] = {
-            points = data.points,
-            category = data.category,
-            description = data.description,
-            timestamp = data.timestamp,
-        }
+    print("")
+    print(
+        "------ "
+        .. category:upper()
+        .. " ------"
+    )
+
+    for i, remote in ipairs(list) do
+
+        print(
+            string.format(
+                "[%d] %s | %s",
+                i,
+                remote.class,
+                remote.path
+            )
+        )
+
+    end
+end
+
+local function report()
+
+    local counts = {}
+
+    for category, list in pairs(
+        State.categories
+    ) do
+
+        counts[category] =
+            #list
 
     end
 
-    return {
-        detected = State.detected,
+    print("")
+    print("==========================================")
+    print("       BLACK-BOX SECURITY REPORT")
+    print("==========================================")
 
-        score = State.score,
+    print(
+        "Player:",
+        LocalPlayer
+            and LocalPlayer.Name
+            or "unknown"
+    )
 
-        confidence =
-            State.confidence,
+    print(
+        "Scans:",
+        State.scanCount
+    )
 
-        scans = table.clone(
-            State.scans
-        ),
+    print("")
+    print("CATEGORY COUNTS")
 
-        statistics =
-            table.clone(
-                State.statistics
-            ),
+    for category, count in pairs(counts) do
 
-        evidence = evidence,
+        print(
+            string.format(
+                "  %-12s %d",
+                category,
+                count
+            )
+        )
 
-        reasons =
-            table.clone(
-                State.reasons
-            ),
+    end
 
-        remoteInventory = {
-            events =
-                table.clone(
-                    State.remoteInventory.events
-                ),
+    if CONFIG.SHOW_ALL then
 
-            functions =
-                table.clone(
-                    State.remoteInventory.functions
-                ),
-        },
+        printCategory("vehicle")
+        printCategory("trade")
+        printCategory("inventory")
+        printCategory("purchase")
+        printCategory("reward")
+        printCategory("currency")
+        printCategory("player")
+        printCategory("unknown")
 
-        incidents =
-            table.clone(
-                State.incidents
-            ),
-    }
+    end
+
+    print("")
+    print(
+        "Detected tree changes:",
+        #State.changes
+    )
+
+    print("==========================================")
 end
 
 --==================================================
 -- PUBLIC API
 --==================================================
 
-_G.__AdvancedSecurityDetector = {
+_G.__BlackBoxRecon = {
 
-    IsDetected = function()
-        return State.detected
+    Scan = function()
+        scan()
     end,
 
-    GetScore = function()
-        return State.score
+    Report = function()
+        report()
     end,
 
-    GetConfidence = function()
-        return State.confidence
+    GetRemotes = function()
+        return State.remotes
     end,
 
-    GetReasons = function()
-        return table.clone(
-            State.reasons
-        )
+    GetCategory = function(category)
+        return State.categories[category]
     end,
 
-    GetEvidence = function()
-        return table.clone(
-            State.evidence
-        )
+    GetChanges = function()
+        return State.changes
     end,
 
-    GetReport = function()
-        return getReport()
-    end,
+    Find = function(term)
 
-    GetRemoteInventory = function()
-        return {
-            events =
-                table.clone(
-                    State.remoteInventory.events
-                ),
+        term =
+            tostring(term):lower()
 
-            functions =
-                table.clone(
-                    State.remoteInventory.functions
-                ),
-        }
-    end,
+        local results = {}
 
-    Rescan = function()
-        if not State.detected then
-            runDeepScan()
+        for _, remote in pairs(
+            State.remotes
+        ) do
+
+            if remote.name:lower():find(
+                term,
+                1,
+                true
+            )
+            or remote.path:lower():find(
+                term,
+                1,
+                true
+            )
+            then
+
+                table.insert(
+                    results,
+                    remote
+                )
+
+            end
+
         end
+
+        return results
     end,
 }
 
@@ -1268,79 +508,24 @@ _G.__AdvancedSecurityDetector = {
 -- START
 --==================================================
 
-log("==============================================")
-log(" ADVANCED SECURITY DETECTOR")
-log(" Starting...")
-log("==============================================")
+log("Starting black-box reconnaissance...")
 
-runInitialScan()
+scan()
 
-if CONFIG.PERIODIC_SCAN then
+report()
 
-    task.spawn(function()
+task.spawn(function()
 
-        local deepTimer = 0
+    while true do
 
-        while not State.detected do
-
-            task.wait(
-                CONFIG.LIGHT_SCAN_INTERVAL
-            )
-
-            if State.detected then
-                break
-            end
-
-            runLightScan()
-
-            deepTimer +=
-                CONFIG.LIGHT_SCAN_INTERVAL
-
-            if CONFIG.ENABLE_DEEP_SCANS
-                and deepTimer
-                    >= CONFIG.DEEP_SCAN_INTERVAL
-            then
-
-                deepTimer = 0
-
-                runDeepScan()
-
-            end
-
-        end
-
-    end)
-
-end
-
-task.defer(function()
-
-    task.wait(1)
-
-    if State.detected then
-
-        warn(
-            string.format(
-                "%s DETECTED | score=%d | confidence=%s",
-                PREFIX,
-                State.score,
-                State.confidence
-            )
+        task.wait(
+            CONFIG.SCAN_INTERVAL
         )
 
-    else
-
-        print(
-            string.format(
-                "%s No strong evidence | score=%d | confidence=%s",
-                PREFIX,
-                State.score,
-                State.confidence
-            )
-        )
+        scan()
 
     end
 
 end)
 
-return State
+log("Recon active.")
