@@ -1,40 +1,79 @@
-local Players = game:GetService("Players")
+-- SPINNER BLACK-BOX AUDITOR
+-- Put in StarterPlayerScripts as a LocalScript.
+-- Observation only.
+
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local function scan(root, label)
-    print("\n========== " .. label .. " ==========")
+local KEYWORDS = {
+    "spin",
+    "spinner",
+    "reward",
+    "prize",
+    "claim",
+    "free",
+    "standard",
+    "hyper",
+}
 
-    local count = 0
+local function interesting(name)
+    name = name:lower()
 
-    for _, obj in ipairs(root:GetDescendants()) do
-        local class = obj.ClassName
-        local name = obj.Name:lower()
-
-        if name:find("car")
-        or name:find("vehicle")
-        or name:find("inventory")
-        or name:find("garage")
-        or name:find("owned")
-        or name:find("collection")
-        or class == "Folder"
-        or class == "Value"
-        or class:find("Value") then
-
-            count += 1
-
-            print(
-                string.format(
-                    "[%d] %s | %s",
-                    count,
-                    class,
-                    obj:GetFullName()
-                )
-            )
+    for _, keyword in ipairs(KEYWORDS) do
+        if name:find(keyword, 1, true) then
+            return true
         end
     end
 
-    print("Objects discovered:", count)
+    return false
 end
 
-scan(Players.LocalPlayer, "LOCAL PLAYER")
-scan(ReplicatedStorage, "REPLICATED STORAGE")
+local function scan()
+    print("================================")
+    print("[SPIN-AUDIT] CLIENT SCAN")
+    print("================================")
+
+    local count = 0
+
+    for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
+
+        if (obj:IsA("RemoteEvent")
+            or obj:IsA("RemoteFunction"))
+            and interesting(obj.Name)
+        then
+
+            count += 1
+
+            print(string.format(
+                "[%03d] %s | %s",
+                count,
+                obj.ClassName,
+                obj:GetFullName()
+            ))
+        end
+    end
+
+    print("--------------------------------")
+    print("Spinner-related remotes:", count)
+    print("================================")
+end
+
+scan()
+
+-- Detect newly-created spinner-related remotes.
+ReplicatedStorage.DescendantAdded:Connect(function(obj)
+
+    if not (
+        obj:IsA("RemoteEvent")
+        or obj:IsA("RemoteFunction")
+    ) then
+        return
+    end
+
+    if interesting(obj.Name) then
+        warn(
+            "[SPIN-AUDIT] NEW REMOTE:",
+            obj.ClassName,
+            obj:GetFullName()
+        )
+    end
+end)
